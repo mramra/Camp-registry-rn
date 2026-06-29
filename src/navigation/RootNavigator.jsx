@@ -9,6 +9,7 @@ import { View, ActivityIndicator, Text, StyleSheet } from 'react-native'
 import { useAuth } from '../context/AuthContext'
 import LoginScreen from '../screens/LoginScreen'
 import DashboardScreen from '../screens/DashboardScreen'
+import FamiliesScreen from '../screens/FamiliesScreen'
 import { colors } from '../theme'
 
 const Stack = createNativeStackNavigator()
@@ -31,7 +32,10 @@ export default function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          <>
+            <Stack.Screen name="Dashboard" component={DashboardScreen} />
+            <Stack.Screen name="Families" component={FamiliesScreen} />
+          </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />
         )}

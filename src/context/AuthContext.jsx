@@ -1,0 +1,211 @@
+/**
+ * AuthContext.jsx — المصادقة + الأدوار + الصلاحيات + معاينة المستخدمين
+ * منقول حرفياً من camp-registry-react/src/context/AuthContext.jsx
+ *
+ * التكييفات لـ React Native (لا تغيير في منطق الأعمال):
+ *   - localStorage (غير موجود في RN) → AsyncStorage (async، فاستُبدلت كل قراءة/كتابة بـ await)
+ *   - navigator.onLine → isOnlineNow() من db.js
+ *   - checkDeviceApproval تستخدم await داخلياً الآن (getDeviceFingerprint أصبحت async)،
+ *     وهذا لا يغيّر السلوك الظاهر لـ signIn لأنها كانت مُستدعاة بـ await من الأساس
+ */
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { ORG_ID, supabase, checkDeviceApproval, isOnlineNow } from '../lib/db'
+import { hasPermission, hasPagePermission, loadPagePermissions, canAccessPageSync } from '../lib/permissions'
+
+const AuthContext = createContext(null)
+const PROFILE_KEY = 'camp_profile'
+const SUPA_URL    = 'https://ojclpkenecicujkqhhlu.supabase.co'
+
+// وظيفة مساعدة: أي promise مع timeout
+function withTimeout(promise, ms, msg) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(msg)), ms))
+  ])
+}
+
+export function AuthProvider({ children }) {
+  const [user,      setUser]      = useState(null)
+  const [profile,   setProfile]   = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const [mustChange,setMustChange]= useState(false)
+  const [previewAs, setPreviewAs] = useState(null)
+  const [pagePermRows, setPagePermRows] = useState([])
+  const [pagePermLoaded, setPagePermLoaded] = useState(false)
+  // أثناء signIn نتولى تحديث user/profile يدوياً بعد اكتمال فحص الجهاز فقط — هذا الـ ref
+  // يجعل مستمع onAuthStateChange يتجاهل حدث "تم تسجيل الدخول" الذي يُطلقه Supabase تلقائياً
+  // فور نجاح المصادقة، فلا يُفتح التطبيق (ولو لجزء من الثانية) قبل أن نقرر اعتماد الجهاز.
+  const suppressAuthEvents = useRef(false)
+
+  useEffect(() => { initAuth() }, [])
+
+  async function initAuth() {
+    // ① استخدم الكاش فوراً
+    try {
+      const cached = await AsyncStorage.getItem(PROFILE_KEY)
+      if (cached) {
+        setProfile(JSON.parse(cached))
+        setLoading(false)
+      }
+    } catch (e) { console.warn('[auth] قراءة الكاش المحلي فشلت:', e.message) }
+
+    // ② تحقق من الجلسة مع timeout
+    try {
+      const { data: { session } } = await withTimeout(
+        supabase.auth.getSession(),
+        6000, 'timeout'
+      )
+      if (session?.user) {
+        setUser(session.user)
+        fetchProfile(session.user.id)
+      } else {
+        await AsyncStorage.removeItem(PROFILE_KEY)
+        setProfile(null)
+        setLoading(false)
+      }
+    } catch {
+      // timeout أو أوف لاين — استخدم الكاش
+      const cached = await AsyncStorage.getItem(PROFILE_KEY)
+      if (!cached) setLoading(false)
+    }
+
+    // ③ مراقبة تغييرات الجلسة
+    supabase.auth.onAuthStateChange((_ev, session) => {
+      if (suppressAuthEvents.current) return // signIn تتولى تحديث الحالة يدوياً بعد فحص الجهاز
+      if (session?.user) {
+        setUser(session.user)
+        fetchProfile(session.user.id)
+      } else {
+        setUser(null); setProfile(null)
+        AsyncStorage.removeItem(PROFILE_KEY)
+        setLoading(false)
+      }
+    })
+  }
+
+  async function fetchProfile(userId) {
+    if (!isOnlineNow()) { setLoading(false); setPagePermLoaded(true); return }
+    try {
+      const { data: members, error } = await withTimeout(
+        supabase.from('org_members').select('*')
+          .eq('user_id', userId).eq('org_id', ORG_ID).limit(1),
+        10000, 'profile_timeout'
+      )
+      const p = members?.[0]
+      if (!error && p) {
+        setProfile(p)
+        await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(p))
+        const { data: meta } = await supabase.auth.getUser()
+        setMustChange(!!(meta?.user?.user_metadata?.must_change_pass))
+        // حمّل صلاحيات الصفحات (دور + استثناءات فردية) — لا تعيق تحميل الصفحة
+        loadPagePermissions().then(rows => { setPagePermRows(rows); setPagePermLoaded(true) }).catch(() => setPagePermLoaded(true))
+      } else {
+        setPagePermLoaded(true) // لا بروفايل — لا حاجة لانتظار صلاحيات
+      }
+    } catch {
+      setPagePermLoaded(true) // فشل/timeout — لا تُبقِ الحماية بانتظار أبدي
+    }
+    setLoading(false)
+  }
+
+  async function signIn(nationalId, password) {
+    const email = `${nationalId}@c.co`
+
+    // أيقظ Supabase أولاً (ping خفيف)
+    try {
+      await withTimeout(
+        fetch(`${SUPA_URL}/auth/v1/health`),
+        3000, 'ping_timeout'
+      )
+    } catch (e) { console.warn('[auth] ping الإيقاظ فشل (غير حرج):', e.message) }
+
+    // عُلِّق مستمع الجلسة — لن يتفاعل مع حدث "تم الدخول" الذي يُطلقه Supabase تلقائياً
+    // الآن؛ نحن من سنقرر صراحة تثبيت user/profile، وفقط لو اعتُمد الجهاز.
+    suppressAuthEvents.current = true
+    try {
+      // تسجيل الدخول مع timeout 20 ثانية
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        20000,
+        'انتهت مهلة الاتصال (20 ثانية)\n\nتحقق من اتصالك بالإنترنت وحاول مرة أخرى'
+      )
+      if (error) throw error
+
+      // فحص اعتماد الجهاز فوراً بعد نجاح المصادقة — قبل أي تحديث لحالة التطبيق.
+      // لو الجهاز محجوب (بانتظار موافقة أو محظور): سجّل خروج فوراً وأرمِ خطأ مخصصاً
+      // يحمل التفاصيل ليعرضها LoginScreen برسالة واضحة — user/profile لم يُلمَسا بعد إطلاقاً.
+      let profileRow = null
+      try {
+        const { data: members } = await supabase.from('org_members')
+          .select('*').eq('user_id', data.user.id).eq('org_id', ORG_ID).limit(1)
+        profileRow = members?.[0] || null
+        if (profileRow) {
+          const deviceCheck = await checkDeviceApproval(data.user.id, profileRow)
+          if (!deviceCheck.ok) {
+            await supabase.auth.signOut().catch(() => {})
+            const err = new Error('DEVICE_NOT_APPROVED')
+            err.deviceStatus = { status: deviceCheck.status, role: deviceCheck.role }
+            throw err
+          }
+        }
+      } catch (e) {
+        if (e.deviceStatus) throw e // أعد رمي خطأ فحص الجهاز كما هو — يوقف الدخول
+        console.warn('[auth] فحص اعتماد الجهاز فشل (غير حرج، نسمح بالدخول):', e.message)
+      }
+
+      // الجهاز معتمَد (أو تعذّر الفحص لخلل مؤقت) — الآن فقط نُفعِّل حالة التطبيق فعلياً،
+      // عبر fetchProfile نفسها المستخدمة لاستعادة الجلسة (بدون تكرار منطق تثبيت البروفايل).
+      setUser(data.user)
+      await fetchProfile(data.user.id)
+
+      return data
+    } finally {
+      suppressAuthEvents.current = false
+    }
+  }
+
+  async function signOut() {
+    await AsyncStorage.removeItem(PROFILE_KEY)
+    try { await supabase.auth.signOut() } catch (e) { console.warn('[auth] signOut من السيرفر فشل (محلياً تم تسجيل الخروج):', e.message) }
+  }
+
+  const effectiveProfile = previewAs || profile
+  const role = effectiveProfile?.role
+  const isOwner        = role === 'platform_owner'
+  const isSuperAdmin   = role === 'super_admin' || isOwner
+  const isCampDelegate = role === 'camp_delegate' || isSuperAdmin
+  const isAssistant    = role === 'assistant'
+
+  // صلاحيات مبنية على permissions.js
+  const can = (action) => hasPermission(effectiveProfile, action)
+  const canPage = (pageKey, op='view') => hasPagePermission(effectiveProfile, pageKey, op)
+  const canWrite  = can('write')
+  const canEdit   = can('edit')
+  const canDelete = can('delete')
+  const canExport = can('export')
+  const canImport = can('import')
+  // فحص صلاحية صفحة معيّنة بمنطق الأولوية (استثناء مستخدم > دور > افتراضي)
+  const canAccessPageNow = (pageKey) => canAccessPageSync(effectiveProfile, pageKey, pagePermRows)
+
+  const value = {
+    user, profile: effectiveProfile, effectiveProfile, realProfile: profile,
+    loading, mustChange, setMustChange, previewAs, setPreviewAs,
+    isPreviewMode: !!previewAs,
+    role, isOwner, isSuperAdmin, isCampDelegate, isAssistant,
+    canWrite, canEdit, canDelete, canExport, canImport,
+    can, canPage,
+    pagePermRows, pagePermLoaded, canAccessPageNow,
+    refetchPagePermissions: () => loadPagePermissions().then(setPagePermRows),
+    signIn, signOut,
+    refetchProfile: () => user && fetchProfile(user.id),
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be inside AuthProvider')
+  return ctx
+}

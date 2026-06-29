@@ -1,0 +1,25 @@
+# EAS Workflow: نشر تحديث فوري (OTA) تلقائياً عند كل push لفرع main
+#
+# لماذا هذا الملف موجود:
+# تشغيل eas update من بيئة Claude محجوب (شبكة الـ sandbox لا تسمح بالوصول
+# لـ api.expo.dev). الحل: نجعل expo.dev نفسه يشغّل التحديث على سيرفراته
+# الخاصة، فور استقبال push جديد على GitHub — لا حاجة لأي CLI خارجي.
+#
+# الشرط: يجب ربط هذا المستودع بمشروع Expo من صفحة GitHub في إعدادات
+# المشروع على expo.dev (Project settings > GitHub) — تم هذا الربط بالفعل.
+#
+# النتيجة: أي تعديل JS/واجهة يُرفع على main يصل لكل الأجهزة المثبت عليها
+# نسخة preview تلقائياً، دون إعادة تثبيت APK.
+
+name: نشر تحديث فوري على preview
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  publish_update:
+    name: نشر التحديث
+    type: update
+    params:
+      channel: preview
+      message: ${{ github.event.head_commit.message }}

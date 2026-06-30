@@ -82,6 +82,15 @@ export default function DashboardScreen() {
         <Text style={styles.navCardArrow}>←</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('Distributions')} activeOpacity={0.8}>
+        <Text style={styles.navCardIcon}>📦</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.navCardTitle}>التوزيعات</Text>
+          <Text style={styles.navCardSubtitle}>توزيع المساعدات وتتبع المستلمين</Text>
+        </View>
+        <Text style={styles.navCardArrow}>←</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
         <Text style={styles.signOutText}>تسجيل الخروج</Text>
       </TouchableOpacity>

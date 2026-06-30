@@ -8,6 +8,16 @@
 # الشرط: يجب ربط هذا المستودع بمشروع Expo من صفحة GitHub في إعدادات
 # المشروع على expo.dev (Project settings > GitHub) — تم هذا الربط بالفعل.
 #
+# ⚠️ إصلاح حرج (30 يونيو 2026): الـ job من نوع type:update له حقل منفصل
+# اسمه "environment" (مختلف تماماً عن "channel" داخل params)، وقيمته
+# الافتراضية production إن لم تُحدَّد صراحة — راجع توثيق Expo الرسمي:
+# https://docs.expo.dev/eas/workflows/pre-packaged-jobs/
+# هذا كان يجعل كل التحديثات تُنشر فعلياً تحت environment=production رغم
+# أن channel=preview، فلا يصل أي تحديث للـ APK المبني بـ profile=preview.
+# تم تأكيد هذا فعلياً من واجهة expo.dev (قسم Jobs أظهر "{x} production"
+# صراحة رغم channel: preview في هذا الملف). الإصلاح: تحديد environment:
+# preview صراحة، ليطابق بروفايل البناء (eas.json → build.preview).
+#
 # النتيجة: أي تعديل JS/واجهة يُرفع على main يصل لكل الأجهزة المثبت عليها
 # نسخة preview تلقائياً، دون إعادة تثبيت APK.
 
@@ -20,6 +30,7 @@ jobs:
   publish_update:
     name: نشر التحديث
     type: update
+    environment: preview
     params:
       channel: preview
       message: ${{ github.event.head_commit.message }}

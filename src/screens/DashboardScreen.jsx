@@ -64,6 +64,15 @@ export default function DashboardScreen() {
         <Text style={styles.navCardArrow}>←</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('Movements')} activeOpacity={0.8}>
+        <Text style={styles.navCardIcon}>🚶</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.navCardTitle}>حركات الأسر</Text>
+          <Text style={styles.navCardSubtitle}>دخول، خروج، ونقل بين المخيمات</Text>
+        </View>
+        <Text style={styles.navCardArrow}>←</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
         <Text style={styles.signOutText}>تسجيل الخروج</Text>
       </TouchableOpacity>

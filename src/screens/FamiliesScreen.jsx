@@ -38,6 +38,7 @@ import EmptyState      from '../components/ui/EmptyState'
 import Modal           from '../components/ui/Modal'
 import Badge           from '../components/ui/Badge'
 import FilterChips     from '../components/ui/FilterChips'
+import SafeScreen       from '../components/ui/SafeScreen'
 import FamilyDetails   from '../components/families/FamilyDetails'
 import { colors, radius } from '../theme'
 
@@ -292,6 +293,7 @@ export default function FamiliesScreen() {
   // ════════════════════════════════════════════════════════════
 
   return (
+    <SafeScreen>
     <View style={styles.screen}>
       {/* الرأس والبحث والفلاتر */}
       <View style={styles.header}>
@@ -436,6 +438,7 @@ export default function FamiliesScreen() {
         )}
       </Modal>
     </View>
+    </SafeScreen>
   )
 }
 

@@ -17,6 +17,7 @@ import {
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext'
 import { NEXT_DEVICE_APPROVER } from '../lib/db'
+import SafeScreen from '../components/ui/SafeScreen'
 import { colors, radius } from '../theme'
 
 export default function LoginScreen() {
@@ -91,6 +92,7 @@ export default function LoginScreen() {
     styles.msgInfo
 
   return (
+    <SafeScreen>
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -173,6 +175,7 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeScreen>
   )
 }
 

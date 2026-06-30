@@ -10,6 +10,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext'
 import { ROLE_LABELS, ROLE_COLORS } from '../lib/permissions'
+import SafeScreen from '../components/ui/SafeScreen'
 import { colors, radius } from '../theme'
 
 export default function DashboardScreen() {
@@ -17,6 +18,7 @@ export default function DashboardScreen() {
   const navigation = useNavigation()
 
   return (
+    <SafeScreen>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.greeting}>🏕️ نبض المخيم</Text>
@@ -57,6 +59,7 @@ export default function DashboardScreen() {
         <Text style={styles.signOutText}>تسجيل الخروج</Text>
       </TouchableOpacity>
     </ScrollView>
+    </SafeScreen>
   )
 }
 

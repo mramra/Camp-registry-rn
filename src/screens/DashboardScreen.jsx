@@ -55,6 +55,15 @@ export default function DashboardScreen() {
         <Text style={styles.navCardArrow}>←</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('Camps')} activeOpacity={0.8}>
+        <Text style={styles.navCardIcon}>⛺</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.navCardTitle}>إدارة المخيمات</Text>
+          <Text style={styles.navCardSubtitle}>المخيمات الرئيسية والفروع</Text>
+        </View>
+        <Text style={styles.navCardArrow}>←</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
         <Text style={styles.signOutText}>تسجيل الخروج</Text>
       </TouchableOpacity>

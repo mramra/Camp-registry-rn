@@ -10,7 +10,7 @@
  *   options — [{ value, label }] قائمة الخيارات
  */
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
-import { colors, radius } from '../../theme'
+import { colors } from '../../theme'
 
 export default function FilterChips({ label, value, onChange, options }) {
   return (

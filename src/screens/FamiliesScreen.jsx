@@ -30,7 +30,7 @@ import {
   visibleFamilies, isOnlineNow,
 } from '../lib/db'
 import {
-  calcAge, checkFamilyIssues, isIncomplete,
+  checkFamilyIssues, isIncomplete,
   getMembers, isAgeInRange,
 } from '../lib/helpers'
 import PageHeader      from '../components/ui/PageHeader'

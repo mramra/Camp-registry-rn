@@ -22,7 +22,7 @@ export default function DashboardScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.greeting}>🏕️ نبض المخيم</Text>
-        <Text style={styles.welcome}>أهلاً {profile?.full_name || '—'} 🧪 [اختبار تحديث v1]</Text>
+        <Text style={styles.welcome}>أهلاً {profile?.full_name || '—'}</Text>
         <View style={[styles.roleBadge, { borderColor: ROLE_COLORS[role] || colors.muted }]}>
           <Text style={[styles.roleText, { color: ROLE_COLORS[role] || colors.muted }]}>
             {ROLE_LABELS[role] || role || '—'}

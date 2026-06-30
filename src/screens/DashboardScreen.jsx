@@ -73,6 +73,15 @@ export default function DashboardScreen() {
         <Text style={styles.navCardArrow}>←</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('SMS')} activeOpacity={0.8}>
+        <Text style={styles.navCardIcon}>💬</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.navCardTitle}>إرسال رسائل SMS</Text>
+          <Text style={styles.navCardSubtitle}>رسائل جماعية للأسر</Text>
+        </View>
+        <Text style={styles.navCardArrow}>←</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
         <Text style={styles.signOutText}>تسجيل الخروج</Text>
       </TouchableOpacity>

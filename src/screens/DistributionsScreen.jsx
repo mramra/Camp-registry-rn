@@ -18,6 +18,7 @@ import { ORG_ID, supabase, isOnlineNow } from '../lib/db'
 import { generateId } from '../lib/utils'
 import PageHeader from '../components/ui/PageHeader'
 import EmptyState from '../components/ui/EmptyState'
+import Select     from '../components/ui/Select'
 import SafeScreen   from '../components/ui/SafeScreen'
 import DistributionCard from '../components/distributions/DistributionCard'
 import DistributionForm from '../components/distributions/DistributionForm'
@@ -27,6 +28,14 @@ import { colors, radius } from '../theme'
 const EMPTY_FORM = {
   name: '', type: 'general', camp_id: '', quantity: '',
   date: new Date().toISOString().split('T')[0],
+}
+
+// نفس الحالات الأربع من camp-registry-react الأصلي (الجولات، لا الدفعات)
+const STATUS_MAP = {
+  draft:     { label: 'مسودة' },
+  active:    { label: 'نشط' },
+  completed: { label: 'مكتمل' },
+  cancelled: { label: 'ملغي' },
 }
 
 export default function DistributionsScreen() {
@@ -39,18 +48,24 @@ export default function DistributionsScreen() {
   const [form,         setForm]         = useState(EMPTY_FORM)
   const [saving,       setSaving]       = useState(false)
   const [openDist,     setOpenDist]     = useState(null) // التوزيع المفتوح حالياً للتفاصيل
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterCamp,   setFilterCamp]   = useState('')
 
   const { canWrite, isOwner } = useAuth()
   const { getVisibleCamps } = useDataScope()
   const { showToast } = useApp()
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [filterStatus, filterCamp])
 
   async function load() {
     setLoading(true)
     try {
+      let q = supabase.from('dist_rounds').select('*').eq('org_id', ORG_ID)
+      if (filterStatus) q = q.eq('status', filterStatus)
+      if (filterCamp)   q = q.eq('camp_id', filterCamp)
+
       const [{ data: distsData }, { data: campsData }] = await Promise.all([
-        supabase.from('dist_rounds').select('*').eq('org_id', ORG_ID).order('created_at', { ascending: false }),
+        q.order('created_at', { ascending: false }),
         supabase.from('camps').select('*').eq('org_id', ORG_ID),
       ])
       const visibleCamps = getVisibleCamps(campsData || [])
@@ -110,7 +125,7 @@ export default function DistributionsScreen() {
         type: form.type,
         camp_id: form.camp_id || null,
         quantity: form.quantity ? parseInt(form.quantity) : null,
-        status: 'active',
+        status: editDist?.status || 'draft',
         created_at: form.date ? new Date(form.date).toISOString() : new Date().toISOString(),
       }
 
@@ -194,6 +209,26 @@ export default function DistributionsScreen() {
           }
         />
 
+        {/* الفلاتر */}
+        <View style={styles.filterRow}>
+          <View style={styles.filterCol}>
+            <Select
+              value={filterStatus}
+              onChange={setFilterStatus}
+              placeholder="كل الحالات"
+              options={Object.entries(STATUS_MAP).map(([k, v]) => ({ value: k, label: v.label }))}
+            />
+          </View>
+          <View style={styles.filterCol}>
+            <Select
+              value={filterCamp}
+              onChange={setFilterCamp}
+              placeholder="كل المخيمات"
+              options={camps.map(c => ({ value: c.id, label: c.name }))}
+            />
+          </View>
+        </View>
+
         {loading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={colors.accent} size="large" />
@@ -243,6 +278,8 @@ const styles = StyleSheet.create({
   },
   addBtn: { backgroundColor: colors.accent, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 8 },
   addBtnText: { color: colors.bg, fontWeight: '900', fontSize: 13 },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  filterCol: { flex: 1 },
   loadingWrap: { paddingVertical: 60, alignItems: 'center' },
   list: { gap: 8 },
 })

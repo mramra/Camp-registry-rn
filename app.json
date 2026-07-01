@@ -30,7 +30,7 @@
       "bundler": "metro"
     },
     "experiments": {
-      "baseUrl": "/camp-registry-rn"
+      "baseUrl": "/Camp-registry-rn"
     },
     "extra": {
       "eas": {

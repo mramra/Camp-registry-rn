@@ -91,6 +91,17 @@ export default function DashboardScreen() {
         <Text style={styles.navCardArrow}>←</Text>
       </TouchableOpacity>
 
+      {(isOwner || isSuperAdmin || isCampDelegate) && (
+        <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('Users')} activeOpacity={0.8}>
+          <Text style={styles.navCardIcon}>👥</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.navCardTitle}>إدارة المستخدمين</Text>
+            <Text style={styles.navCardSubtitle}>مديرين، مناديب، مساعدين</Text>
+          </View>
+          <Text style={styles.navCardArrow}>←</Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
         <Text style={styles.signOutText}>تسجيل الخروج</Text>
       </TouchableOpacity>

@@ -173,15 +173,13 @@ export default function DistributionsScreen() {
   if (openDist) {
     return (
       <SafeScreen>
-        <View style={styles.screen}>
-          <View style={styles.content}>
-            <DistributionDetail
-              dist={openDist}
-              allDists={dists}
-              onBack={() => { setOpenDist(null); load() }}
-              canConfirm={canWrite}
-            />
-          </View>
+        <View style={[styles.screen, styles.detailContent]}>
+          <DistributionDetail
+            dist={openDist}
+            allDists={dists}
+            onBack={() => { setOpenDist(null); load() }}
+            canConfirm={canWrite}
+          />
         </View>
       </SafeScreen>
     )
@@ -270,6 +268,7 @@ export default function DistributionsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  detailContent: { paddingHorizontal: 16, paddingTop: 8 },
   content: { paddingHorizontal: 16, paddingBottom: 24 },
   headerActions: { flexDirection: 'row', gap: 8 },
   iconBtn: {

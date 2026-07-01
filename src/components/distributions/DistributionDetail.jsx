@@ -55,7 +55,7 @@ export default function DistributionDetail({ dist, allDists, onBack, canConfirm 
     setLoading(true)
     try {
       const [{ data: fams }, { data: mems }, { data: recv }, { data: campsData }] = await Promise.all([
-        supabase.from('families').select('id,head_name,head_id,camp_id,status,tent,phone1').eq('org_id', ORG_ID).limit(1000),
+        supabase.from('families').select('id,head_name,head_id,camp_id,category_tags,economic_level,tent,phone1').eq('org_id', ORG_ID).limit(1000),
         supabase.from('family_members').select('id,family_id,national_id'),
         supabase.from('camp_dist_families').select('*').eq('distribution_id', dist.id),
         supabase.from('camps').select('id,name'),

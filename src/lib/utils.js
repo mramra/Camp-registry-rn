@@ -4,11 +4,21 @@
  *
  * الفروقات عن نسخة الويب:
  *   - getDeviceFingerprint(): كانت sync مع localStorage، الآن async مع SecureStore
- *     (لأن SecureStore على React Native لا يوفر API متزامن).
- *     كل من يستخدمها يجب أن يستخدم await.
- *   - getDeviceName/getDeviceType: كانت تحلّل navigator.userAgent (غير موجود في RN)،
- *     الآن تعتمد على expo-device مباشرة.
+ *     على أندرويد/iOS (لأن SecureStore لا يوفر API متزامن). كل من يستخدمها
+ *     يجب أن يستخدم await.
+ *   - getDeviceName/getDeviceType: كانت تحلّل navigator.userAgent (متاح فقط
+ *     على الويب)، الآن تعتمد على expo-device على أندرويد/iOS.
+ *
+ * ⚠️ دعم منصة الويب (1 يوليو 2026): expo-secure-store غير مدعومة على الويب
+ * إطلاقاً (isAvailableAsync يُرجع true على أندرويد/iOS فقط حسب توثيق Expo
+ * الرسمي) — استدعاؤها هناك يُرجع Promise معلَّقة بلا حل ولا رفض، فتُعلِّق
+ * تسجيل الدخول بالكامل بصمت (لا خطأ ظاهر، فقط "جاري الدخول" أبدياً).
+ * الحل: تفرّع بحسب Platform.OS — localStorage على الويب (متاح دائماً في
+ * المتصفحات)، SecureStore على أندرويد/iOS كما كان. هذا الفرع مطلوب فقط
+ * لأن هذا المشروع يُصدَّر أيضاً كمعاينة ويب سريعة عبر GitHub Pages
+ * (انظر .github/workflows/deploy-web.yml) بجانب التطبيق الأساسي (APK).
  */
+import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import * as Device from 'expo-device'
 
@@ -57,12 +67,24 @@ export function randomPassword(length = 10) {
 // ════════════════════════════════════════════════════════════
 
 const FINGERPRINT_KEY = 'device_fingerprint'
+const isWeb = Platform.OS === 'web'
 
 /**
- * بصمة ثابتة لهذا الجهاز — تُولَّد مرة واحدة وتبقى مخزَّنة بأمان عبر SecureStore.
- * مهم: هذه الدالة async (خلافاً لنسخة الويب المتزامنة) — استخدم await دائماً.
+ * بصمة ثابتة لهذا الجهاز — تُولَّد مرة واحدة وتبقى مخزَّنة بأمان
+ * (SecureStore على أندرويد/iOS، localStorage على الويب).
+ * مهم: هذه الدالة async دائماً (حتى على الويب، لتوحيد واجهة الاستخدام
+ * وتفادي فروع async/sync متفرقة عند نقاط الاستدعاء) — استخدم await دائماً.
  */
 export async function getDeviceFingerprint() {
+  if (isWeb) {
+    let fp = null
+    try { fp = window.localStorage.getItem(FINGERPRINT_KEY) } catch { /* localStorage غير متاح (نادر) */ }
+    if (!fp) {
+      fp = generateId()
+      try { window.localStorage.setItem(FINGERPRINT_KEY, fp) } catch { /* تجاهل فشل الكتابة */ }
+    }
+    return fp
+  }
   let fp = await SecureStore.getItemAsync(FINGERPRINT_KEY)
   if (!fp) {
     fp = generateId()
@@ -71,8 +93,16 @@ export async function getDeviceFingerprint() {
   return fp
 }
 
-/** اسم وصفي لنظام الجهاز — مبني على expo-device بدل user agent */
+/** اسم وصفي لنظام الجهاز — expo-device على أندرويد/iOS، تحليل بسيط لـ userAgent على الويب */
 export function getDeviceName() {
+  if (isWeb) {
+    try {
+      const ua = navigator.userAgent || ''
+      if (/Android/i.test(ua)) return '🌐 متصفح (أندرويد)'
+      if (/iPhone|iPad|iPod/i.test(ua)) return '🌐 متصفح (iOS)'
+      return '🌐 متصفح ويب'
+    } catch { return '🌐 متصفح ويب' }
+  }
   const brand = Device.brand || ''
   const model = Device.modelName || ''
   if (Device.osName === 'Android') return `🤖 ${brand} ${model}`.trim() || '🤖 Android'
@@ -80,8 +110,13 @@ export function getDeviceName() {
   return '🌐 جهاز غير معروف'
 }
 
-/** نوع الجهاز: mobile أو desktop — في React Native يكون mobile دائماً عملياً (الهواتف والأجهزة اللوحية) */
+/** نوع الجهاز: mobile أو desktop — على الويب نخمّن من userAgent، على أندرويد/iOS mobile دائماً عملياً */
 export function getDeviceType() {
+  if (isWeb) {
+    try {
+      return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '') ? 'mobile' : 'desktop'
+    } catch { return 'desktop' }
+  }
   if (Device.deviceType === Device.DeviceType.DESKTOP) return 'desktop'
   return 'mobile'
 }

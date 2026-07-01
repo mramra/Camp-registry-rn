@@ -45,18 +45,6 @@ export default function DistributionForm({
         />
 
         <View>
-          <Text style={styles.label}>الكمية</Text>
-          <TextInput
-            value={String(form.quantity || '')}
-            onChangeText={v => set('quantity', v)}
-            placeholder="0 = غير محدد"
-            placeholderTextColor={colors.muted}
-            keyboardType="number-pad"
-            style={styles.input}
-          />
-        </View>
-
-        <View>
           <Text style={styles.label}>التاريخ</Text>
           <TextInput
             value={form.date}

@@ -1,16 +1,22 @@
 /**
- * DistributionDetail.jsx — تفاصيل توزيع واحد (المرشَّحون + المستلمون)
- * مستخلص من camp-registry (المستودع القديم) — openDist/applyDistFilter/confirmDistribution
+ * DistributionDetail.jsx — تفاصيل جولة توزيع واحدة (v2 — بدون دفعات)
  *
- * تبسيط متعمد (موثَّق): الأصل به "استبعاد من استلم في أي توزيع آخر من
- * نفس النوع" (sameType check عبر استعلام شامل لكل camp_distributions من
- * نفس النوع) — منطق ثقيل ومكلف. هنا نكتفي باستبعاد من استلم في **هذا
- * التوزيع تحديداً** فقط، وهو الأهم عملياً (منع ازدواجية الاستلام لنفس
- * الدفعة). الاستبعاد الأشمل (نفس النوع عبر كل التوزيعات) يمكن إضافته
- * لاحقاً كميزة منفصلة إذا احتاجها محمود فعلياً.
+ * ⚠️ إعادة كتابة كاملة بناءً على توضيح دقيق من محمود (1 يوليو 2026):
+ * لا يوجد مفهوم "دفعة" منفصلة عن "الجولة" — الجولة نفسها هي وحدة
+ * التوزيع الوحيدة. تم حذف كل منطق camp_distributions (لم يكن مستخدَماً
+ * فعلياً أصلاً — تعريف جدول فقط بدون استدعاءات).
  *
- * تكييف: window.prompt('ملاحظة...') → Alert.prompt (iOS فقط أصلاً في RN؛
- * Android لا يدعم prompt نصي بشكل أصلي) → استُبدل بحقل نصي في الشاشة نفسها.
+ * الفلاتر الأربعة (بالترتيب المتفَق عليه):
+ *   1. مخيم — قائمة منسدلة
+ *   2. جولة سابقة — قائمة منسدلة بكل الجولات الأخرى (عدا الحالية)؛
+ *      عند الاختيار، تُعرض فقط الأسر التي لم تستلم من تلك الجولة تحديداً
+ *      (بغض النظر عن نوعها). لا يوجد مفهوم "منتهية" منفصل — كل الجولات
+ *      الموجودة صالحة للمقارنة فوراً (قرار مبسَّط متفَق عليه).
+ *   3. بحث نصي — بالاسم، هوية رب الأسرة، أو هوية أي فرد من العائلة
+ *   4. ترتيب — أكبر أسرة / رقم خيمة / أبجدي تصاعدي
+ *
+ * التحديد جماعي (checkbox متعدد) + زر حفظ واحد يسجّل الكل دفعة واحدة،
+ * وقابل للتعديل لاحقاً (إلغاء استلام فردي من تبويب "استلموا").
  */
 import { useState, useEffect, useMemo } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native'
@@ -20,35 +26,37 @@ import Select from '../ui/Select'
 import { colors, radius } from '../../theme'
 
 const SORT_OPTIONS = [
-  { value: 'priority',      label: '🔴 الأولوية أولاً' },
-  { value: 'alpha',         label: '🔤 أبجدي' },
-  { value: 'members_desc',  label: '👨‍👩‍👧 أكبر أسرة أولاً' },
-  { value: 'members_asc',   label: '👤 أصغر أسرة أولاً' },
-  { value: 'tent_asc',      label: '🏠 رقم خيمة تصاعدي' },
+  { value: 'members_desc', label: '👨‍👩‍👧 أكبر أسرة أولاً' },
+  { value: 'tent_asc',     label: '🏠 رقم خيمة تصاعدي' },
+  { value: 'alpha',        label: '🔤 أبجدي تصاعدي' },
 ]
 
-export default function DistributionDetail({ dist, onBack, canConfirm }) {
+export default function DistributionDetail({ dist, allDists, onBack, canConfirm }) {
   const [tab,        setTab]        = useState('pending') // pending | received
   const [families,   setFamilies]   = useState([])
   const [members,    setMembers]    = useState([])
-  const [receivedRecords, setReceivedRecords] = useState([])
+  const [receivedRecords,     setReceivedRecords]     = useState([]) // استلام هذه الجولة
+  const [otherRoundReceived,  setOtherRoundReceived]  = useState([]) // استلام الجولة المقارَنة (فلتر 2)
   const [camps,      setCamps]      = useState({})
   const [loading,    setLoading]    = useState(true)
-  const [sortMode,   setSortMode]   = useState('priority')
+  const [sortMode,   setSortMode]   = useState('members_desc')
+  const [filterCamp, setFilterCamp] = useState('')
+  const [filterPrevRound, setFilterPrevRound] = useState('')
+  const [search,     setSearch]     = useState('')
   const [selected,   setSelected]   = useState(new Set())
-  const [note,       setNote]       = useState('')
   const [confirming, setConfirming] = useState(false)
 
   const { showToast } = useApp()
 
   useEffect(() => { load() }, [dist.id])
+  useEffect(() => { loadOtherRoundReceived() }, [filterPrevRound])
 
   async function load() {
     setLoading(true)
     try {
       const [{ data: fams }, { data: mems }, { data: recv }, { data: campsData }] = await Promise.all([
         supabase.from('families').select('id,head_name,head_id,camp_id,status,tent,phone1').eq('org_id', ORG_ID).limit(1000),
-        supabase.from('family_members').select('id,family_id'),
+        supabase.from('family_members').select('id,family_id,national_id'),
         supabase.from('camp_dist_families').select('*').eq('distribution_id', dist.id),
         supabase.from('camps').select('id,name'),
       ])
@@ -63,7 +71,19 @@ export default function DistributionDetail({ dist, onBack, canConfirm }) {
     }
   }
 
-  const receivedIds = useMemo(() => new Set(receivedRecords.map(r => r.family_id)), [receivedRecords])
+  async function loadOtherRoundReceived() {
+    if (!filterPrevRound) { setOtherRoundReceived([]); return }
+    try {
+      const { data } = await supabase.from('camp_dist_families')
+        .select('family_id').eq('distribution_id', filterPrevRound)
+      setOtherRoundReceived(data || [])
+    } catch (e) {
+      showToast('فشل تحميل بيانات الجولة السابقة: ' + e.message, true)
+    }
+  }
+
+  const receivedIds      = useMemo(() => new Set(receivedRecords.map(r => r.family_id)), [receivedRecords])
+  const otherReceivedIds = useMemo(() => new Set(otherRoundReceived.map(r => r.family_id)), [otherRoundReceived])
 
   const memberCountMap = useMemo(() => {
     const map = {}
@@ -71,19 +91,40 @@ export default function DistributionDetail({ dist, onBack, canConfirm }) {
     return map
   }, [members])
 
+  /** خريطة family_id → كل أرقام الهويات المرتبطة (رب الأسرة + كل الأفراد) — للبحث */
+  const idsByFamily = useMemo(() => {
+    const map = {}
+    families.forEach(f => { map[f.id] = f.head_id ? [f.head_id] : [] })
+    members.forEach(m => {
+      if (m.national_id) {
+        if (!map[m.family_id]) map[m.family_id] = []
+        map[m.family_id].push(m.national_id)
+      }
+    })
+    return map
+  }, [families, members])
+
+  const otherRoundsList = useMemo(
+    () => (allDists || []).filter(d => d.id !== dist.id),
+    [allDists, dist.id]
+  )
+
   const candidates = useMemo(() => {
     let list = families.filter(f => !receivedIds.has(f.id))
-    if (dist.camp_id) list = list.filter(f => f.camp_id === dist.camp_id)
 
-    if (sortMode === 'priority') {
-      const pri = { urgent: 0, need: 1, ok: 2 }
-      list = [...list].sort((a, b) => (pri[a.status] ?? 2) - (pri[b.status] ?? 2))
-    } else if (sortMode === 'alpha') {
-      list = [...list].sort((a, b) => (a.head_name || '').localeCompare(b.head_name || '', 'ar'))
-    } else if (sortMode === 'members_desc') {
+    if (filterCamp)      list = list.filter(f => f.camp_id === filterCamp)
+    if (filterPrevRound) list = list.filter(f => !otherReceivedIds.has(f.id))
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter(f =>
+        (f.head_name || '').toLowerCase().includes(q) ||
+        (idsByFamily[f.id] || []).some(id => id.includes(q))
+      )
+    }
+
+    if (sortMode === 'members_desc') {
       list = [...list].sort((a, b) => (memberCountMap[b.id] || 0) - (memberCountMap[a.id] || 0))
-    } else if (sortMode === 'members_asc') {
-      list = [...list].sort((a, b) => (memberCountMap[a.id] || 0) - (memberCountMap[b.id] || 0))
     } else if (sortMode === 'tent_asc') {
       list = [...list].sort((a, b) => {
         const ta = (a.tent || '').trim(), tb = (b.tent || '').trim()
@@ -93,9 +134,11 @@ export default function DistributionDetail({ dist, onBack, canConfirm }) {
         const na = parseFloat(ta), nb = parseFloat(tb)
         return (!isNaN(na) && !isNaN(nb)) ? na - nb : ta.localeCompare(tb, 'ar', { numeric: true })
       })
+    } else if (sortMode === 'alpha') {
+      list = [...list].sort((a, b) => (a.head_name || '').localeCompare(b.head_name || '', 'ar'))
     }
     return list
-  }, [families, receivedIds, dist.camp_id, sortMode, memberCountMap])
+  }, [families, receivedIds, filterCamp, filterPrevRound, otherReceivedIds, search, idsByFamily, sortMode, memberCountMap])
 
   const receivedFamilies = useMemo(
     () => families.filter(f => receivedIds.has(f.id)),
@@ -121,17 +164,14 @@ export default function DistributionDetail({ dist, onBack, canConfirm }) {
       const records = [...selected].map(familyId => ({
         distribution_id: dist.id,
         family_id: familyId,
-        round_id: dist.id, // مبسَّط: الجولة = التوزيع نفسه
         org_id: ORG_ID,
         received_at: new Date().toISOString(),
-        notes: note.trim() || null,
       }))
       const { error } = await supabase.from('camp_dist_families').insert(records)
       if (error) throw error
 
       showToast(`✅ تم تسجيل استلام ${selected.size} أسرة`)
       setSelected(new Set())
-      setNote('')
       await load()
     } catch (e) {
       showToast('خطأ: ' + e.message, true)
@@ -158,25 +198,24 @@ export default function DistributionDetail({ dist, onBack, canConfirm }) {
     }
   }
 
-  const remaining = (dist.quantity || 0) - receivedIds.size
-
   return (
     <View style={styles.screen}>
-      {/* رأس التوزيع */}
+      {/* رأس الجولة */}
       <View style={styles.headerCard}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{dist.name}</Text>
-            <Text style={styles.subtitle}>{dist.camp_id ? (camps[dist.camp_id] || '—') : 'كل المخيمات'}</Text>
+            <Text style={styles.subtitle}>
+              {dist.created_at ? new Date(dist.created_at).toLocaleDateString('ar-EG') : ''}
+            </Text>
           </View>
           <TouchableOpacity onPress={onBack}>
             <Text style={styles.backText}>← رجوع</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.statsRow}>
-          <Stat value={dist.quantity || 0} label="📦 الكمية" color={colors.accent} />
           <Stat value={receivedIds.size} label="✅ استلموا" color={colors.green} />
-          <Stat value={remaining} label="📋 متبقي" color={remaining > 0 ? colors.blue : colors.green} />
+          <Stat value={candidates.length} label="⏳ لم يستلموا" color={colors.blue} />
         </View>
       </View>
 
@@ -194,15 +233,34 @@ export default function DistributionDetail({ dist, onBack, canConfirm }) {
         <Text style={styles.emptyText}>جارٍ التحميل...</Text>
       ) : tab === 'pending' ? (
         <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+          {/* الفلاتر الأربعة */}
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="🔍 بحث بالاسم أو رقم الهوية (رب الأسرة أو أي فرد)..."
+            placeholderTextColor={colors.muted}
+            style={styles.searchInput}
+          />
+          <View style={styles.filterRow}>
+            <View style={styles.filterCol}>
+              <Select
+                value={filterCamp} onChange={setFilterCamp}
+                placeholder="كل المخيمات"
+                options={Object.entries(camps).map(([id, name]) => ({ value: id, label: name }))}
+              />
+            </View>
+            <View style={styles.filterCol}>
+              <Select
+                value={filterPrevRound} onChange={setFilterPrevRound}
+                placeholder="لم يستلم من جولة..."
+                options={otherRoundsList.map(d => ({ value: d.id, label: d.name }))}
+              />
+            </View>
+          </View>
           <Select value={sortMode} onChange={setSortMode} options={SORT_OPTIONS} />
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryText}>📋 {candidates.length} أسرة لم تستلم</Text>
-            {!!dist.quantity && (
-              <Text style={[styles.summaryRemaining, { color: remaining >= 0 ? colors.blue : colors.red }]}>
-                متبقي: {remaining} من {dist.quantity}
-              </Text>
-            )}
           </View>
 
           {canConfirm && candidates.length > 0 && (
@@ -218,7 +276,7 @@ export default function DistributionDetail({ dist, onBack, canConfirm }) {
           )}
 
           {candidates.length === 0 ? (
-            <Text style={styles.emptyText}>✅ كل الأسر استلمت</Text>
+            <Text style={styles.emptyText}>✅ لا يوجد أحد ضمن هذا الفلتر</Text>
           ) : (
             candidates.map(f => {
               const checked = selected.has(f.id)
@@ -240,33 +298,21 @@ export default function DistributionDetail({ dist, onBack, canConfirm }) {
                       {camps[f.camp_id] || '—'}{f.tent ? ` · خيمة ${f.tent}` : ''} · 👥 {(memberCountMap[f.id] || 0) + 1} فرد
                     </Text>
                   </View>
-                  <Text style={[styles.statusBadge, { color: f.status === 'urgent' ? colors.red : f.status === 'need' ? colors.accent : colors.muted }]}>
-                    {f.status === 'urgent' ? '🚨' : f.status === 'need' ? '⚠️' : '✅'}
-                  </Text>
                 </TouchableOpacity>
               )
             })
           )}
 
           {canConfirm && candidates.length > 0 && (
-            <View style={styles.confirmBox}>
-              <TextInput
-                value={note}
-                onChangeText={setNote}
-                placeholder="ملاحظة على هذا التوزيع (اختياري)"
-                placeholderTextColor={colors.muted}
-                style={styles.noteInput}
-              />
-              <TouchableOpacity
-                onPress={confirmReceipt}
-                disabled={confirming || !selected.size}
-                style={[styles.confirmBtn, (confirming || !selected.size) && styles.disabled]}
-              >
-                <Text style={styles.confirmBtnText}>
-                  {confirming ? 'جاري الحفظ...' : `✅ تأكيد الاستلام للمحددين (${selected.size})`}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              onPress={confirmReceipt}
+              disabled={confirming || !selected.size}
+              style={[styles.confirmBtn, (confirming || !selected.size) && styles.disabled]}
+            >
+              <Text style={styles.confirmBtnText}>
+                {confirming ? 'جاري الحفظ...' : `✅ تأكيد الاستلام للمحددين (${selected.size})`}
+              </Text>
+            </TouchableOpacity>
           )}
         </ScrollView>
       ) : (
@@ -284,7 +330,6 @@ export default function DistributionDetail({ dist, onBack, canConfirm }) {
                       {camps[f.camp_id] || '—'}
                       {rec?.received_at ? ` · ${new Date(rec.received_at).toLocaleDateString('ar-EG')}` : ''}
                     </Text>
-                    {!!rec?.notes && <Text style={styles.noteText}>📝 {rec.notes}</Text>}
                   </View>
                   {canConfirm && (
                     <TouchableOpacity onPress={() => confirmUnmark(f.id, f.head_name)}>
@@ -325,18 +370,22 @@ const styles = StyleSheet.create({
   statLabel: { color: colors.muted, fontSize: 10, marginTop: 2 },
   tabs: {
     flexDirection: 'row', backgroundColor: colors.surface2, borderRadius: radius.md,
-    padding: 4, marginBottom: 12, gap: 0,
+    padding: 4, marginBottom: 12,
   },
   tab: { flex: 1, paddingVertical: 9, borderRadius: radius.sm, alignItems: 'center' },
   tabActive: { backgroundColor: colors.accent },
   tabText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   tabTextActive: { color: colors.bg },
+  searchInput: {
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    paddingHorizontal: 14, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 8,
+  },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  filterCol: { flex: 1 },
   summaryRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: colors.surface2, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8, marginVertical: 10,
   },
   summaryText: { color: colors.muted, fontSize: 12 },
-  summaryRemaining: { fontSize: 12, fontWeight: '700' },
   selectRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 10 },
   smallBtn: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingVertical: 6, alignItems: 'center' },
   smallBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
@@ -351,19 +400,12 @@ const styles = StyleSheet.create({
   checkmark: { color: colors.bg, fontSize: 12, fontWeight: '900' },
   rowName: { color: colors.white, fontSize: 13, fontWeight: '700' },
   rowMeta: { color: colors.muted, fontSize: 10, marginTop: 2 },
-  statusBadge: { fontSize: 13 },
-  confirmBox: { marginTop: 14, gap: 8 },
-  noteInput: {
-    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    paddingHorizontal: 14, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right',
-  },
-  confirmBtn: { backgroundColor: colors.accent, borderRadius: radius.md, paddingVertical: 13, alignItems: 'center' },
+  confirmBtn: { backgroundColor: colors.accent, borderRadius: radius.md, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
   confirmBtnText: { color: colors.bg, fontWeight: '900', fontSize: 14 },
   disabled: { opacity: 0.6 },
   receivedRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  noteText: { color: colors.muted, fontSize: 10, marginTop: 4 },
   unmarkBtn: { color: colors.red, fontSize: 11, fontWeight: '700' },
 })

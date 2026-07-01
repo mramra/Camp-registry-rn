@@ -1,19 +1,18 @@
 /**
- * DistributionCard.jsx — بطاقة توزيع واحد
- * مستخلص من camp-registry (المستودع القديم) — دالة loadDistPage
- * منطق العرض فقط، بدون التخزين المحلي (مبسَّط لـ Supabase مباشرة).
+ * DistributionCard.jsx — بطاقة جولة توزيع واحدة (v2 — بدون مفهوم الكمية/الدفعة)
+ * تم حذف quantity/remaining بعد إلغاء مفهوم "الدفعة" (1 يوليو 2026) —
+ * الجولة الآن كيان واحد بلا كمية محددة مسبقاً، فقط عدد من استلم فعلياً.
  */
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { colors, radius } from '../../theme'
 
 export const TYPE_NAMES = {
-  food: '🍞 غذاء', clothes: '👕 ملابس', blankets: '🧣 بطاطين',
-  medicine: '💊 دواء', hygiene: '🧴 نظافة', general: '📦 عام',
+  food: '🍞 غذاء', shelter: '🏠 إيواء',
+  hygiene: '🧴 نظافة', financial: '💰 مالية', general: '📦 عام',
 }
 
 export default function DistributionCard({ dist, campMap, receivedCount, onOpen, onEdit, onDelete, canWrite }) {
   const date = dist.created_at ? new Date(dist.created_at).toLocaleDateString('ar-EG') : ''
-  const remaining = (dist.quantity || 0) - (receivedCount || 0)
 
   return (
     <View style={styles.card}>
@@ -25,15 +24,13 @@ export default function DistributionCard({ dist, campMap, receivedCount, onOpen,
           </Text>
           <Text style={styles.receivedLine}>
             👥 استلم: <Text style={styles.receivedCount}>{receivedCount ?? '...'}</Text> أسرة
-            {dist.quantity ? ` من ${dist.quantity}` : ''}
-            {dist.quantity ? ` (متبقي ${remaining})` : ''}
           </Text>
         </View>
       </View>
 
       <View style={styles.actions}>
         <TouchableOpacity onPress={() => onOpen(dist.id)} style={styles.openBtn}>
-          <Text style={styles.openBtnText}>📋 فتح التوزيع</Text>
+          <Text style={styles.openBtnText}>📋 فتح الجولة</Text>
         </TouchableOpacity>
         {canWrite && (
           <>

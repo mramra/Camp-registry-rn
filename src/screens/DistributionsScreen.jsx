@@ -26,7 +26,7 @@ import DistributionDetail from '../components/distributions/DistributionDetail'
 import { colors, radius } from '../theme'
 
 const EMPTY_FORM = {
-  name: '', type: 'general', camp_id: '', quantity: '',
+  name: '', type: 'general', camp_id: '',
   date: new Date().toISOString().split('T')[0],
 }
 
@@ -106,7 +106,7 @@ export default function DistributionsScreen() {
     setEditDist(dist)
     setForm({
       name: dist.name || '', type: dist.type || 'general',
-      camp_id: dist.camp_id || '', quantity: dist.quantity || '',
+      camp_id: dist.camp_id || '',
       date: dist.created_at ? dist.created_at.split('T')[0] : EMPTY_FORM.date,
     })
     setShowForm(true)
@@ -124,7 +124,6 @@ export default function DistributionsScreen() {
         name: form.name.trim(),
         type: form.type,
         camp_id: form.camp_id || null,
-        quantity: form.quantity ? parseInt(form.quantity) : null,
         status: editDist?.status || 'draft',
         created_at: form.date ? new Date(form.date).toISOString() : new Date().toISOString(),
       }
@@ -178,6 +177,7 @@ export default function DistributionsScreen() {
           <View style={styles.content}>
             <DistributionDetail
               dist={openDist}
+              allDists={dists}
               onBack={() => { setOpenDist(null); load() }}
               canConfirm={canWrite}
             />

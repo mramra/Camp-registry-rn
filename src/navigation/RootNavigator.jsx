@@ -14,6 +14,7 @@ import CampsScreen from '../screens/CampsScreen'
 import MovementsScreen from '../screens/MovementsScreen'
 import SMSScreen from '../screens/SMSScreen'
 import DistributionsScreen from '../screens/DistributionsScreen'
+import FamilyFormScreen from '../screens/FamilyFormScreen'
 import { colors } from '../theme'
 
 const Stack = createNativeStackNavigator()
@@ -43,6 +44,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Movements" component={MovementsScreen} />
             <Stack.Screen name="SMS" component={SMSScreen} />
             <Stack.Screen name="Distributions" component={DistributionsScreen} />
+            <Stack.Screen name="FamilyForm" component={FamilyFormScreen} />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />

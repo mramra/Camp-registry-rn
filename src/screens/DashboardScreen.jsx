@@ -102,6 +102,17 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       )}
 
+      {(isOwner || profile?.can_review_approvals === true) && (
+        <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('PendingRequests')} activeOpacity={0.8}>
+          <Text style={styles.navCardIcon}>📋</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.navCardTitle}>الطلبات المعلّقة</Text>
+            <Text style={styles.navCardSubtitle}>مراجعة طلبات الموافقة</Text>
+          </View>
+          <Text style={styles.navCardArrow}>←</Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
         <Text style={styles.signOutText}>تسجيل الخروج</Text>
       </TouchableOpacity>

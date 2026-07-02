@@ -298,6 +298,7 @@ export default function FamiliesScreen() {
       {/* الرأس والبحث والفلاتر */}
       <View style={styles.header}>
         <PageHeader
+          menu
           icon="👨‍👩‍👧‍👦"
           title="قائمة الأسر"
           subtitle={`${filtered.length}/${families.length} أسرة`}

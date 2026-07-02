@@ -190,6 +190,7 @@ export default function DistributionsScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <PageHeader
+          menu
           icon="📦"
           title="التوزيعات"
           subtitle={`${dists.length} توزيع`}

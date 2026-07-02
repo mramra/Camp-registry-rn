@@ -1,22 +1,23 @@
 /**
- * RootNavigator.jsx — يحدد الشاشة حسب حالة المصادقة (Login أو Dashboard).
- * يكافئ منطق App.jsx الأصلي في React (PrivateRoute / حماية المسارات عبر react-router)،
- * لكن بمنطق Native Stack بدل URLs.
+ * RootNavigator.jsx — يحدد الشاشة حسب حالة المصادقة (Login أو التطبيق الرئيسي).
+ *
+ * بنية التنقل (بعد إضافة Drawer Navigation، 2 يوليو 2026):
+ *   Stack جذر
+ *     └─ AppDrawer (كل الشاشات الرئيسية: Dashboard, Families, Camps...)
+ *     └─ FamilyForm (شاشة فرعية تُفتح من داخل Families، تظهر فوق الـ Drawer
+ *                    بدون أن تكون جزءاً من عناصر القائمة الجانبية نفسها)
+ *
+ * السبب: FamilyForm ليست "صفحة تنقل رئيسية" (مثل Camps أو Users) بل
+ * إجراء ينبثق من داخل شاشة الأسر (إضافة/تعديل) ثم يعود إليها — وضعها
+ * داخل الـ Drawer نفسه كان سيجعلها تظهر كعنصر قائمة مستقل بلا داعٍ.
  */
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native'
 import { useAuth } from '../context/AuthContext'
 import LoginScreen from '../screens/LoginScreen'
-import DashboardScreen from '../screens/DashboardScreen'
-import FamiliesScreen from '../screens/FamiliesScreen'
-import CampsScreen from '../screens/CampsScreen'
-import MovementsScreen from '../screens/MovementsScreen'
-import SMSScreen from '../screens/SMSScreen'
-import DistributionsScreen from '../screens/DistributionsScreen'
 import FamilyFormScreen from '../screens/FamilyFormScreen'
-import UsersScreen from '../screens/UsersScreen'
-import PendingRequestsScreen from '../screens/PendingRequestsScreen'
+import AppDrawer from './AppDrawer'
 import { colors } from '../theme'
 
 const Stack = createNativeStackNavigator()
@@ -40,15 +41,8 @@ export default function RootNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <>
-            <Stack.Screen name="Dashboard" component={DashboardScreen} />
-            <Stack.Screen name="Families" component={FamiliesScreen} />
-            <Stack.Screen name="Camps" component={CampsScreen} />
-            <Stack.Screen name="Movements" component={MovementsScreen} />
-            <Stack.Screen name="SMS" component={SMSScreen} />
-            <Stack.Screen name="Distributions" component={DistributionsScreen} />
+            <Stack.Screen name="Main" component={AppDrawer} />
             <Stack.Screen name="FamilyForm" component={FamilyFormScreen} />
-            <Stack.Screen name="Users" component={UsersScreen} />
-            <Stack.Screen name="PendingRequests" component={PendingRequestsScreen} />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />

@@ -152,7 +152,7 @@ export default function SMSScreen() {
   return (
     <SafeScreen>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <PageHeader icon="💬" title="إرسال رسائل SMS" subtitle={`${selected.size} محدَّد`} />
+      <PageHeader menu icon="💬" title="إرسال رسائل SMS" subtitle={`${selected.size} محدَّد`} />
 
       {/* الفلاتر والبحث */}
       <Card title="المستلمون" icon="🎯">

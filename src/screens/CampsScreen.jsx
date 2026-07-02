@@ -271,6 +271,7 @@ export default function CampsScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <PageHeader
+          menu
           icon="⛺"
           title="إدارة المخيمات"
           subtitle={`${visible.length} مخيم`}

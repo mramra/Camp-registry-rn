@@ -1,40 +1,50 @@
 /**
- * DashboardScreen.jsx — نسخة أولية مبسطة (placeholder وظيفي)
+ * DashboardScreen.jsx — الصفحة الرئيسية (نسخة مبسّطة، أساسيات + صلاحيات)
  *
- * ⚠️ هذه ليست النسخة النهائية. الأصل (camp-registry-react/src/pages/Dashboard/Dashboard.jsx)
- * 403 سطر ويحتوي إحصائيات شاملة (عدد الأسر، توزيعات حديثة، نشاط الأسر، تنبيهات).
- * هذه نسخة أولى للتأكد من عمل تسجيل الدخول + الصلاحيات + التنقل فعلياً على
- * جهاز محمود عبر Expo Go، قبل استكمال نقل كل تفاصيل اللوحة الأصلية.
+ * ⚠️ بعد إضافة Drawer Navigation (2 يوليو 2026)، بطاقات التنقل التي كانت
+ * هنا مؤقتاً (رابط مباشر لكل شاشة) أُزيلت — التنقل بين الشاشات أصبح عبر
+ * القائمة الجانبية (☰) المتاحة من كل شاشة، فتكرارها هنا لم يعد ضرورياً.
+ * هذه الشاشة الآن أقرب لطبيعتها الأصلية: ترحيب + ملخص صلاحيات المستخدم.
+ *
+ * ⚠️ لا تزال هذه نسخة مبسّطة (ليست الأصل 403 سطر بإحصائيات شاملة —
+ * عدد الأسر، توزيعات حديثة، نشاط الأسر، تنبيهات). يمكن استكمالها لاحقاً
+ * كأولوية منفصلة إذا احتاجها محمود فعلياً.
  */
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, DrawerActions } from '@react-navigation/native'
 import { useAuth } from '../context/AuthContext'
 import { ROLE_LABELS, ROLE_COLORS } from '../lib/permissions'
+import PageHeader from '../components/ui/PageHeader'
 import SafeScreen from '../components/ui/SafeScreen'
 import { colors, radius } from '../theme'
 
 export default function DashboardScreen() {
-  const { profile, role, signOut, isOwner, isSuperAdmin, isCampDelegate, isAssistant } = useAuth()
+  const { profile, role, isOwner, isSuperAdmin, isCampDelegate, isAssistant } = useAuth()
   const navigation = useNavigation()
 
   return (
     <SafeScreen>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.greeting}>🏕️ نبض المخيم</Text>
-        <Text style={styles.welcome}>أهلاً {profile?.full_name || '—'}</Text>
-        <View style={[styles.roleBadge, { borderColor: ROLE_COLORS[role] || colors.muted }]}>
-          <Text style={[styles.roleText, { color: ROLE_COLORS[role] || colors.muted }]}>
-            {ROLE_LABELS[role] || role || '—'}
-          </Text>
-        </View>
+      <PageHeader
+        icon="🏕️" title="نبض المخيم"
+        subtitle={`أهلاً ${profile?.full_name || '—'}`}
+        action={
+          <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())} style={styles.menuBtn}>
+            <Text style={styles.menuBtnText}>☰</Text>
+          </TouchableOpacity>
+        }
+      />
+
+      <View style={[styles.roleBadge, { borderColor: ROLE_COLORS[role] || colors.muted }]}>
+        <Text style={[styles.roleText, { color: ROLE_COLORS[role] || colors.muted }]}>
+          {ROLE_LABELS[role] || role || '—'}
+        </Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>✅ تم تسجيل الدخول بنجاح</Text>
         <Text style={styles.cardText}>
-          هذه نسخة أولية من لوحة التحكم — للتأكد من عمل المصادقة ونظام الصلاحيات
-          بشكل صحيح على جهازك قبل استكمال باقي الصفحات.
+          افتح القائمة الجانبية (☰) للتنقل بين قائمة الأسر، المخيمات، الحركات، والصفحات الأخرى.
         </Text>
       </View>
 
@@ -45,77 +55,6 @@ export default function DashboardScreen() {
         <PermRow label="مندوب مخيم أو أعلى" value={isCampDelegate} />
         <PermRow label="مساعد" value={isAssistant} />
       </View>
-
-      <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('Families')} activeOpacity={0.8}>
-        <Text style={styles.navCardIcon}>👨‍👩‍👧‍👦</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.navCardTitle}>قائمة الأسر</Text>
-          <Text style={styles.navCardSubtitle}>عرض، بحث، وتعديل بيانات الأسر</Text>
-        </View>
-        <Text style={styles.navCardArrow}>←</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('Camps')} activeOpacity={0.8}>
-        <Text style={styles.navCardIcon}>⛺</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.navCardTitle}>إدارة المخيمات</Text>
-          <Text style={styles.navCardSubtitle}>المخيمات الرئيسية والفروع</Text>
-        </View>
-        <Text style={styles.navCardArrow}>←</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('Movements')} activeOpacity={0.8}>
-        <Text style={styles.navCardIcon}>🚶</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.navCardTitle}>حركات الأسر</Text>
-          <Text style={styles.navCardSubtitle}>دخول، خروج، ونقل بين المخيمات</Text>
-        </View>
-        <Text style={styles.navCardArrow}>←</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('SMS')} activeOpacity={0.8}>
-        <Text style={styles.navCardIcon}>💬</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.navCardTitle}>إرسال رسائل SMS</Text>
-          <Text style={styles.navCardSubtitle}>رسائل جماعية للأسر</Text>
-        </View>
-        <Text style={styles.navCardArrow}>←</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('Distributions')} activeOpacity={0.8}>
-        <Text style={styles.navCardIcon}>📦</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.navCardTitle}>التوزيعات</Text>
-          <Text style={styles.navCardSubtitle}>توزيع المساعدات وتتبع المستلمين</Text>
-        </View>
-        <Text style={styles.navCardArrow}>←</Text>
-      </TouchableOpacity>
-
-      {(isOwner || isSuperAdmin || isCampDelegate) && (
-        <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('Users')} activeOpacity={0.8}>
-          <Text style={styles.navCardIcon}>👥</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.navCardTitle}>إدارة المستخدمين</Text>
-            <Text style={styles.navCardSubtitle}>مديرين، مناديب، مساعدين</Text>
-          </View>
-          <Text style={styles.navCardArrow}>←</Text>
-        </TouchableOpacity>
-      )}
-
-      {(isOwner || profile?.can_review_approvals === true) && (
-        <TouchableOpacity style={styles.navCard} onPress={() => navigation.navigate('PendingRequests')} activeOpacity={0.8}>
-          <Text style={styles.navCardIcon}>📋</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.navCardTitle}>الطلبات المعلّقة</Text>
-            <Text style={styles.navCardSubtitle}>مراجعة طلبات الموافقة</Text>
-          </View>
-          <Text style={styles.navCardArrow}>←</Text>
-        </TouchableOpacity>
-      )}
-
-      <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
-        <Text style={styles.signOutText}>تسجيل الخروج</Text>
-      </TouchableOpacity>
     </ScrollView>
     </SafeScreen>
   )
@@ -135,11 +74,13 @@ function PermRow({ label, value }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, gap: 16 },
-  header: { alignItems: 'center', gap: 6, marginBottom: 8 },
-  greeting: { color: colors.white, fontSize: 22, fontWeight: '900' },
-  welcome: { color: colors.muted, fontSize: 14 },
+  menuBtn: {
+    width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.surface2,
+    borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
+  },
+  menuBtnText: { color: colors.white, fontSize: 18 },
   roleBadge: {
-    marginTop: 6, paddingHorizontal: 12, paddingVertical: 4,
+    alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 4,
     borderRadius: 999, borderWidth: 1,
   },
   roleText: { fontSize: 12, fontWeight: '700' },
@@ -155,18 +96,4 @@ const styles = StyleSheet.create({
   },
   permLabel: { color: colors.white, fontSize: 13 },
   permValue: { fontSize: 13, fontWeight: '700' },
-  navCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg, padding: 14,
-  },
-  navCardIcon: { fontSize: 26 },
-  navCardTitle: { color: colors.white, fontSize: 14, fontWeight: '800' },
-  navCardSubtitle: { color: colors.muted, fontSize: 11, marginTop: 2 },
-  navCardArrow: { color: colors.accent, fontSize: 18 },
-  signOutBtn: {
-    backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
-    borderRadius: radius.md, paddingVertical: 13, alignItems: 'center', marginTop: 8,
-  },
-  signOutText: { color: colors.red, fontWeight: '800', fontSize: 14 },
 })

@@ -152,6 +152,7 @@ export default function MovementsScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <PageHeader
+          menu
           icon="🚶"
           title="حركات الأسر"
           subtitle={`${movements.length} حركة`}

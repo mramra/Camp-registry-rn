@@ -109,6 +109,7 @@ export default function PendingRequestsScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <PageHeader
+          menu
           icon="📋" title="الطلبات المعلّقة"
           subtitle={tab === 'pending' ? `${requests.length} طلب بانتظار مراجعتك` : `${decisionLog.length} قرار سابق`}
         />

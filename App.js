@@ -12,6 +12,7 @@
 import { useEffect } from 'react'
 import { StatusBar } from 'expo-status-bar'
 import * as Updates from 'expo-updates'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { AuthProvider } from './src/context/AuthContext'
 import { PowerSyncProvider } from './src/context/PowerSyncContext'
@@ -38,15 +39,17 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <PowerSyncProvider>
-          <AppProvider>
-            <StatusBar style="light" />
-            <RootNavigator />
-          </AppProvider>
-        </PowerSyncProvider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <PowerSyncProvider>
+            <AppProvider>
+              <StatusBar style="light" />
+              <RootNavigator />
+            </AppProvider>
+          </PowerSyncProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   )
 }

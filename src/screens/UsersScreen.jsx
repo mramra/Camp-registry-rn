@@ -338,6 +338,7 @@ export default function UsersScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <PageHeader
+          menu
           icon="👥" title="إدارة المستخدمين" subtitle={`${users.length} مستخدم`}
           action={(isOwner || isSuperAdmin || isCampDelegate) && (
             <TouchableOpacity onPress={openAdd} style={styles.addBtn}>

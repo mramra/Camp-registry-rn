@@ -18,6 +18,7 @@ import SMSScreen from '../screens/SMSScreen'
 import DistributionsScreen from '../screens/DistributionsScreen'
 import UsersScreen from '../screens/UsersScreen'
 import PendingRequestsScreen from '../screens/PendingRequestsScreen'
+import PaperPreviewScreen from '../screens/PaperPreviewScreen'
 import { colors } from '../theme'
 
 const Drawer = createDrawerNavigator()
@@ -42,6 +43,7 @@ export default function AppDrawer() {
       <Drawer.Screen name="Distributions" component={DistributionsScreen} />
       <Drawer.Screen name="Users" component={UsersScreen} />
       <Drawer.Screen name="PendingRequests" component={PendingRequestsScreen} />
+      <Drawer.Screen name="PaperPreview" component={PaperPreviewScreen} options={{ title: '🧪 معاينة Paper' }} />
     </Drawer.Navigator>
   )
 }

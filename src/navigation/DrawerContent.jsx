@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { route: 'Distributions',    icon: '📦', label: 'التوزيعات',          show: () => true },
   { route: 'Users',            icon: '👥', label: 'إدارة المستخدمين',   show: (a) => a.isOwner || a.isSuperAdmin || a.isCampDelegate },
   { route: 'PendingRequests',  icon: '📋', label: 'الطلبات المعلّقة',   show: (a) => a.isOwner || a.profile?.can_review_approvals === true },
+  { route: 'PaperPreview',     icon: '🧪', label: 'معاينة Paper (تجريبي)', show: () => true },
 ]
 
 export default function DrawerContent(props) {

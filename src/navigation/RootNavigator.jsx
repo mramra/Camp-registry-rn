@@ -2,19 +2,18 @@ import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import FamiliesListScreen from '../screens/families/FamiliesListScreen';
+import FamilyDetailScreen from '../screens/families/FamilyDetailScreen';
+import FamilyFormScreen from '../screens/families/FamilyFormScreen';
 
 const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
 
 // Auth Navigator
 const AuthNavigator = () => {
-  const { colors } = useTheme();
-
   return (
     <Stack.Navigator
       screenOptions={{
@@ -32,37 +31,34 @@ const AppNavigator = () => {
   const { colors } = useTheme();
 
   return (
-    <Tab.Navigator
+    <Stack.Navigator
       screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.primary,
-          borderBottomColor: colors.border,
-          borderBottomWidth: 1,
-        },
+        headerStyle: { backgroundColor: colors.primary },
         headerTintColor: '#ffffff',
-        headerTitleStyle: {
-          fontWeight: '600',
-          color: '#ffffff',
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-        },
+        headerTitleStyle: { fontWeight: '600' },
       }}
     >
-      <Tab.Screen
-        name="Home"
+      <Stack.Screen
+        name="Dashboard"
         component={DashboardScreen}
-        options={{
-          title: 'الرئيسية',
-          tabBarLabel: 'الرئيسية',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏠</Text>,
-        }}
+        options={{ headerShown: false }}
       />
-    </Tab.Navigator>
+      <Stack.Screen
+        name="FamiliesList"
+        component={FamiliesListScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="FamilyDetail"
+        component={FamilyDetailScreen}
+        options={{ title: 'تفاصيل الأسرة' }}
+      />
+      <Stack.Screen
+        name="FamilyForm"
+        component={FamilyFormScreen}
+        options={{ title: 'إضافة أسرة' }}
+      />
+    </Stack.Navigator>
   );
 };
 
@@ -86,5 +82,4 @@ export const RootNavigator = () => {
   );
 };
 
-import { Text } from 'react-native';
 export default RootNavigator;

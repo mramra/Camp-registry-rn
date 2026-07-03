@@ -12,19 +12,39 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 // =========== Helper Functions ===========
 
-export const fetchFamilies = async (orgId) => {
+export const fetchFamilies = async (orgId, campId = null) => {
+  try {
+    let q = supabase
+      .from('families')
+      .select('id, org_id, camp_id, head_name, head_id, phone1, phone2, category_tags, economic_level, review_status, pending_delete, created_at')
+      .eq('org_id', orgId)
+      .eq('_deleted', false)
+      .order('created_at', { ascending: false });
+
+    if (campId) q = q.eq('camp_id', campId);
+
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data || []).filter((f) => !f.pending_delete);
+  } catch (err) {
+    console.error('[fetchFamilies]', err.message);
+    return [];
+  }
+};
+
+export const fetchFamilyMembers = async (familyIds) => {
+  if (!familyIds || familyIds.length === 0) return [];
   try {
     const { data, error } = await supabase
-      .from('families')
-      .select('id, name, camp_id, members_count, priority, created_at')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+      .from('family_members')
+      .select('id, family_id, name, relation, national_id, dob, gender')
+      .in('family_id', familyIds)
+      .eq('_deleted', false);
 
     if (error) throw error;
     return data || [];
   } catch (err) {
-    console.error('[fetchFamilies]', err.message);
+    console.error('[fetchFamilyMembers]', err.message);
     return [];
   }
 };
@@ -32,9 +52,9 @@ export const fetchFamilies = async (orgId) => {
 export const fetchDashboardStats = async (orgId) => {
   try {
     const [familiesRes, membersRes, campsRes] = await Promise.all([
-      supabase.from('families').select('id', { count: 'exact' }).eq('org_id', orgId),
-      supabase.from('family_members').select('id', { count: 'exact' }).eq('org_id', orgId),
-      supabase.from('camps').select('id', { count: 'exact' }).eq('org_id', orgId),
+      supabase.from('families').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('_deleted', false),
+      supabase.from('family_members').select('id', { count: 'exact', head: true }).eq('_deleted', false),
+      supabase.from('camps').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('_deleted', false),
     ]);
 
     return {
@@ -56,8 +76,9 @@ export const fetchCamps = async (orgId) => {
   try {
     const { data, error } = await supabase
       .from('camps')
-      .select('id, name, location, families_count')
+      .select('id, name, status, address, capacity')
       .eq('org_id', orgId)
+      .eq('_deleted', false)
       .order('name', { ascending: true });
 
     if (error) throw error;

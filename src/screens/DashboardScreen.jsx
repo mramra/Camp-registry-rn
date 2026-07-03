@@ -13,6 +13,7 @@ import { Text, Card, Button, ActivityIndicator, Badge } from 'react-native-paper
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { fetchDashboardStats, fetchFamilies } from '../lib/supabase';
+import { getFamilyPriority, TIER_LABELS } from '../lib/helpers';
 import { showError } from '../utils/toast';
 import spacing from '../theme/spacing';
 
@@ -179,25 +180,28 @@ const DashboardScreen = ({ navigation }) => {
     </Card>
   );
 
-  const renderFamilyCard = ({ item }) => (
-    <Card mode="elevated" style={styles.familyCard}>
-      <Card.Content style={styles.familyHeader}>
-        <View style={{ flex: 1 }}>
-          <Text variant="bodyLarge" style={styles.familyName}>{item.name}</Text>
-          <Text variant="bodySmall" style={styles.familyMeta}>{item.members_count} أفراد</Text>
-        </View>
-        <Badge
-          style={{
-            backgroundColor: item.priority === 'high' ? colors.errorLight : colors.warningLight,
-            color: colors.text,
-          }}
-          size={26}
-        >
-          {item.priority === 'high' ? '⚠️ عالية' : '📋 عادية'}
-        </Badge>
-      </Card.Content>
-    </Card>
-  );
+  const renderFamilyCard = ({ item }) => {
+    const priority = getFamilyPriority(item, []);
+    return (
+      <Card mode="elevated" style={styles.familyCard}>
+        <Card.Content style={styles.familyHeader}>
+          <View style={{ flex: 1 }}>
+            <Text variant="bodyLarge" style={styles.familyName}>{item.head_name || '—'}</Text>
+            <Text variant="bodySmall" style={styles.familyMeta}>{item.head_id || ''}</Text>
+          </View>
+          <Badge
+            style={{
+              backgroundColor: priority.tier === 'urgent' ? colors.errorLight : priority.tier === 'need' ? colors.warningLight : colors.successLight,
+              color: colors.text,
+            }}
+            size={26}
+          >
+            {TIER_LABELS[priority.tier]}
+          </Badge>
+        </Card.Content>
+      </Card>
+    );
+  };
 
   if (loading) {
     return (
@@ -278,7 +282,11 @@ const DashboardScreen = ({ navigation }) => {
           <View style={styles.section}>
             <Text variant="titleMedium" style={styles.sectionTitle}>الإجراءات السريعة</Text>
             <View style={styles.actionsContainer}>
-              <Button mode="contained" style={styles.actionButton}>
+              <Button
+                mode="contained"
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('FamiliesList')}
+              >
                 قائمة الأسر
               </Button>
               <Button mode="outlined" style={styles.actionButton}>

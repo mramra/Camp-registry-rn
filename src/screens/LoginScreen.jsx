@@ -155,7 +155,11 @@ const LoginScreen = () => {
                   style={styles.input}
                   right={
                     <TextInput.Icon
-                      icon={showPassword ? 'eye-off' : 'eye'}
+                      icon={() => (
+                        <Text style={{ fontSize: 18 }}>
+                          {showPassword ? '🙈' : '👁️'}
+                        </Text>
+                      )}
                       onPress={() => setShowPassword(!showPassword)}
                     />
                   }

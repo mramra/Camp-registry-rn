@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -21,6 +21,31 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // إصلاح خاص بالويب: كروم يفرض خلفية فاتحة على الحقول المحفوظة (autofill)
+  // بغض النظر عن أي theme في React Native Web، لازم override بـ CSS مباشر
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const styleId = 'autofill-fix-style';
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.innerHTML = `
+      input:-webkit-autofill,
+      input:-webkit-autofill:hover,
+      input:-webkit-autofill:focus,
+      input:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0 30px ${colors.surface} inset !important;
+        -webkit-text-fill-color: ${colors.text} !important;
+        caret-color: ${colors.text} !important;
+        transition: background-color 5000s ease-in-out 0s !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.getElementById(styleId)?.remove();
+    };
+  }, [colors]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -136,7 +161,12 @@ const LoginScreen = () => {
                   autoCapitalize="none"
                   disabled={loading}
                   error={!!errors.nationalId}
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: colors.surface }]}
+                  outlineColor={colors.border}
+                  activeOutlineColor={colors.primary}
+                  textColor={colors.text}
+                  placeholderTextColor={colors.textMuted}
+                  theme={{ colors: { onSurfaceVariant: colors.textSecondary } }}
                 />
                 <HelperText type="error" visible={!!errors.nationalId}>
                   {errors.nationalId}
@@ -152,7 +182,12 @@ const LoginScreen = () => {
                   secureTextEntry={!showPassword}
                   disabled={loading}
                   error={!!errors.password}
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: colors.surface }]}
+                  outlineColor={colors.border}
+                  activeOutlineColor={colors.primary}
+                  textColor={colors.text}
+                  placeholderTextColor={colors.textMuted}
+                  theme={{ colors: { onSurfaceVariant: colors.textSecondary } }}
                   right={
                     <TextInput.Icon
                       icon={() => (
@@ -161,6 +196,7 @@ const LoginScreen = () => {
                         </Text>
                       )}
                       onPress={() => setShowPassword(!showPassword)}
+                      style={{ backgroundColor: colors.surface }}
                     />
                   }
                 />

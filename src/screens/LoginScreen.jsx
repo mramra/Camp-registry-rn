@@ -1,29 +1,25 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   SafeAreaView,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Text, TextInput, Button, Card, HelperText } from 'react-native-paper';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import Button from '../components/Button';
-import Card from '../components/Card';
-import Input from '../components/Input';
 import { showError, showSuccess } from '../utils/toast';
 import spacing from '../theme/spacing';
-import typography from '../theme/typography';
 
 const LoginScreen = () => {
   const { login, loading } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [nationalId, setNationalId] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
   const validateForm = () => {
@@ -68,48 +64,38 @@ const LoginScreen = () => {
       marginBottom: spacing.md,
     },
     appName: {
-      ...typography.h1,
       color: '#ffffff',
       textAlign: 'center',
       marginBottom: spacing.sm,
+      fontWeight: 'bold',
     },
     tagline: {
-      ...typography.body,
-      color: 'rgba(255, 255, 255, 0.8)',
+      color: 'rgba(255, 255, 255, 0.85)',
       textAlign: 'center',
     },
     formContainer: {
       paddingHorizontal: spacing.lg,
       marginBottom: spacing['2xl'],
     },
-    formCard: {
-      padding: spacing.xl,
+    card: {
+      padding: spacing.md,
+    },
+    input: {
+      marginBottom: spacing.xs,
+      textAlign: 'right',
     },
     submitButton: {
       marginTop: spacing.lg,
+      borderRadius: 8,
     },
-    demoSection: {
-      marginTop: spacing.xl,
-      paddingTop: spacing.lg,
-      borderTopColor: colors.border,
-      borderTopWidth: 1,
-    },
-    demoTitle: {
-      ...typography.label,
-      color: colors.textSecondary,
-      marginBottom: spacing.sm,
-    },
-    demoText: {
-      ...typography.bodySmall,
-      color: colors.textMuted,
-      marginBottom: spacing.xs,
+    submitButtonContent: {
+      paddingVertical: spacing.xs,
     },
     helperText: {
-      ...typography.bodySmall,
-      color: colors.textMuted,
       textAlign: 'center',
       marginTop: spacing.lg,
       paddingHorizontal: spacing.lg,
+      color: colors.textMuted,
     },
   });
 
@@ -131,51 +117,70 @@ const LoginScreen = () => {
             style={styles.gradientHeader}
           >
             <Text style={styles.logo}>🏕️</Text>
-            <Text style={styles.appName}>نبض المخيم</Text>
-            <Text style={styles.tagline}>إدارة أسرية ذكية</Text>
+            <Text variant="headlineMedium" style={styles.appName}>نبض المخيم</Text>
+            <Text variant="bodyMedium" style={styles.tagline}>إدارة أسرية ذكية</Text>
           </LinearGradient>
 
           {/* Form Card */}
           <View style={styles.formContainer}>
-            <Card>
-              {/* National ID Input */}
-              <Input
-                label="رقم الهوية"
-                placeholder="أدخل رقم الهوية"
-                value={nationalId}
-                onChangeText={setNationalId}
-                keyboardType="number-pad"
-                autoCapitalize="none"
-                editable={!loading}
-                error={errors.nationalId}
-              />
+            <Card mode="elevated" style={styles.card}>
+              <Card.Content>
+                {/* National ID Input */}
+                <TextInput
+                  mode="outlined"
+                  label="رقم الهوية"
+                  placeholder="أدخل رقم الهوية"
+                  value={nationalId}
+                  onChangeText={setNationalId}
+                  keyboardType="number-pad"
+                  autoCapitalize="none"
+                  disabled={loading}
+                  error={!!errors.nationalId}
+                  style={styles.input}
+                />
+                <HelperText type="error" visible={!!errors.nationalId}>
+                  {errors.nationalId}
+                </HelperText>
 
-              {/* Password Input */}
-              <Input
-                label="كلمة المرور"
-                placeholder="أدخل كلمة المرور"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                editable={!loading}
-                error={errors.password}
-              />
+                {/* Password Input */}
+                <TextInput
+                  mode="outlined"
+                  label="كلمة المرور"
+                  placeholder="أدخل كلمة المرور"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  disabled={loading}
+                  error={!!errors.password}
+                  style={styles.input}
+                  right={
+                    <TextInput.Icon
+                      icon={showPassword ? 'eye-off' : 'eye'}
+                      onPress={() => setShowPassword(!showPassword)}
+                    />
+                  }
+                />
+                <HelperText type="error" visible={!!errors.password}>
+                  {errors.password}
+                </HelperText>
 
-              {/* Submit Button */}
-              <Button
-                text={loading ? 'جاري الدخول...' : 'دخول'}
-                variant="primary"
-                fullWidth
-                onPress={handleLogin}
-                disabled={loading}
-                loading={loading}
-                style={styles.submitButton}
-              />
+                {/* Submit Button */}
+                <Button
+                  mode="contained"
+                  onPress={handleLogin}
+                  disabled={loading}
+                  loading={loading}
+                  style={styles.submitButton}
+                  contentStyle={styles.submitButtonContent}
+                >
+                  {loading ? 'جاري الدخول...' : 'دخول'}
+                </Button>
+              </Card.Content>
             </Card>
           </View>
 
           {/* Helper Text */}
-          <Text style={styles.helperText}>
+          <Text variant="bodySmall" style={styles.helperText}>
             هل نسيت كلمة المرور؟ تواصل مع المسؤول
           </Text>
         </ScrollView>

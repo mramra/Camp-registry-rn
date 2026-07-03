@@ -1,24 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   SafeAreaView,
   ScrollView,
   RefreshControl,
-  ActivityIndicator,
   Pressable,
   FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Text, Card, Button, ActivityIndicator, Badge } from 'react-native-paper';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { fetchDashboardStats, fetchFamilies } from '../lib/supabase';
-import Card from '../components/Card';
-import Button from '../components/Button';
 import { showError } from '../utils/toast';
 import spacing from '../theme/spacing';
-import typography from '../theme/typography';
 
 const DashboardScreen = ({ navigation }) => {
   const { user, logout, userRole, orgId } = useAuth();
@@ -45,7 +41,6 @@ const DashboardScreen = ({ navigation }) => {
       setStats(statsData);
       setFamilies(familiesData.slice(0, 5)); // آخر 5 أسر
     } catch (error) {
-      console.error('[loadData]', error.message);
       showError('حدث خطأ في تحميل البيانات');
     } finally {
       setLoading(false);
@@ -76,17 +71,15 @@ const DashboardScreen = ({ navigation }) => {
       paddingHorizontal: spacing.lg,
     },
     headerTitle: {
-      ...typography.h1,
       color: '#ffffff',
       marginBottom: spacing.xs,
+      fontWeight: 'bold',
     },
     headerSubtitle: {
-      ...typography.body,
-      color: 'rgba(255, 255, 255, 0.8)',
+      color: 'rgba(255, 255, 255, 0.85)',
       marginBottom: spacing.xs,
     },
     headerRole: {
-      ...typography.bodySmall,
       color: 'rgba(255, 255, 255, 0.7)',
     },
     content: {
@@ -97,9 +90,9 @@ const DashboardScreen = ({ navigation }) => {
       marginBottom: spacing['2xl'],
     },
     sectionTitle: {
-      ...typography.h3,
       color: colors.text,
       marginBottom: spacing.lg,
+      fontWeight: 'bold',
     },
     statsContainer: {
       flexDirection: 'row',
@@ -108,52 +101,35 @@ const DashboardScreen = ({ navigation }) => {
     },
     statCard: {
       flex: 1,
-      padding: spacing.lg,
+    },
+    statCardContent: {
       alignItems: 'center',
+      paddingVertical: spacing.lg,
     },
     statValue: {
-      ...typography.h2,
       color: colors.primary,
       marginBottom: spacing.xs,
+      fontWeight: 'bold',
     },
     statLabel: {
-      ...typography.bodySmall,
       color: colors.textSecondary,
       textAlign: 'center',
     },
     familyCard: {
       marginBottom: spacing.md,
-      padding: spacing.lg,
     },
     familyHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: spacing.md,
     },
     familyName: {
-      ...typography.body,
-      fontWeight: '600',
       color: colors.text,
+      fontWeight: '600',
     },
     familyMeta: {
-      ...typography.bodySmall,
       color: colors.textSecondary,
-      marginTop: spacing.sm,
-    },
-    badge: {
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      borderRadius: spacing.radiusFull,
-      backgroundColor: colors.warningLight,
-    },
-    badgeHigh: {
-      backgroundColor: colors.errorLight,
-    },
-    badgeText: {
-      ...typography.labelSmall,
-      color: colors.text,
-      fontWeight: '600',
+      marginTop: spacing.xs,
     },
     emptyContainer: {
       alignItems: 'center',
@@ -161,12 +137,14 @@ const DashboardScreen = ({ navigation }) => {
       paddingVertical: spacing['3xl'],
     },
     emptyText: {
-      ...typography.body,
       color: colors.textMuted,
     },
     actionsContainer: {
       gap: spacing.md,
       marginTop: spacing.lg,
+    },
+    actionButton: {
+      borderRadius: 8,
     },
     loaderContainer: {
       flex: 1,
@@ -192,31 +170,32 @@ const DashboardScreen = ({ navigation }) => {
   };
 
   const renderStatCard = (title, value, icon) => (
-    <Card variant="elevated" style={styles.statCard}>
-      <Text style={{ fontSize: 28, marginBottom: spacing.sm }}>{icon}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{title}</Text>
+    <Card mode="elevated" style={styles.statCard}>
+      <Card.Content style={styles.statCardContent}>
+        <Text style={{ fontSize: 28, marginBottom: spacing.sm }}>{icon}</Text>
+        <Text variant="headlineSmall" style={styles.statValue}>{value}</Text>
+        <Text variant="bodySmall" style={styles.statLabel}>{title}</Text>
+      </Card.Content>
     </Card>
   );
 
   const renderFamilyCard = ({ item }) => (
-    <Card style={styles.familyCard}>
-      <View style={styles.familyHeader}>
+    <Card mode="elevated" style={styles.familyCard}>
+      <Card.Content style={styles.familyHeader}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.familyName}>{item.name}</Text>
-          <Text style={styles.familyMeta}>{item.members_count} أفراد</Text>
+          <Text variant="bodyLarge" style={styles.familyName}>{item.name}</Text>
+          <Text variant="bodySmall" style={styles.familyMeta}>{item.members_count} أفراد</Text>
         </View>
-        <View
-          style={[
-            styles.badge,
-            item.priority === 'high' && styles.badgeHigh,
-          ]}
+        <Badge
+          style={{
+            backgroundColor: item.priority === 'high' ? colors.errorLight : colors.warningLight,
+            color: colors.text,
+          }}
+          size={26}
         >
-          <Text style={styles.badgeText}>
-            {item.priority === 'high' ? '⚠️ عالية' : '📋 عادية'}
-          </Text>
-        </View>
-      </View>
+          {item.priority === 'high' ? '⚠️ عالية' : '📋 عادية'}
+        </Badge>
+      </Card.Content>
     </Card>
   );
 
@@ -258,11 +237,11 @@ const DashboardScreen = ({ navigation }) => {
           end={{ x: 1, y: 1 }}
           style={styles.gradientHeader}
         >
-          <Text style={styles.headerTitle}>نبض المخيم</Text>
-          <Text style={styles.headerSubtitle}>
+          <Text variant="headlineMedium" style={styles.headerTitle}>نبض المخيم</Text>
+          <Text variant="bodyMedium" style={styles.headerSubtitle}>
             أهلاً {user?.email?.split('@')[0]}
           </Text>
-          <Text style={styles.headerRole}>{getRoleLabel()}</Text>
+          <Text variant="bodySmall" style={styles.headerRole}>{getRoleLabel()}</Text>
         </LinearGradient>
 
         <View style={styles.content}>
@@ -277,7 +256,7 @@ const DashboardScreen = ({ navigation }) => {
 
           {/* Recent Families */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>الأسر المضافة حديثاً</Text>
+            <Text variant="titleMedium" style={styles.sectionTitle}>الأسر المضافة حديثاً</Text>
             {families.length > 0 ? (
               <FlatList
                 data={families}
@@ -297,24 +276,23 @@ const DashboardScreen = ({ navigation }) => {
 
           {/* Quick Actions */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>الإجراءات السريعة</Text>
+            <Text variant="titleMedium" style={styles.sectionTitle}>الإجراءات السريعة</Text>
             <View style={styles.actionsContainer}>
+              <Button mode="contained" style={styles.actionButton}>
+                قائمة الأسر
+              </Button>
+              <Button mode="outlined" style={styles.actionButton}>
+                إدارة المخيمات
+              </Button>
               <Button
-                text="قائمة الأسر"
-                variant="primary"
-                fullWidth
-              />
-              <Button
-                text="إدارة المخيمات"
-                variant="secondary"
-                fullWidth
-              />
-              <Button
-                text="تسجيل الخروج"
-                variant="danger"
-                fullWidth
+                mode="contained-tonal"
+                buttonColor={colors.errorLight}
+                textColor={colors.error}
+                style={styles.actionButton}
                 onPress={handleLogout}
-              />
+              >
+                تسجيل الخروج
+              </Button>
             </View>
           </View>
         </View>

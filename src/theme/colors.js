@@ -96,4 +96,4 @@ export const darkColors = {
 // Default to light mode
 export const colors = lightColors;
 
-export { lightColors, darkColors };
+

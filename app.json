@@ -30,7 +30,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-font"],
     "extra": {
       "eas": {
         "projectId": "c8d89b81-f55b-4f80-8b43-abcb76529c5d"

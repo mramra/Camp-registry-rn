@@ -22,13 +22,13 @@ import typography from '../theme/typography';
 const LoginScreen = () => {
   const { login, loading } = useAuth();
   const { colors, isDark } = useTheme();
-  const [email, setEmail] = useState('412617003@c.co');
-  const [password, setPassword] = useState('506641234');
+  const [nationalId, setNationalId] = useState('');
+  const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({});
 
   const validateForm = () => {
     const newErrors = {};
-    if (!email.trim()) newErrors.email = 'البريد الإلكتروني مطلوب';
+    if (!nationalId.trim()) newErrors.nationalId = 'رقم الهوية مطلوب';
     if (!password.trim()) newErrors.password = 'كلمة المرور مطلوبة';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -37,7 +37,8 @@ const LoginScreen = () => {
   const handleLogin = async () => {
     if (!validateForm()) return;
 
-    const result = await login(email.trim(), password);
+    const email = `${nationalId.trim()}@c.co`;
+    const result = await login(email, password);
 
     if (!result.success) {
       showError(result.error || 'فشل تسجيل الدخول');
@@ -137,16 +138,16 @@ const LoginScreen = () => {
           {/* Form Card */}
           <View style={styles.formContainer}>
             <Card>
-              {/* Email Input */}
+              {/* National ID Input */}
               <Input
-                label="البريد الإلكتروني"
-                placeholder="أدخل بريدك الإلكتروني"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
+                label="رقم الهوية"
+                placeholder="أدخل رقم الهوية"
+                value={nationalId}
+                onChangeText={setNationalId}
+                keyboardType="number-pad"
                 autoCapitalize="none"
                 editable={!loading}
-                error={errors.email}
+                error={errors.nationalId}
               />
 
               {/* Password Input */}
@@ -170,13 +171,6 @@ const LoginScreen = () => {
                 loading={loading}
                 style={styles.submitButton}
               />
-
-              {/* Demo Credentials */}
-              <View style={styles.demoSection}>
-                <Text style={styles.demoTitle}>بيانات الاختبار:</Text>
-                <Text style={styles.demoText}>البريد: 412617003@c.co</Text>
-                <Text style={styles.demoText}>كلمة المرور: 506641234</Text>
-              </View>
             </Card>
           </View>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, SafeAreaView, FlatList, RefreshControl } from 'react-native';
+import { View, StyleSheet, SafeAreaView, FlatList, RefreshControl, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Text,
@@ -8,8 +8,9 @@ import {
   Chip,
   FAB,
   ActivityIndicator,
+  IconButton,
 } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchCamps, fetchCampFamilyCounts, fetchOrgMembers } from '../../lib/supabase';
@@ -17,9 +18,9 @@ import { showError } from '../../utils/toast';
 import spacing from '../../theme/spacing';
 
 const STATUS_LABEL = {
-  active: { label: '✅ نشط', tone: 'success' },
-  suspended: { label: '⏸️ موقوف', tone: 'warning' },
-  closed: { label: '🔴 مغلق', tone: 'error' },
+  active: { label: '✅ نشط', color: '#10b981' },
+  suspended: { label: '⏸️ موقوف', color: '#f59e0b' },
+  closed: { label: '🔴 مغلق', color: '#ef4444' },
 };
 
 const CampsListScreen = () => {
@@ -31,12 +32,10 @@ const CampsListScreen = () => {
   const [familyCounts, setFamilyCounts] = useState({});
   const [orgMembers, setOrgMembers] = useState([]);
   const [search, setSearch] = useState('');
+  const [collapsed, setCollapsed] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // إدارة المخيمات (هيكل إداري) محصورة حالياً بمالك المنصة ومدير الإيواء —
-  // نفس القيد بالنسخة الأصلية؛ صلاحيات المندوب لإضافة فرع تحت مخيمه لم تُنقل
-  // بعد بهذه النسخة الأولى (خطوة قادمة عند الحاجة).
   const canManageCamps = profile?.role === 'platform_owner' || profile?.role === 'super_admin';
 
   const loadData = useCallback(async () => {
@@ -63,13 +62,28 @@ const CampsListScreen = () => {
     loadData();
   }, [loadData]);
 
+  // إعادة تحميل تلقائي عند الرجوع من الإضافة/التعديل
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
   };
 
-  // اسم مدير الإيواء لكل مخيم (camps.manager_id → org_members.id)
-  // مع وراثة من المخيم الرئيسي للفروع بلا مدير خاص بها (نفس منطق النسخة الأصلية)
+  const toggleCollapse = (id) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // اسم مدير الإيواء لكل مخيم (مع وراثة من المخيم الرئيسي للفروع بلا مدير خاص بها)
   const managerMap = useMemo(() => {
     const byId = Object.fromEntries(orgMembers.map((m) => [m.id, m]));
     const gm = {};
@@ -78,34 +92,37 @@ const CampsListScreen = () => {
       if (mgr?.full_name) gm[c.id] = mgr.full_name;
     });
     camps.forEach((c) => {
-      if (c.parent_camp_id && !gm[c.id] && gm[c.parent_camp_id]) {
-        gm[c.id] = gm[c.parent_camp_id];
-      }
+      if (c.parent_camp_id && !gm[c.id] && gm[c.parent_camp_id]) gm[c.id] = gm[c.parent_camp_id];
     });
     return gm;
   }, [camps, orgMembers]);
 
-  // اسم مندوب المخيم (org_members حيث role=camp_delegate وcamp_id=هذا المخيم)
+  // اسم المندوب لكل مخيم
   const delegateMap = useMemo(() => {
     const dm = {};
     orgMembers
       .filter((m) => m.role === 'camp_delegate' && m.camp_id)
-      .forEach((m) => {
-        dm[m.camp_id] = m.full_name;
-      });
+      .forEach((m) => { dm[m.camp_id] = m.full_name; });
     camps.forEach((c) => {
-      if (c.parent_camp_id && !dm[c.id] && dm[c.parent_camp_id]) {
-        dm[c.id] = dm[c.parent_camp_id];
-      }
+      if (c.parent_camp_id && !dm[c.id] && dm[c.parent_camp_id]) dm[c.id] = dm[c.parent_camp_id];
     });
     return dm;
   }, [camps, orgMembers]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return camps;
-    return camps.filter((c) => (c.name || '').toLowerCase().includes(q));
-  }, [camps, search]);
+  const visibleIds = useMemo(() => new Set(camps.map((c) => c.id)), [camps]);
+  const isSearching = !!search.trim();
+  const searchLower = search.trim().toLowerCase();
+
+  // هرمي: المخيمات الرئيسية (بلا أب معروف) + فروعها تحتها — مطابق تماماً لمنطق النسخة الأصلية
+  const parents = useMemo(() => {
+    if (isSearching) return camps.filter((c) => (c.name || '').toLowerCase().includes(searchLower));
+    return camps.filter((c) => !c.parent_camp_id || !visibleIds.has(c.parent_camp_id));
+  }, [camps, isSearching, searchLower, visibleIds]);
+
+  const childrenOf = useCallback(
+    (campId) => (isSearching ? [] : camps.filter((c) => c.parent_camp_id === campId)),
+    [camps, isSearching]
+  );
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
@@ -114,51 +131,95 @@ const CampsListScreen = () => {
     headerCount: { color: 'rgba(255,255,255,0.85)', marginTop: spacing.xs },
     searchBar: { marginHorizontal: spacing.lg, marginTop: -spacing.lg, marginBottom: spacing.md, elevation: 3 },
     listContent: { paddingHorizontal: spacing.lg, paddingBottom: 100 },
-    card: { marginBottom: spacing.md },
+    parentCard: { marginBottom: spacing.sm, borderRightWidth: 3, borderRightColor: '#f59e0b' },
+    subCard: { marginBottom: spacing.sm, marginStart: spacing.xl, borderRightWidth: 3, borderRightColor: colors.primary },
     cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-    name: { color: colors.text, fontWeight: '600' },
-    subRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
-    meta: { color: colors.textSecondary },
+    name: { color: colors.text, fontWeight: 'bold' },
+    subName: { color: colors.text, fontWeight: '600', fontSize: 13 },
+    metaLine: { fontSize: 11, marginTop: spacing.xs },
+    warnLine: { fontSize: 11, marginTop: spacing.xs, color: colors.error, fontWeight: 'bold' },
+    mapLink: { fontSize: 11, marginTop: spacing.xs, color: colors.primary },
+    collapseToggle: { fontSize: 11, color: colors.primary, marginTop: spacing.xs },
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     emptyContainer: { alignItems: 'center', paddingVertical: spacing['3xl'] },
     fab: { position: 'absolute', right: spacing.lg, bottom: spacing.lg, backgroundColor: colors.primary },
   });
 
-  const renderCamp = ({ item }) => {
-    const st = STATUS_LABEL[item.status] || STATUS_LABEL.active;
-    const count = familyCounts[item.id] || 0;
+  const openMap = (lat, lng) => {
+    Linking.openURL(`https://maps.google.com/?q=${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`);
+  };
+
+  const renderCampInfo = (camp, isSub) => {
+    const st = STATUS_LABEL[camp.status] || STATUS_LABEL.active;
+    const count = familyCounts[camp.id] || 0;
+    const hasManager = !!managerMap[camp.id];
+    const hasDelegate = !!delegateMap[camp.id];
 
     return (
-      <Card
-        mode="elevated"
-        style={styles.card}
-        onPress={() => canManageCamps && navigation.navigate('CampForm', { campId: item.id })}
-      >
-        <Card.Content>
-          <View style={styles.cardRow}>
-            <View style={{ flex: 1 }}>
-              <Text variant="bodyLarge" style={styles.name}>
-                {item.camp_type === 'sub' ? '↳ ' : ''}
-                {item.name}
+      <>
+        <View style={styles.cardRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={isSub ? styles.subName : styles.name}>
+              {isSub ? '🏕️ ' : '⛺ '}{camp.name}
+            </Text>
+            {hasManager ? (
+              <Text style={[styles.metaLine, { color: colors.error }]}>🔴 مدير الإيواء: {managerMap[camp.id]}</Text>
+            ) : (
+              <Text style={styles.warnLine}>⚠️ بلا مدير إيواء معيّن</Text>
+            )}
+            {hasDelegate ? (
+              <Text style={[styles.metaLine, { color: colors.warning }]}>🟠 مندوب: {delegateMap[camp.id]}</Text>
+            ) : (
+              <Text style={styles.warnLine}>⚠️ بلا مندوب معيّن</Text>
+            )}
+            {camp.address && <Text style={[styles.metaLine, { color: colors.textSecondary }]}>📍 {camp.address}</Text>}
+            <Text style={[styles.metaLine, { color: colors.textSecondary }]}>
+              👥 {count} أسرة{camp.capacity ? ` من ${camp.capacity}` : ''}
+            </Text>
+            {camp.latitude && camp.longitude && (
+              <Text style={styles.mapLink} onPress={() => openMap(camp.latitude, camp.longitude)}>
+                🗺️ عرض على الخريطة
               </Text>
-              <View style={styles.subRow}>
-                <Text variant="bodySmall" style={styles.meta}>
-                  {count} أسرة{item.capacity ? ` · السعة ${item.capacity}` : ''}
-                </Text>
-              </View>
-              {(delegateMap[item.id] || managerMap[item.id]) && (
-                <Text variant="bodySmall" style={styles.meta}>
-                  {delegateMap[item.id] ? `👤 المندوب: ${delegateMap[item.id]}` : ''}
-                  {managerMap[item.id] ? `  🏢 المدير: ${managerMap[item.id]}` : ''}
-                </Text>
-              )}
-            </View>
-            <Chip compact mode="flat">
-              {st.label}
-            </Chip>
+            )}
           </View>
-        </Card.Content>
-      </Card>
+          <Chip compact mode="flat" textStyle={{ fontSize: 10 }}>{st.label}</Chip>
+        </View>
+      </>
+    );
+  };
+
+  const renderParent = ({ item: camp }) => {
+    const subs = childrenOf(camp.id);
+    const isCollapsed = collapsed.has(camp.id);
+
+    return (
+      <View>
+        <Card
+          mode="elevated"
+          style={styles.parentCard}
+          onPress={() => canManageCamps && navigation.navigate('CampForm', { campId: camp.id })}
+        >
+          <Card.Content>
+            {renderCampInfo(camp, false)}
+            {subs.length > 0 && (
+              <Text style={styles.collapseToggle} onPress={() => toggleCollapse(camp.id)}>
+                🏕️ {subs.length} فرع {isCollapsed ? '▼' : '▲'}
+              </Text>
+            )}
+          </Card.Content>
+        </Card>
+
+        {!isCollapsed && subs.map((s) => (
+          <Card
+            key={s.id}
+            mode="elevated"
+            style={styles.subCard}
+            onPress={() => canManageCamps && navigation.navigate('CampForm', { campId: s.id })}
+          >
+            <Card.Content>{renderCampInfo(s, true)}</Card.Content>
+          </Card>
+        ))}
+      </View>
     );
   };
 
@@ -182,7 +243,7 @@ const CampsListScreen = () => {
       >
         <Text variant="headlineSmall" style={styles.headerTitle}>🏕️ المخيمات</Text>
         <Text variant="bodySmall" style={styles.headerCount}>
-          {filtered.length} من أصل {camps.length} مخيم
+          {parents.length} من أصل {camps.length} مخيم
         </Text>
       </LinearGradient>
 
@@ -194,9 +255,9 @@ const CampsListScreen = () => {
       />
 
       <FlatList
-        data={filtered}
+        data={parents}
         keyExtractor={(item) => item.id}
-        renderItem={renderCamp}
+        renderItem={renderParent}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />

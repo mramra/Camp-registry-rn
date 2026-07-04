@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
   Menu,
 } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
@@ -79,6 +79,13 @@ const FamiliesListScreen = () => {
     setLoading(true);
     loadData();
   }, [loadData]);
+
+  // إعادة تحميل تلقائي عند الرجوع من شاشة الإضافة/التعديل (كانت القائمة لا تتحدث)
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

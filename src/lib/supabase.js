@@ -37,7 +37,10 @@ export const fetchFamilyMembers = async (familyIds) => {
   try {
     const { data, error } = await supabase
       .from('family_members')
-      .select('id, family_id, name, relation, national_id, dob, gender')
+      .select(
+        'id, family_id, name, relation, national_id, dob, gender, health, ' +
+        'orphan_status, orphan_cause, disabilities, injuries, chronic_diseases, female_status'
+      )
       .in('family_id', familyIds)
       .eq('_deleted', false);
 
@@ -183,6 +186,42 @@ export const deleteFamily = async (familyId) => {
   } catch (err) {
     return { success: false, error: err.message };
   }
+};
+
+// أسرة واحدة كاملة (كل الأعمدة) — تُستخدم بشاشة التعديل
+export const fetchFamilyById = async (familyId) => {
+  const { data, error } = await supabase.from('families').select('*').eq('id', familyId).single();
+  if (error) throw error;
+  return data;
+};
+
+// حفظ أفراد الأسرة: نحذف كل الأفراد الحاليين ثم نُدرج القائمة الجديدة كاملة —
+// أبسط وأضمن من مقارنة الفروقات (diff) لحجم بيانات هذا الفورم، وعملية غير متكررة.
+export const saveFamilyMembers = async (familyId, members) => {
+  const { error: delErr } = await supabase.from('family_members').delete().eq('family_id', familyId);
+  if (delErr) throw delErr;
+
+  if (!members || members.length === 0) return [];
+
+  const rows = members.map((m) => ({
+    family_id: familyId,
+    name: m.name?.trim() || '',
+    relation: m.relation || null,
+    national_id: m.national_id?.trim() || null,
+    dob: m.dob || null,
+    gender: m.gender || null,
+    health: m.health || null,
+    orphan_status: m.orphan_status || null,
+    orphan_cause: m.orphan_cause || null,
+    disabilities: m.disabilities || [],
+    injuries: m.injuries || [],
+    chronic_diseases: m.chronic_diseases || [],
+    female_status: m.female_status || [],
+  }));
+
+  const { data, error } = await supabase.from('family_members').insert(rows).select();
+  if (error) throw error;
+  return data;
 };
 
 export default supabase;

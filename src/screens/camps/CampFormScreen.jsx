@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import { View, StyleSheet, SafeAreaView, ScrollView, Linking } from 'react-native';
 import { Text, TextInput, Button, Card, HelperText, Menu, SegmentedButtons } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -34,6 +35,8 @@ const CampFormScreen = () => {
   const [capacity, setCapacity] = useState('');
   const [status, setStatus] = useState('active');
   const [managerId, setManagerId] = useState(null);
+  const [coordinates, setCoordinates] = useState(''); // "lat,lng" نفس صيغة النسخة الأصلية
+  const [locating, setLocating] = useState(false);
 
   const [allCamps, setAllCamps] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]);
@@ -48,8 +51,7 @@ const CampFormScreen = () => {
     if (!orgId) return;
     (async () => {
       const [camps, members] = await Promise.all([fetchCamps(orgId), fetchOrgMembers(orgId)]);
-      setAllCamps(camps.filter((c) => c.id !== campId)); // امنع اختيار المخيم نفسه كأب له
-      // مدير الإيواء = super_admin نشط فقط
+      setAllCamps(camps.filter((c) => c.id !== campId));
       setOrgMembers(members.filter((m) => m.role === 'super_admin' && m.is_active !== false));
 
       if (campId) {
@@ -62,6 +64,7 @@ const CampFormScreen = () => {
           setCapacity(data.capacity ? String(data.capacity) : '');
           setStatus(data.status || 'active');
           setManagerId(data.manager_id || null);
+          setCoordinates(data.latitude && data.longitude ? `${data.latitude},${data.longitude}` : '');
         }
         setLoading(false);
       }
@@ -76,10 +79,46 @@ const CampFormScreen = () => {
     return Object.keys(e).length === 0;
   };
 
+  const useMyLocation = async () => {
+    setLocating(true);
+    try {
+      const { status: permStatus } = await Location.requestForegroundPermissionsAsync();
+      if (permStatus !== 'granted') {
+        showError('لم يُسمح بالوصول للموقع');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({});
+      setCoordinates(`${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`);
+      showSuccess('تم تحديد الموقع الحالي');
+    } catch (e) {
+      showError('تعذّر الحصول على الموقع الحالي');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const openOnMap = () => {
+    const c = coordinates.trim();
+    if (c.includes(',')) Linking.openURL(`https://maps.google.com/?q=${c}`);
+  };
+
+  const parseCoordinates = () => {
+    const c = coordinates.trim();
+    if (!c || !c.includes(',')) return { latitude: null, longitude: null };
+    const [latStr, lngStr] = c.split(',');
+    const latitude = parseFloat(latStr.trim());
+    const longitude = parseFloat(lngStr.trim());
+    return {
+      latitude: isNaN(latitude) ? null : latitude,
+      longitude: isNaN(longitude) ? null : longitude,
+    };
+  };
+
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
     try {
+      const { latitude, longitude } = parseCoordinates();
       const payload = {
         org_id: orgId,
         name: name.trim(),
@@ -89,6 +128,8 @@ const CampFormScreen = () => {
         capacity: capacity ? parseInt(capacity, 10) : null,
         status,
         manager_id: managerId || null,
+        latitude,
+        longitude,
         _deleted: false,
       };
 
@@ -117,6 +158,8 @@ const CampFormScreen = () => {
     menuAnchor: { marginBottom: spacing.xs },
     saveButton: { marginTop: spacing.lg, borderRadius: 8 },
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    hint: { color: colors.textMuted, fontSize: 11, marginBottom: spacing.sm },
+    locBtn: { marginBottom: spacing.sm },
   });
 
   if (loading) {
@@ -172,7 +215,7 @@ const CampFormScreen = () => {
                   }
                 >
                   {allCamps
-                    .filter((c) => c.camp_type !== 'sub')
+                    .filter((c) => !c.parent_camp_id)
                     .map((c) => (
                       <Menu.Item
                         key={c.id}
@@ -204,6 +247,33 @@ const CampFormScreen = () => {
               keyboardType="number-pad"
               style={styles.input}
             />
+
+            <Text style={styles.fieldLabel}>📍 إحداثيات GPS</Text>
+            <TextInput
+              mode="outlined"
+              placeholder="31.547565,34.461274"
+              value={coordinates}
+              onChangeText={setCoordinates}
+              style={styles.input}
+            />
+            <Text style={styles.hint}>الصيغة: خط_العرض,خط_الطول</Text>
+
+            <Button
+              mode="outlined"
+              icon="crosshairs-gps"
+              onPress={useMyLocation}
+              loading={locating}
+              disabled={locating}
+              style={styles.locBtn}
+            >
+              استخدام موقعي الحالي
+            </Button>
+
+            {coordinates.includes(',') && (
+              <Button mode="text" icon="map" onPress={openOnMap} style={styles.locBtn}>
+                🗺️ عرض على الخريطة
+              </Button>
+            )}
 
             <Text style={styles.fieldLabel}>الحالة</Text>
             <SegmentedButtons

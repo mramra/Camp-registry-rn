@@ -1,45 +1,69 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { Text, Card, ActivityIndicator, Divider, Chip } from 'react-native-paper';
-import { useRoute } from '@react-navigation/native';
+import { Text, Card, ActivityIndicator, Divider, Chip, FAB } from 'react-native-paper';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { supabase, fetchFamilyMembers } from '../../lib/supabase';
+import { supabase, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { getFamilyPriority, TIER_LABELS, getFamilyCategories, CATEGORY_LABELS } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import spacing from '../../theme/spacing';
 
+const ECONOMIC_LABELS = {
+  extreme_poverty: '🔴 فقر مدقع',
+  poor: '🟠 فقير',
+  worker: '🟡 عامل / متوسط',
+  employee: '🟢 موظف / متوسط',
+  well_off: '🔵 ميسور',
+};
+
 const FamilyDetailScreen = () => {
   const route = useRoute();
+  const navigation = useNavigation();
   const { familyId } = route.params || {};
+  const { profile } = useAuth();
   const { colors } = useTheme();
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
+  const [campName, setCampName] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('families')
-          .select('*')
-          .eq('id', familyId)
-          .single();
-        if (error) throw error;
-        setFamily(data);
-        const mems = await fetchFamilyMembers([familyId]);
-        setMembers(mems);
-      } catch (e) {
-        showError('تعذّر تحميل بيانات الأسرة');
-      } finally {
-        setLoading(false);
+  const canEdit = profile?.role === 'platform_owner' || profile?.can_edit;
+
+  const load = useCallback(async () => {
+    if (!familyId) return;
+    try {
+      const { data, error } = await supabase
+        .from('families')
+        .select('*')
+        .eq('id', familyId)
+        .single();
+      if (error) throw error;
+      setFamily(data);
+      const mems = await fetchFamilyMembers([familyId]);
+      setMembers(mems);
+      if (data?.org_id && data?.camp_id) {
+        const camps = await fetchCamps(data.org_id);
+        setCampName(camps.find((c) => c.id === data.camp_id)?.name || '');
       }
-    };
-    if (familyId) load();
+    } catch (e) {
+      showError('تعذّر تحميل بيانات الأسرة');
+    } finally {
+      setLoading(false);
+    }
   }, [familyId]);
+
+  // إعادة التحميل تلقائياً عند الرجوع من شاشة التعديل (لعرض آخر تعديل مباشرة)
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      load();
+    }, [load])
+  );
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
-    content: { padding: spacing.lg },
+    content: { padding: spacing.lg, paddingBottom: 100 },
     card: { marginBottom: spacing.lg },
     row: {
       flexDirection: 'row',
@@ -52,6 +76,7 @@ const FamilyDetailScreen = () => {
     memberCard: { marginBottom: spacing.sm },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    fab: { position: 'absolute', right: spacing.lg, bottom: spacing.lg, backgroundColor: colors.primary },
   });
 
   if (loading) {
@@ -83,7 +108,11 @@ const FamilyDetailScreen = () => {
     ['جوال إضافي', family.phone2],
     ['الحالة الاجتماعية', family.head_marital],
     ['الجنس', family.head_gender],
+    ['المخيم', campName],
+    ['رقم الخيمة', family.tent],
     ['العنوان الأصلي', family.original_address],
+    ['تفاصيل العنوان', family.address_details],
+    ['المستوى الاقتصادي', ECONOMIC_LABELS[family.economic_level]],
     ['ملاحظات', family.notes],
   ].filter(([, v]) => v);
 
@@ -135,6 +164,14 @@ const FamilyDetailScreen = () => {
           ))
         )}
       </ScrollView>
+
+      {canEdit && (
+        <FAB
+          icon="pencil"
+          style={styles.fab}
+          onPress={() => navigation.navigate('FamilyForm', { familyId })}
+        />
+      )}
     </SafeAreaView>
   );
 };

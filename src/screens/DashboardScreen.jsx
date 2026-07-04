@@ -6,7 +6,6 @@ import {
   ScrollView,
   RefreshControl,
   Pressable,
-  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Card, Button, ActivityIndicator, Badge } from 'react-native-paper';
@@ -262,15 +261,12 @@ const DashboardScreen = ({ navigation }) => {
           <View style={styles.section}>
             <Text variant="titleMedium" style={styles.sectionTitle}>الأسر المضافة حديثاً</Text>
             {families.length > 0 ? (
-              <FlatList
-                data={families}
-                renderItem={renderFamilyCard}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                ItemSeparatorComponent={() => (
-                  <View style={{ height: spacing.md }} />
-                )}
-              />
+              families.map((item, index) => (
+                <View key={item.id}>
+                  {renderFamilyCard({ item })}
+                  {index < families.length - 1 && <View style={{ height: spacing.md }} />}
+                </View>
+              ))
             ) : (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>لا توجد أسر مسجلة</Text>

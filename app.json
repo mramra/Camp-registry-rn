@@ -30,6 +30,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "experiments": {
+      "baseUrl": "/Camp-registry-rn"
+    },
     "extra": {
       "eas": {
         "projectId": "c8d89b81-f55b-4f80-8b43-abcb76529c5d"

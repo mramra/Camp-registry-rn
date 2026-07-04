@@ -9,6 +9,8 @@ import DashboardScreen from '../screens/DashboardScreen';
 import FamiliesListScreen from '../screens/families/FamiliesListScreen';
 import FamilyDetailScreen from '../screens/families/FamilyDetailScreen';
 import FamilyFormScreen from '../screens/families/FamilyFormScreen';
+import CampsListScreen from '../screens/camps/CampsListScreen';
+import CampFormScreen from '../screens/camps/CampFormScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -57,6 +59,16 @@ const AppNavigator = () => {
         name="FamilyForm"
         component={FamilyFormScreen}
         options={{ title: 'إضافة أسرة' }}
+      />
+      <Stack.Screen
+        name="CampsList"
+        component={CampsListScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="CampForm"
+        component={CampFormScreen}
+        options={{ title: 'المخيم' }}
       />
     </Stack.Navigator>
   );

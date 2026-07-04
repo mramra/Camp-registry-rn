@@ -285,7 +285,11 @@ const DashboardScreen = ({ navigation }) => {
               >
                 قائمة الأسر
               </Button>
-              <Button mode="outlined" style={styles.actionButton}>
+              <Button
+                mode="outlined"
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('CampsList')}
+              >
                 إدارة المخيمات
               </Button>
               <Button

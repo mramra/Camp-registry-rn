@@ -76,7 +76,7 @@ export const fetchCamps = async (orgId) => {
   try {
     const { data, error } = await supabase
       .from('camps')
-      .select('id, name, status, address, capacity')
+      .select('id, org_id, name, status, address, capacity, manager_id, parent_camp_id, camp_type, latitude, longitude, created_at')
       .eq('org_id', orgId)
       .eq('_deleted', false)
       .order('name', { ascending: true });
@@ -86,6 +86,59 @@ export const fetchCamps = async (orgId) => {
   } catch (err) {
     console.error('[fetchCamps]', err.message);
     return [];
+  }
+};
+
+// عدد الأسر بكل مخيم (لعرضه ببطاقة المخيم بدون جلب كل الأسر)
+export const fetchCampFamilyCounts = async (orgId) => {
+  const { data, error } = await supabase
+    .from('families')
+    .select('camp_id')
+    .eq('org_id', orgId)
+    .eq('_deleted', false);
+
+  if (error) throw error;
+  const counts = {};
+  (data || []).forEach((f) => {
+    if (!f.camp_id) return;
+    counts[f.camp_id] = (counts[f.camp_id] || 0) + 1;
+  });
+  return counts;
+};
+
+// أعضاء المنظمة (لعرض اسم مندوب/مدير كل مخيم واختيار مدير عند الإضافة)
+export const fetchOrgMembers = async (orgId) => {
+  const { data, error } = await supabase
+    .from('org_members')
+    .select('id, full_name, role, camp_id, is_active')
+    .eq('org_id', orgId)
+    .eq('_deleted', false);
+
+  if (error) throw error;
+  return data || [];
+};
+
+export const createCamp = async (campData) => {
+  try {
+    const { data, error } = await supabase.from('camps').insert([campData]).select();
+    if (error) throw error;
+    return { success: true, data: data[0] };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+export const updateCamp = async (campId, updates) => {
+  try {
+    const { data, error } = await supabase
+      .from('camps')
+      .update(updates)
+      .eq('id', campId)
+      .select();
+    if (error) throw error;
+    return { success: true, data: data[0] };
+  } catch (err) {
+    return { success: false, error: err.message };
   }
 };
 

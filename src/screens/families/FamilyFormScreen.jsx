@@ -9,18 +9,23 @@ import {
   Menu,
   Checkbox,
   SegmentedButtons,
+  IconButton,
+  Divider,
 } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
   fetchCamps,
+  fetchFamilyMembers,
   createFamily,
   updateFamily,
+  saveFamilyMembers,
   supabase,
 } from '../../lib/supabase';
 import { showError, showSuccess, showInfo } from '../../utils/toast';
 import { luhnCheck, validateName, validateDob } from '../../lib/helpers';
+import { RELATION_BY_GENDER, ALL_RELATIONS, HEALTH_OPTIONS } from '../../lib/formOptions';
 import spacing from '../../theme/spacing';
 
 const MARITAL_BY_GENDER = {
@@ -49,6 +54,9 @@ const MONTHS = [
   'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
 ];
 
+let localIdCounter = 0;
+const genLocalId = () => `local_${Date.now()}_${localIdCounter++}`;
+
 function parseDob(dob) {
   if (!dob) return { day: null, month: null, year: null };
   const d = new Date(dob);
@@ -63,8 +71,7 @@ function buildDob(day, month, year) {
   return `${year}-${mm}-${dd}`;
 }
 
-// حقل اختيار بسيط عبر قائمة منسدلة (Menu) — مستخدم لعدة حقول اختيار بهذه الشاشة
-const SelectField = ({ label, value, options, onSelect, placeholder = 'اختر' }) => {
+const SelectField = ({ value, options, onSelect, placeholder = 'اختر' }) => {
   const [visible, setVisible] = useState(false);
   return (
     <Menu
@@ -77,18 +84,23 @@ const SelectField = ({ label, value, options, onSelect, placeholder = 'اختر'
       }
     >
       {options.map((opt) => (
-        <Menu.Item
-          key={opt}
-          title={opt}
-          onPress={() => {
-            onSelect(opt);
-            setVisible(false);
-          }}
-        />
+        <Menu.Item key={opt} title={opt} onPress={() => { onSelect(opt); setVisible(false); }} />
       ))}
     </Menu>
   );
 };
+
+const newMember = () => ({
+  localId: genLocalId(),
+  name: '',
+  gender: '',
+  relation: '',
+  national_id: '',
+  day: null,
+  month: null,
+  year: null,
+  health: 'سليم',
+});
 
 const FamilyFormScreen = () => {
   const navigation = useNavigation();
@@ -120,6 +132,7 @@ const FamilyFormScreen = () => {
   const [categories, setCategories] = useState([]);
   const [economicLevel, setEconomicLevel] = useState('');
   const [notes, setNotes] = useState('');
+  const [members, setMembers] = useState([]);
 
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -172,6 +185,31 @@ const FamilyFormScreen = () => {
       } catch {
         setCategories([]);
       }
+
+      // تحميل أفراد الأسرة الحاليين
+      try {
+        const mems = await fetchFamilyMembers([familyId]);
+        setMembers(
+          mems.map((m) => {
+            const d = parseDob(m.dob);
+            return {
+              localId: m.id,
+              dbId: m.id,
+              name: m.name || '',
+              gender: m.gender || '',
+              relation: m.relation || '',
+              national_id: m.national_id || '',
+              day: d.day,
+              month: d.month,
+              year: d.year,
+              health: m.health || 'سليم',
+            };
+          })
+        );
+      } catch (e) {
+        showError('تعذّر تحميل أفراد الأسرة');
+      }
+
       setLoading(false);
     })();
   }, [familyId]);
@@ -182,6 +220,19 @@ const FamilyFormScreen = () => {
 
   const toggleCategory = (key) => {
     setCategories((prev) => (prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key]));
+  };
+
+  const addMember = () => setMembers((prev) => [...prev, newMember()]);
+  const removeMember = (localId) => setMembers((prev) => prev.filter((m) => m.localId !== localId));
+  const updateMember = (localId, field, value) => {
+    setMembers((prev) =>
+      prev.map((m) => {
+        if (m.localId !== localId) return m;
+        const updated = { ...m, [field]: value };
+        if (field === 'gender') updated.relation = ''; // إعادة ضبط الصلة عند تغيير الجنس
+        return updated;
+      })
+    );
   };
 
   const validate = () => {
@@ -202,6 +253,14 @@ const FamilyFormScreen = () => {
 
     if (!campId) e.campId = 'اختر المخيم';
 
+    members.forEach((m, i) => {
+      if (!m.name.trim()) e[`m_name_${i}`] = 'اسم الفرد مطلوب';
+      else {
+        const nameErr = validateName(m.name);
+        if (nameErr) e[`m_name_${i}`] = nameErr;
+      }
+    });
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -212,7 +271,6 @@ const FamilyFormScreen = () => {
     try {
       const dobStr = buildDob(dobDay, dobMonth, dobYear);
 
-      // فحص هوية مكررة (تنبيه فقط، لا يمنع الحفظ - نفس سلوك النسخة الأصلية)
       if (!familyId || headId.trim() !== existingFamily?.head_id) {
         const { data: dupRows } = await supabase
           .from('families')
@@ -246,6 +304,7 @@ const FamilyFormScreen = () => {
       };
 
       let result;
+      let finalFamilyId = familyId;
       if (familyId) {
         result = await updateFamily(familyId, payload);
       } else {
@@ -255,6 +314,7 @@ const FamilyFormScreen = () => {
           pending_delete: false,
           created_by: user?.id || null,
         });
+        if (result.success) finalFamilyId = result.data.id;
       }
 
       if (!result.success) {
@@ -262,12 +322,29 @@ const FamilyFormScreen = () => {
         return;
       }
 
+      // حفظ أفراد الأسرة (يستبدل القائمة بالكامل)
+      try {
+        await saveFamilyMembers(
+          finalFamilyId,
+          members.map((m) => ({
+            name: m.name.trim(),
+            relation: m.relation || null,
+            national_id: m.national_id?.trim() || null,
+            dob: buildDob(m.day, m.month, m.year),
+            gender: m.gender || null,
+            health: m.health || null,
+          }))
+        );
+      } catch (memErr) {
+        showError('تم حفظ الأسرة لكن حدث خطأ بحفظ الأفراد: ' + memErr.message);
+      }
+
       // قاعدة عمل: عند إضافة أسرة جديدة بمخيم، تُسجَّل حركة دخول تلقائياً
       if (!familyId) {
         try {
           await supabase.from('family_movements').insert([
             {
-              family_id: result.data.id,
+              family_id: finalFamilyId,
               org_id: orgId,
               type: 'entry',
               to_camp: campId,
@@ -302,6 +379,11 @@ const FamilyFormScreen = () => {
     checkboxRow: { flexDirection: 'row', alignItems: 'center' },
     saveButton: { marginTop: spacing.sm, borderRadius: 8 },
     loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    memberCard: { backgroundColor: colors.surface2, borderRadius: 10, padding: spacing.md, marginBottom: spacing.md },
+    memberHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+    memberTitle: { color: colors.primary, fontWeight: 'bold', fontSize: 12 },
+    emptyMembers: { textAlign: 'center', color: colors.textMuted, paddingVertical: spacing.lg, fontSize: 12 },
+    addMemberBtn: { borderStyle: 'dashed', marginTop: spacing.xs },
   });
 
   if (loading) {
@@ -370,10 +452,7 @@ const FamilyFormScreen = () => {
             <Text style={styles.fieldLabel}>الجنس</Text>
             <SegmentedButtons
               value={headGender}
-              onValueChange={(v) => {
-                setHeadGender(v);
-                setHeadMarital('');
-              }}
+              onValueChange={(v) => { setHeadGender(v); setHeadMarital(''); }}
               buttons={[
                 { value: 'ذكر', label: 'ذكر' },
                 { value: 'أنثى', label: 'أنثى' },
@@ -382,38 +461,18 @@ const FamilyFormScreen = () => {
             />
 
             <Text style={styles.fieldLabel}>الحالة الاجتماعية</Text>
-            <SelectField
-              value={headMarital}
-              options={maritalOptions}
-              onSelect={setHeadMarital}
-              placeholder="اختر الحالة الاجتماعية"
-            />
+            <SelectField value={headMarital} options={maritalOptions} onSelect={setHeadMarital} placeholder="اختر الحالة الاجتماعية" />
 
             <Text style={styles.fieldLabel}>تاريخ الميلاد</Text>
             <View style={styles.row}>
               <View style={styles.flex1}>
-                <SelectField
-                  value={dobDay ? String(dobDay) : null}
-                  options={days.map(String)}
-                  onSelect={(v) => setDobDay(Number(v))}
-                  placeholder="اليوم"
-                />
+                <SelectField value={dobDay ? String(dobDay) : null} options={days.map(String)} onSelect={(v) => setDobDay(Number(v))} placeholder="اليوم" />
               </View>
               <View style={styles.flex1}>
-                <SelectField
-                  value={dobMonth ? MONTHS[dobMonth - 1] : null}
-                  options={MONTHS}
-                  onSelect={(v) => setDobMonth(MONTHS.indexOf(v) + 1)}
-                  placeholder="الشهر"
-                />
+                <SelectField value={dobMonth ? MONTHS[dobMonth - 1] : null} options={MONTHS} onSelect={(v) => setDobMonth(MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
               </View>
               <View style={styles.flex1}>
-                <SelectField
-                  value={dobYear ? String(dobYear) : null}
-                  options={years.map(String)}
-                  onSelect={(v) => setDobYear(Number(v))}
-                  placeholder="السنة"
-                />
+                <SelectField value={dobYear ? String(dobYear) : null} options={years.map(String)} onSelect={(v) => setDobYear(Number(v))} placeholder="السنة" />
               </View>
             </View>
             <HelperText type="error" visible={!!errors.dob}>{errors.dob}</HelperText>
@@ -429,12 +488,7 @@ const FamilyFormScreen = () => {
               visible={campMenuVisible}
               onDismiss={() => setCampMenuVisible(false)}
               anchor={
-                <Button
-                  mode="outlined"
-                  onPress={() => setCampMenuVisible(true)}
-                  style={styles.menuAnchor}
-                  icon="chevron-down"
-                >
+                <Button mode="outlined" onPress={() => setCampMenuVisible(true)} style={styles.menuAnchor} icon="chevron-down">
                   {camps.find((c) => c.id === campId)?.name || '— اختر المخيم — *'}
                 </Button>
               }
@@ -446,37 +500,99 @@ const FamilyFormScreen = () => {
             <HelperText type="error" visible={!!errors.campId}>{errors.campId}</HelperText>
 
             <View style={styles.row}>
-              <TextInput
-                mode="outlined"
-                label="رقم الخيمة"
-                value={tent}
-                onChangeText={setTent}
-                style={[styles.input, styles.flex1]}
-              />
-              <TextInput
-                mode="outlined"
-                label="خيمة ثانية"
-                value={tent2}
-                onChangeText={setTent2}
-                style={[styles.input, styles.flex1]}
-              />
+              <TextInput mode="outlined" label="رقم الخيمة" value={tent} onChangeText={setTent} style={[styles.input, styles.flex1]} />
+              <TextInput mode="outlined" label="خيمة ثانية" value={tent2} onChangeText={setTent2} style={[styles.input, styles.flex1]} />
             </View>
 
             <Text style={styles.fieldLabel}>العنوان الأصلي</Text>
-            <SelectField
-              value={originalAddress}
-              options={REGIONS}
-              onSelect={setOriginalAddress}
-              placeholder="اختر المنطقة"
-            />
+            <SelectField value={originalAddress} options={REGIONS} onSelect={setOriginalAddress} placeholder="اختر المنطقة" />
 
-            <TextInput
-              mode="outlined"
-              label="تفاصيل العنوان"
-              value={addressDetails}
-              onChangeText={setAddressDetails}
-              style={[styles.input, { marginTop: spacing.sm }]}
-            />
+            <TextInput mode="outlined" label="تفاصيل العنوان" value={addressDetails} onChangeText={setAddressDetails} style={[styles.input, { marginTop: spacing.sm }]} />
+          </Card.Content>
+        </Card>
+
+        {/* أفراد الأسرة */}
+        <Card mode="elevated" style={styles.card}>
+          <Card.Content>
+            <Text variant="titleMedium" style={styles.sectionTitle}>👨‍👩‍👧 أفراد الأسرة ({members.length})</Text>
+
+            {members.length === 0 && (
+              <Text style={styles.emptyMembers}>لا يوجد أفراد مضافون بعد</Text>
+            )}
+
+            {members.map((m, i) => {
+              const relations = m.gender ? RELATION_BY_GENDER[m.gender] || ALL_RELATIONS : ALL_RELATIONS;
+              return (
+                <View key={m.localId} style={styles.memberCard}>
+                  <View style={styles.memberHeader}>
+                    <Text style={styles.memberTitle}>فرد {i + 1}</Text>
+                    <IconButton icon="delete-outline" size={18} iconColor={colors.error} onPress={() => removeMember(m.localId)} />
+                  </View>
+
+                  <TextInput
+                    mode="outlined"
+                    label="الاسم *"
+                    placeholder="الاسم الرباعي"
+                    value={m.name}
+                    onChangeText={(v) => updateMember(m.localId, 'name', v)}
+                    error={!!errors[`m_name_${i}`]}
+                    dense
+                    style={styles.input}
+                  />
+                  <HelperText type="error" visible={!!errors[`m_name_${i}`]}>{errors[`m_name_${i}`]}</HelperText>
+
+                  <View style={styles.row}>
+                    <View style={styles.flex1}>
+                      <SelectField value={m.gender} options={['ذكر', 'أنثى']} onSelect={(v) => updateMember(m.localId, 'gender', v)} placeholder="الجنس" />
+                    </View>
+                    <View style={styles.flex1}>
+                      <SelectField value={m.relation} options={relations} onSelect={(v) => updateMember(m.localId, 'relation', v)} placeholder="صلة القرابة" />
+                    </View>
+                  </View>
+
+                  <TextInput
+                    mode="outlined"
+                    label="رقم الهوية (اختياري)"
+                    placeholder="9 أرقام"
+                    value={m.national_id}
+                    onChangeText={(v) => updateMember(m.localId, 'national_id', v)}
+                    keyboardType="number-pad"
+                    maxLength={9}
+                    dense
+                    style={[styles.input, { marginTop: spacing.sm }]}
+                  />
+                  {m.national_id?.length >= 9 && (
+                    <HelperText type={luhnCheck(m.national_id) ? 'info' : 'error'} visible>
+                      {luhnCheck(m.national_id) ? '✅ هوية صحيحة' : '❌ هوية غير صحيحة'}
+                    </HelperText>
+                  )}
+
+                  <Text style={styles.fieldLabel}>تاريخ الميلاد</Text>
+                  <View style={styles.row}>
+                    <View style={styles.flex1}>
+                      <SelectField value={m.day ? String(m.day) : null} options={days.map(String)} onSelect={(v) => updateMember(m.localId, 'day', Number(v))} placeholder="اليوم" />
+                    </View>
+                    <View style={styles.flex1}>
+                      <SelectField value={m.month ? MONTHS[m.month - 1] : null} options={MONTHS} onSelect={(v) => updateMember(m.localId, 'month', MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
+                    </View>
+                    <View style={styles.flex1}>
+                      <SelectField value={m.year ? String(m.year) : null} options={years.map(String)} onSelect={(v) => updateMember(m.localId, 'year', Number(v))} placeholder="السنة" />
+                    </View>
+                  </View>
+
+                  <Text style={styles.fieldLabel}>الحالة الصحية</Text>
+                  <SelectField
+                    value={HEALTH_OPTIONS.find((h) => h.v === m.health)?.label || m.health}
+                    options={HEALTH_OPTIONS.map((h) => h.label)}
+                    onSelect={(label) => updateMember(m.localId, 'health', HEALTH_OPTIONS.find((h) => h.label === label)?.v || label)}
+                  />
+                </View>
+              );
+            })}
+
+            <Button mode="outlined" icon="plus" onPress={addMember} style={styles.addMemberBtn}>
+              إضافة فرد
+            </Button>
           </Card.Content>
         </Card>
 
@@ -488,10 +604,7 @@ const FamilyFormScreen = () => {
             <Text style={styles.fieldLabel}>فئة الأسرة</Text>
             {FAMILY_CATEGORIES.map((cat) => (
               <View key={cat.key} style={styles.checkboxRow}>
-                <Checkbox
-                  status={categories.includes(cat.key) ? 'checked' : 'unchecked'}
-                  onPress={() => toggleCategory(cat.key)}
-                />
+                <Checkbox status={categories.includes(cat.key) ? 'checked' : 'unchecked'} onPress={() => toggleCategory(cat.key)} />
                 <Text style={{ color: colors.text }}>{cat.label}</Text>
               </View>
             ))}
@@ -507,14 +620,7 @@ const FamilyFormScreen = () => {
               }
             >
               {ECONOMIC_LEVELS.map((l) => (
-                <Menu.Item
-                  key={l.key || 'none'}
-                  title={l.label}
-                  onPress={() => {
-                    setEconomicLevel(l.key);
-                    setEconMenuVisible(false);
-                  }}
-                />
+                <Menu.Item key={l.key || 'none'} title={l.label} onPress={() => { setEconomicLevel(l.key); setEconMenuVisible(false); }} />
               ))}
             </Menu>
           </Card.Content>
@@ -524,13 +630,7 @@ const FamilyFormScreen = () => {
         <Card mode="elevated" style={styles.card}>
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>📝 ملاحظات</Text>
-            <TextInput
-              mode="outlined"
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              numberOfLines={3}
-            />
+            <TextInput mode="outlined" value={notes} onChangeText={setNotes} multiline numberOfLines={3} />
           </Card.Content>
         </Card>
 

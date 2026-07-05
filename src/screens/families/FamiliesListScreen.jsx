@@ -15,12 +15,14 @@ import {
   FAB,
   ActivityIndicator,
   Menu,
+  IconButton,
+  TextInput,
 } from 'react-native-paper';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { getFamilyPriority, TIER_LABELS, isIncomplete } from '../../lib/helpers';
+import { getFamilyPriority, TIER_LABELS, isIncomplete, isAgeInRange } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import spacing from '../../theme/spacing';
 
@@ -29,6 +31,12 @@ const TIER_COLOR = {
   need: 'warning',
   ok: 'success',
 };
+
+const APPROVAL_TABS = [
+  { key: 'approved', label: '✅ مكتمل' },
+  { key: 'pending', label: '🔍 قيد المراجعة' },
+  { key: 'rejected', label: '❌ مرفوض' },
+];
 
 const FamiliesListScreen = () => {
   const navigation = useNavigation();
@@ -44,6 +52,11 @@ const FamiliesListScreen = () => {
   const [search, setSearch] = useState('');
   const [campFilter, setCampFilter] = useState(null);
   const [qualityFilter, setQualityFilter] = useState(''); // '', 'incomplete', 'dup_id', 'dup_phone'
+  const [approvalFilter, setApprovalFilter] = useState('approved');
+  const [genderFilter, setGenderFilter] = useState(''); // '', 'ذكر', 'أنثى'
+  const [ageMin, setAgeMin] = useState('');
+  const [ageMax, setAgeMax] = useState('');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,7 +93,7 @@ const FamiliesListScreen = () => {
     loadData();
   }, [loadData]);
 
-  // إعادة تحميل تلقائي عند الرجوع من شاشة الإضافة/التعديل (كانت القائمة لا تتحدث)
+  // إعادة تحميل تلقائي عند الرجوع من شاشة الإضافة/التعديل
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -141,12 +154,30 @@ const FamiliesListScreen = () => {
     [families, membersByFamily]
   );
 
+  const approvalCounts = useMemo(() => {
+    const c = { approved: 0, pending: 0, rejected: 0 };
+    families.forEach((f) => {
+      const st = f.review_status || 'approved';
+      if (c[st] !== undefined) c[st]++;
+    });
+    return c;
+  }, [families]);
+
   const filteredFamilies = useMemo(() => {
-    let list = families;
+    let list = families.filter((f) => (f.review_status || 'approved') === approvalFilter);
 
     if (qualityFilter === 'incomplete') list = list.filter((f) => isIncomplete(f, membersByFamily[f.id]));
     else if (qualityFilter === 'dup_id') list = list.filter((f) => dupIdSet.has(f.id));
     else if (qualityFilter === 'dup_phone') list = list.filter((f) => dupPhoneSet.has(f.id));
+
+    if (genderFilter) list = list.filter((f) => f.head_gender === genderFilter);
+
+    if (ageMin || ageMax) {
+      list = list.filter((f) => {
+        if (isAgeInRange(f.head_dob, ageMin, ageMax)) return true;
+        return (membersByFamily[f.id] || []).some((m) => isAgeInRange(m.dob, ageMin, ageMax));
+      });
+    }
 
     const q = search.trim().toLowerCase();
     if (q) {
@@ -158,7 +189,7 @@ const FamiliesListScreen = () => {
       );
     }
     return list;
-  }, [families, search, qualityFilter, membersByFamily, dupIdSet, dupPhoneSet]);
+  }, [families, search, qualityFilter, approvalFilter, genderFilter, ageMin, ageMax, membersByFamily, dupIdSet, dupPhoneSet]);
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
@@ -180,9 +211,23 @@ const FamiliesListScreen = () => {
       flexWrap: 'wrap',
       alignItems: 'center',
       paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+      gap: spacing.sm,
+    },
+    moreFiltersToggle: {
+      color: colors.primary,
+      fontSize: 12,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+    },
+    ageRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
       marginBottom: spacing.md,
       gap: spacing.sm,
     },
+    ageInput: { flex: 1, height: 44 },
     listContent: {
       paddingHorizontal: spacing.lg,
       paddingBottom: 100,
@@ -279,6 +324,21 @@ const FamiliesListScreen = () => {
         style={styles.searchBar}
       />
 
+      {/* حالة المراجعة */}
+      <View style={styles.filterRow}>
+        {APPROVAL_TABS.map((tab) => (
+          <Chip
+            key={tab.key}
+            selected={approvalFilter === tab.key}
+            mode={approvalFilter === tab.key ? 'flat' : 'outlined'}
+            onPress={() => setApprovalFilter(tab.key)}
+          >
+            {tab.label} ({approvalCounts[tab.key]})
+          </Chip>
+        ))}
+      </View>
+
+      {/* جودة البيانات + المخيم */}
       <View style={styles.filterRow}>
         <Chip
           selected={qualityFilter === ''}
@@ -313,28 +373,59 @@ const FamiliesListScreen = () => {
           visible={menuVisible}
           onDismiss={() => setMenuVisible(false)}
           anchor={
-            <Chip
-              icon="filter-variant"
-              mode="outlined"
-              onPress={() => setMenuVisible(true)}
-            >
+            <Chip icon="filter-variant" mode="outlined" onPress={() => setMenuVisible(true)}>
               {campFilter ? campMap[campFilter] : 'كل المخيمات'}
             </Chip>
           }
         >
-          <Menu.Item
-            title="كل المخيمات"
-            onPress={() => { setCampFilter(null); setMenuVisible(false); }}
-          />
+          <Menu.Item title="كل المخيمات" onPress={() => { setCampFilter(null); setMenuVisible(false); }} />
           {camps.map((c) => (
-            <Menu.Item
-              key={c.id}
-              title={c.name}
-              onPress={() => { setCampFilter(c.id); setMenuVisible(false); }}
-            />
+            <Menu.Item key={c.id} title={c.name} onPress={() => { setCampFilter(c.id); setMenuVisible(false); }} />
           ))}
         </Menu>
       </View>
+
+      {/* الجنس */}
+      <View style={styles.filterRow}>
+        <Chip selected={genderFilter === ''} mode={genderFilter === '' ? 'flat' : 'outlined'} onPress={() => setGenderFilter('')}>
+          كل الجنس
+        </Chip>
+        <Chip selected={genderFilter === 'ذكر'} mode={genderFilter === 'ذكر' ? 'flat' : 'outlined'} onPress={() => setGenderFilter(genderFilter === 'ذكر' ? '' : 'ذكر')}>
+          👨 ذكر
+        </Chip>
+        <Chip selected={genderFilter === 'أنثى'} mode={genderFilter === 'أنثى' ? 'flat' : 'outlined'} onPress={() => setGenderFilter(genderFilter === 'أنثى' ? '' : 'أنثى')}>
+          👩 أنثى
+        </Chip>
+        <Text style={styles.moreFiltersToggle} onPress={() => setShowMoreFilters((v) => !v)}>
+          🎂 فلتر العمر {showMoreFilters ? '▲' : '▼'}
+        </Text>
+      </View>
+
+      {showMoreFilters && (
+        <View style={styles.ageRow}>
+          <TextInput
+            mode="outlined"
+            label="من (سنة)"
+            value={ageMin}
+            onChangeText={setAgeMin}
+            keyboardType="number-pad"
+            dense
+            style={styles.ageInput}
+          />
+          <TextInput
+            mode="outlined"
+            label="إلى (سنة)"
+            value={ageMax}
+            onChangeText={setAgeMax}
+            keyboardType="number-pad"
+            dense
+            style={styles.ageInput}
+          />
+          {(ageMin || ageMax) && (
+            <IconButton icon="close" size={20} onPress={() => { setAgeMin(''); setAgeMax(''); }} />
+          )}
+        </View>
+      )}
 
       <FlatList
         data={filteredFamilies}

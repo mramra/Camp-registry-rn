@@ -16,7 +16,7 @@ export const fetchFamilies = async (orgId, campId = null) => {
   try {
     let q = supabase
       .from('families')
-      .select('id, org_id, camp_id, head_name, head_id, phone1, phone2, category_tags, economic_level, review_status, pending_delete, created_at')
+      .select('id, org_id, camp_id, head_name, head_id, head_gender, head_dob, head_marital, phone1, phone2, category_tags, economic_level, review_status, pending_delete, created_at')
       .eq('org_id', orgId)
       .eq('_deleted', false)
       .order('created_at', { ascending: false });

@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { hasPermission } from '../lib/permissions';
 
 export const AuthContext = createContext({});
 
@@ -120,6 +121,12 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const role = profile?.role;
+  const isOwner = role === 'platform_owner';
+  const isSuperAdmin = role === 'super_admin' || isOwner;
+  const isCampDelegate = role === 'camp_delegate' || isSuperAdmin;
+  const isAssistant = role === 'assistant';
+
   const value = {
     user,
     session,
@@ -129,8 +136,15 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     isAuthenticated: !!session,
-    userRole: profile?.role,
+    userRole: role,
     orgId: profile?.org_id,
+    isOwner,
+    isSuperAdmin,
+    isCampDelegate,
+    isAssistant,
+    canWrite: hasPermission(profile, 'write'),
+    canEdit: hasPermission(profile, 'edit'),
+    canDelete: hasPermission(profile, 'delete'),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

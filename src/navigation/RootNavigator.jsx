@@ -5,6 +5,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import FamiliesListScreen from '../screens/families/FamiliesListScreen';
+import FamilyDetailScreen from '../screens/families/FamilyDetailScreen';
+import FamilyFormScreen from '../screens/families/FamilyFormScreen';
 import UnderMigrationScreen from '../screens/UnderMigrationScreen';
 import colors from '../theme/colors';
 
@@ -53,9 +56,12 @@ const RootNavigator = () => {
               component={DashboardScreen}
               options={{ title: '🏕️ نبض المخيم' }}
             />
-            {/* شاشات لم تُنقل بعد — تُستبدل تدريجياً بالشاشات الفعلية */}
-            <Stack.Screen name="FamiliesList" component={UnderMigrationScreen} options={{ title: 'قائمة الأسر' }} />
-            <Stack.Screen name="FamilyForm" component={UnderMigrationScreen} options={{ title: 'إضافة أسرة' }} />
+            {/* الأسر — منقولة بالكامل */}
+            <Stack.Screen name="FamiliesList" component={FamiliesListScreen} options={{ title: 'قائمة الأسر' }} />
+            <Stack.Screen name="FamilyDetail" component={FamilyDetailScreen} options={{ title: 'تفاصيل الأسرة' }} />
+            <Stack.Screen name="FamilyForm" component={FamilyFormScreen} options={{ title: 'بيانات الأسرة' }} />
+
+            {/* شاشات لم تُنقل بعد */}
             <Stack.Screen name="CampsList" component={UnderMigrationScreen} options={{ title: 'المخيمات' }} />
           </>
         )}

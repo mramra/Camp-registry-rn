@@ -10,6 +10,23 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 });
 
+/** استدعاء Edge Function للعمليات الإدارية (إنشاء/حذف مستخدم، إعادة تعيين كلمة مرور) */
+export const callAdminAPI = async (action, payload) => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token}`,
+    },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
 // =========== Helper Functions ===========
 
 export const fetchFamilies = async (orgId, campId = null) => {
@@ -113,12 +130,30 @@ export const fetchCampFamilyCounts = async (orgId) => {
 export const fetchOrgMembers = async (orgId) => {
   const { data, error } = await supabase
     .from('org_members')
-    .select('id, full_name, role, camp_id, is_active')
+    .select(
+      'id, user_id, org_id, full_name, national_id, phone, role, camp_id, supervisor_id, ' +
+      'can_add, can_edit, can_delete, can_export, can_import, bypass_approval, ' +
+      'can_review_approvals, is_active, created_at'
+    )
     .eq('org_id', orgId)
     .eq('_deleted', false);
 
   if (error) throw error;
   return data || [];
+};
+
+export const updateOrgMember = async (memberId, updates) => {
+  try {
+    const { data, error } = await supabase
+      .from('org_members')
+      .update(updates)
+      .eq('id', memberId)
+      .select();
+    if (error) throw error;
+    return { success: true, data: data[0] };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 };
 
 export const createCamp = async (campData) => {

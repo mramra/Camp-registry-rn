@@ -10,6 +10,8 @@ import FamilyDetailScreen from '../screens/families/FamilyDetailScreen';
 import FamilyFormScreen from '../screens/families/FamilyFormScreen';
 import CampsListScreen from '../screens/camps/CampsListScreen';
 import CampFormScreen from '../screens/camps/CampFormScreen';
+import UsersListScreen from '../screens/users/UsersListScreen';
+import UserFormScreen from '../screens/users/UserFormScreen';
 import UnderMigrationScreen from '../screens/UnderMigrationScreen';
 import colors from '../theme/colors';
 
@@ -66,6 +68,10 @@ const RootNavigator = () => {
             {/* المخيمات — منقولة بالكامل */}
             <Stack.Screen name="CampsList" component={CampsListScreen} options={{ title: 'المخيمات' }} />
             <Stack.Screen name="CampForm" component={CampFormScreen} options={{ title: 'بيانات المخيم' }} />
+
+            {/* المستخدمون — منقولة بالكامل */}
+            <Stack.Screen name="UsersList" component={UsersListScreen} options={{ title: 'المستخدمون' }} />
+            <Stack.Screen name="UserForm" component={UserFormScreen} options={{ title: 'بيانات المستخدم' }} />
           </>
         )}
       </Stack.Navigator>

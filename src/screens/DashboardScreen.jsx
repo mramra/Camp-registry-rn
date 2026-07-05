@@ -117,6 +117,7 @@ export default function DashboardScreen() {
     { icon: '➕', label: 'إضافة أسرة', screen: 'FamilyForm' },
     { icon: '🏕️', label: 'المخيمات', screen: 'CampsList' },
     { icon: '👨‍👩‍👧‍👦', label: 'قائمة الأسر', screen: 'FamiliesList' },
+    { icon: '👥', label: 'المستخدمون', screen: 'UsersList' },
     { icon: '🚪', label: 'تسجيل الخروج', action: 'logout' },
   ];
 

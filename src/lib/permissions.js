@@ -34,4 +34,18 @@ export function hasPermission(profile, action) {
   }
 }
 
-export default { hasPermission };
+export function getCreatableRoles(profile) {
+  if (!profile) return [];
+  switch (profile.role) {
+    case 'platform_owner':
+      return ['super_admin', 'camp_delegate', 'assistant'];
+    case 'super_admin':
+      return ['camp_delegate', 'assistant'];
+    case 'camp_delegate':
+      return ['assistant'];
+    default:
+      return [];
+  }
+}
+
+export default { hasPermission, getCreatableRoles };

@@ -1,5 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, View, Pressable, Text } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +19,7 @@ import DistributionReceiveScreen from '../screens/distributions/DistributionRece
 import PermissionsAdminScreen from '../screens/permissions/PermissionsAdminScreen';
 import RegistersScreen from '../screens/registers/RegistersScreen';
 import SMSScreen from '../screens/sms/SMSScreen';
-import UnderMigrationScreen from '../screens/UnderMigrationScreen';
+import AppDrawer from './AppDrawer';
 import colors from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -39,6 +39,8 @@ const navTheme = {
 
 const RootNavigator = () => {
   const { isAuthenticated, loading } = useAuth();
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [navRef, setNavRef] = useState(null);
 
   if (loading) {
     return (
@@ -48,14 +50,22 @@ const RootNavigator = () => {
     );
   }
 
+  // زر القائمة (☰) — يُضاف تلقائياً بأعلى كل شاشة مُصادَق عليها
+  const menuButton = () => (
+    <Pressable onPress={() => setDrawerVisible(true)} hitSlop={12} style={{ paddingHorizontal: 4 }}>
+      <Text style={{ color: colors.white, fontSize: 22 }}>☰</Text>
+    </Pressable>
+  );
+
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer theme={navTheme} ref={setNavRef}>
       <Stack.Navigator
         screenOptions={{
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.white,
           headerTitleStyle: { fontWeight: '900' },
           contentStyle: { backgroundColor: colors.bg },
+          ...(isAuthenticated ? { headerRight: menuButton } : {}),
         }}
       >
         {!isAuthenticated ? (
@@ -99,6 +109,10 @@ const RootNavigator = () => {
           </>
         )}
       </Stack.Navigator>
+
+      {isAuthenticated && navRef && (
+        <AppDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} navigation={navRef} />
+      )}
     </NavigationContainer>
   );
 };

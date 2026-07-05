@@ -145,6 +145,16 @@ export const updateCamp = async (campId, updates) => {
   }
 };
 
+export const deleteCamp = async (campId) => {
+  try {
+    const { error } = await supabase.from('camps').delete().eq('id', campId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
 export const createFamily = async (familyData) => {
   try {
     const { data, error } = await supabase

@@ -190,6 +190,33 @@ export const deleteCamp = async (campId) => {
   }
 };
 
+// ── حركات الأسر (دخول/خروج/نقل) ─────────────────────────
+export const fetchMovements = async (orgId, { type, campId } = {}) => {
+  let q = supabase
+    .from('family_movements')
+    .select('*, families(head_name, head_id)')
+    .eq('org_id', orgId)
+    .order('date', { ascending: false })
+    .limit(200);
+
+  if (type) q = q.eq('type', type);
+  if (campId) q = q.or(`from_camp.eq.${campId},to_camp.eq.${campId}`);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+};
+
+export const createMovement = async (movementData) => {
+  try {
+    const { data, error } = await supabase.from('family_movements').insert([movementData]).select();
+    if (error) throw error;
+    return { success: true, data: data[0] };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
 export const createFamily = async (familyData) => {
   try {
     const { data, error } = await supabase

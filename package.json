@@ -30,5 +30,7 @@
   "private": true,
   "devDependencies": {
     "babel-preset-expo": "~55.0.23"
-  }
+  },
+  "license": "UNLICENSED",
+  "author": "Mahmoud Rateb Ramadan"
 }

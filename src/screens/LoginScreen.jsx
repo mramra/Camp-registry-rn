@@ -158,6 +158,7 @@ export default function LoginScreen() {
             </Pressable>
 
             <Text style={styles.hint}>كلمة المرور الأولى = رقم الجوال</Text>
+            <Text style={styles.copyright}>© 2026 Mahmoud Rateb Ramadan</Text>
 
             {seconds > 10 && (
               <View style={styles.slowBox}>
@@ -231,6 +232,7 @@ const styles = StyleSheet.create({
   buttonPressed: { transform: [{ scale: 0.97 }] },
   buttonText: { color: colors.bg, fontWeight: '900', fontSize: 14, textAlign: 'center' },
   hint: { color: colors.muted, fontSize: 12, textAlign: 'center', marginTop: 24 },
+  copyright: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: 8, opacity: 0.6 },
   slowBox: {
     marginTop: 16,
     padding: 12,

@@ -1,0 +1,14 @@
+# نشر تحديث OTA تلقائياً عند كل push لفرع main
+# (نفس أمر "eas update --branch preview" اللي كنت نكتبه يدوياً)
+name: نشر تحديث تلقائي
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  publish_update:
+    type: update
+    params:
+      branch: preview
+      message: "تحديث تلقائي من آخر commit على main"

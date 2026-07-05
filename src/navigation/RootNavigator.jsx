@@ -13,6 +13,9 @@ import CampFormScreen from '../screens/camps/CampFormScreen';
 import UsersListScreen from '../screens/users/UsersListScreen';
 import UserFormScreen from '../screens/users/UserFormScreen';
 import MovementsScreen from '../screens/movements/MovementsScreen';
+import DistributionsScreen from '../screens/distributions/DistributionsScreen';
+import DistributionBatchesScreen from '../screens/distributions/DistributionBatchesScreen';
+import DistributionReceiveScreen from '../screens/distributions/DistributionReceiveScreen';
 import UnderMigrationScreen from '../screens/UnderMigrationScreen';
 import colors from '../theme/colors';
 
@@ -76,6 +79,11 @@ const RootNavigator = () => {
 
             {/* حركات الأسر — منقولة بالكامل */}
             <Stack.Screen name="Movements" component={MovementsScreen} options={{ title: 'حركات الأسر' }} />
+
+            {/* التوزيعات — منقولة بالكامل */}
+            <Stack.Screen name="Distributions" component={DistributionsScreen} options={{ title: 'التوزيعات' }} />
+            <Stack.Screen name="DistributionBatches" component={DistributionBatchesScreen} options={{ title: 'الدفعات' }} />
+            <Stack.Screen name="DistributionReceive" component={DistributionReceiveScreen} options={{ title: 'تسجيل الاستلام' }} />
           </>
         )}
       </Stack.Navigator>

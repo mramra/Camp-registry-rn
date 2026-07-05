@@ -11,6 +11,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
+import ExportButton from '../../components/ui/ExportButton';
 import colors from '../../theme/colors';
 
 const TABS = [
@@ -264,7 +265,53 @@ export default function RegistersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <View>
-            <PageHeader icon="📋" title="السجلات" />
+            <PageHeader
+              icon="📋"
+              title="السجلات"
+              action={
+                <ExportButton
+                  getRows={() => {
+                    if (tab === 'children') {
+                      return childrenData.map((k, i) => ({
+                        '#': i + 1,
+                        'الخيمة': k.tent,
+                        'الاسم': k.name,
+                        'رقم الهوية': k.national_id || '',
+                        'العمر': k.age,
+                        'الصلة': k.relation || '',
+                        'الجنس': k.gender || '',
+                        'رب الأسرة': k.famName,
+                        'المخيم': k.camp,
+                      }));
+                    }
+                    if (tab === 'women') {
+                      return womenData.map((w, i) => ({
+                        '#': i + 1,
+                        'الخيمة': w.tent,
+                        'الاسم': w.name,
+                        'العمر': w.age ?? '',
+                        'الصلة': w.type,
+                        'الحالة الاجتماعية': w.marital,
+                        'الوضع': w.status,
+                        'أمراض مزمنة': w.chronic,
+                        'المخيم': w.camp,
+                      }));
+                    }
+                    return healthData.map((r, i) => ({
+                      '#': i + 1,
+                      'الخيمة': r.tent,
+                      'الاسم': r.name,
+                      'الصلة': r.role,
+                      'النوع': r.healthType,
+                      'الحالة': r.val,
+                      'المخيم': r.camp,
+                    }));
+                  }}
+                  sheetName={tab === 'children' ? 'الأطفال' : tab === 'women' ? 'النساء' : 'الصحة'}
+                  fileName={tab === 'children' ? 'سجل_الأطفال' : tab === 'women' ? 'سجل_النساء' : 'سجل_الصحة'}
+                />
+              }
+            />
 
             <View style={styles.chipsRow}>
               <FilterChip

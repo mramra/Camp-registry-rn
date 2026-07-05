@@ -8,17 +8,22 @@ import {
   StyleSheet,
   SafeAreaView,
   RefreshControl,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
-import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { checkFamilyIssues, isIncomplete, isAgeInRange, getMembers } from '../../lib/helpers';
+import { fetchFamilies, fetchFamilyMembers, fetchCamps, createFamily } from '../../lib/supabase';
+import { checkFamilyIssues, isIncomplete, isAgeInRange, getMembers, luhnCheck } from '../../lib/helpers';
+import { pickAndParseXLSX } from '../../lib/excelIO';
+import { showError, showSuccess, showInfo } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
+import ExportButton from '../../components/ui/ExportButton';
 import colors from '../../theme/colors';
 
 // ── فلاتر ثابتة (نفس النسخة الأصلية) ──────────────────────
@@ -61,6 +66,7 @@ export default function FamiliesListScreen() {
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
   const [campPickerVisible, setCampPickerVisible] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   // ── تحميل البيانات (مباشرة من Supabase — بدون طبقة SQLite وسيطة) ──
   const loadData = useCallback(async () => {
@@ -85,6 +91,82 @@ export default function FamiliesListScreen() {
     setLoading(false);
     setRefreshing(false);
   }, [orgId]);
+
+  // ── استيراد أسر جماعي من ملف Excel ──────────────────
+  // يتوقع أعمدة تطابق نفس تصدير الشاشة (اسم رب الأسرة، رقم الهوية، الجوال،
+  // المخيم [بالاسم]، الخيمة) — أي عمود إضافي يُتجاهل بأمان.
+  const handleImport = async () => {
+    try {
+      const parsed = await pickAndParseXLSX();
+      if (!parsed) return; // ألغى المستخدم الاختيار
+
+      if (!parsed.rows.length) {
+        showError('الملف فارغ أو لا يحتوي بيانات مقروءة');
+        return;
+      }
+
+      setImporting(true);
+      const campByName = {};
+      camps.forEach((c) => { campByName[c.name.trim()] = c.id; });
+
+      let success = 0;
+      const errors = [];
+
+      for (let i = 0; i < parsed.rows.length; i++) {
+        const row = parsed.rows[i];
+        const headName = String(row['اسم رب الأسرة'] || row['الاسم'] || '').trim();
+        const headId = String(row['رقم الهوية'] || '').trim();
+        const campName = String(row['المخيم'] || '').trim();
+        const phone1 = String(row['الجوال'] || '').trim();
+        const tent = String(row['الخيمة'] || '').trim();
+
+        if (!headName || !headId) {
+          errors.push(`صف ${i + 2}: الاسم أو رقم الهوية ناقص`);
+          continue;
+        }
+        if (headId.length < 9 || !luhnCheck(headId)) {
+          errors.push(`صف ${i + 2}: رقم الهوية "${headId}" غير صحيح`);
+          continue;
+        }
+        const campId = campByName[campName] || null;
+        if (campName && !campId) {
+          errors.push(`صف ${i + 2}: المخيم "${campName}" غير موجود بالنظام`);
+          continue;
+        }
+
+        const result = await createFamily({
+          org_id: orgId,
+          head_name: headName,
+          head_id: headId,
+          camp_id: campId,
+          phone1: phone1 || null,
+          tent: tent || null,
+          review_status: 'approved',
+          pending_delete: false,
+          _deleted: false,
+        });
+
+        if (result.success) success++;
+        else errors.push(`صف ${i + 2} (${headName}): ${result.error}`);
+      }
+
+      await loadData();
+
+      const summary = `تم استيراد ${success} أسرة بنجاح من أصل ${parsed.rows.length}`;
+      if (errors.length === 0) {
+        showSuccess(summary);
+      } else {
+        Alert.alert(
+          summary,
+          `⚠️ ${errors.length} صف به مشكلة:\n\n` + errors.slice(0, 10).join('\n') + (errors.length > 10 ? '\n...' : '')
+        );
+      }
+    } catch (e) {
+      showError('فشل الاستيراد: ' + e.message);
+    } finally {
+      setImporting(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -297,14 +379,42 @@ export default function FamiliesListScreen() {
                 </Text>
               }
               action={
-                canWrite && (
-                  <Pressable
-                    style={styles.addBtn}
-                    onPress={() => navigation.navigate('FamilyForm')}
-                  >
-                    <Text style={styles.addBtnText}>➕ إضافة</Text>
-                  </Pressable>
-                )
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <ExportButton
+                    getRows={() =>
+                      filtered.map((f, i) => ({
+                        '#': i + 1,
+                        'اسم رب الأسرة': f.head_name || '',
+                        'رقم الهوية': f.head_id || '',
+                        'الجوال': f.phone1 || '',
+                        'المخيم': campMap[f.camp_id] || '',
+                        'الخيمة': f.tent || '',
+                        'عدد الأفراد': 1 + (membersByFamily[f.id]?.length || 0),
+                        'الحالة الاجتماعية': f.head_marital || '',
+                        'المستوى الاقتصادي': f.economic_level || '',
+                      }))
+                    }
+                    sheetName="الأسر"
+                    fileName="سجل_الأسر"
+                  />
+                  {canWrite && (
+                    <Pressable style={styles.importBtn} onPress={handleImport} disabled={importing}>
+                      {importing ? (
+                        <ActivityIndicator size="small" color={colors.blue} />
+                      ) : (
+                        <Text style={styles.importBtnText}>📤 استيراد</Text>
+                      )}
+                    </Pressable>
+                  )}
+                  {canWrite && (
+                    <Pressable
+                      style={styles.addBtn}
+                      onPress={() => navigation.navigate('FamilyForm')}
+                    >
+                      <Text style={styles.addBtnText}>➕ إضافة</Text>
+                    </Pressable>
+                  )}
+                </View>
               }
             />
 
@@ -440,6 +550,8 @@ const styles = StyleSheet.create({
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
   addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
+  importBtn: { borderWidth: 1, borderColor: colors.blue, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12 },
+  importBtnText: { color: colors.blue, fontWeight: 'bold', fontSize: 11 },
   addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
 
   searchInput: {

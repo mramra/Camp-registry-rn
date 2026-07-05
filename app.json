@@ -49,7 +49,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "يستخدم التطبيق موقعك لتسجيل إحداثيات GPS الخاصة بالمخيم."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "owner": "mramra1980",
     "runtimeVersion": {

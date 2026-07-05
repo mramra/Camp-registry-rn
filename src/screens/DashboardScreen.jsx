@@ -121,6 +121,7 @@ export default function DashboardScreen() {
     { icon: '🚶', label: 'حركات الأسر', screen: 'Movements' },
     { icon: '📦', label: 'التوزيعات', screen: 'Distributions' },
     { icon: '📋', label: 'السجلات', screen: 'Registers' },
+    { icon: '💬', label: 'الرسائل', screen: 'SMS' },
     ...(profile?.role === 'platform_owner'
       ? [{ icon: '🔐', label: 'إدارة الصلاحيات', screen: 'PermissionsAdmin' }]
       : []),

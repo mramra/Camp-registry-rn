@@ -18,6 +18,7 @@ import DistributionBatchesScreen from '../screens/distributions/DistributionBatc
 import DistributionReceiveScreen from '../screens/distributions/DistributionReceiveScreen';
 import PermissionsAdminScreen from '../screens/permissions/PermissionsAdminScreen';
 import RegistersScreen from '../screens/registers/RegistersScreen';
+import SMSScreen from '../screens/sms/SMSScreen';
 import UnderMigrationScreen from '../screens/UnderMigrationScreen';
 import colors from '../theme/colors';
 
@@ -92,6 +93,9 @@ const RootNavigator = () => {
 
             {/* السجلات — منقولة (أطفال/نساء/صحة) */}
             <Stack.Screen name="Registers" component={RegistersScreen} options={{ title: 'السجلات' }} />
+
+            {/* الرسائل — منقولة بالكامل */}
+            <Stack.Screen name="SMS" component={SMSScreen} options={{ title: 'الرسائل' }} />
           </>
         )}
       </Stack.Navigator>

@@ -190,6 +190,39 @@ export const deleteCamp = async (campId) => {
   }
 };
 
+// ── صلاحيات الصفحات التفصيلية (page_permissions) ───────
+export const fetchAllPagePermissions = async (orgId) => {
+  const { data, error } = await supabase.from('page_permissions').select('*').eq('org_id', orgId);
+  if (error) throw error;
+  return (data || []).map((r) => ({ ...r, allowed: !!r.allowed }));
+};
+
+export const setPagePermission = async ({ orgId, scope, scopeValue, pageKey, allowed, updatedBy }) => {
+  const { error } = await supabase.from('page_permissions').upsert(
+    {
+      org_id: orgId,
+      scope,
+      scope_value: scopeValue,
+      page_key: pageKey,
+      allowed,
+      updated_by: updatedBy || null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'org_id,scope,scope_value,page_key' }
+  );
+  if (error) throw error;
+};
+
+export const clearPagePermission = async ({ orgId, scope, scopeValue, pageKey }) => {
+  const { error } = await supabase
+    .from('page_permissions')
+    .delete()
+    .eq('org_id', orgId)
+    .eq('scope', scope)
+    .eq('scope_value', scopeValue)
+    .eq('page_key', pageKey);
+  if (error) throw error;
+};
 // ── حركات الأسر (دخول/خروج/نقل) ─────────────────────────
 export const fetchMovements = async (orgId, { type, campId } = {}) => {
   let q = supabase

@@ -48,4 +48,34 @@ export function getCreatableRoles(profile) {
   }
 }
 
+// سجل الصفحات لإدارة الصلاحيات التفصيلية (منقول حرفياً من الأصل)
+export const PAGE_REGISTRY = {
+  dashboard: { label: '🏠 الرئيسية' },
+  families: { label: '👨‍👩‍👧 قائمة الأسر' },
+  camps: { label: '🏕️ المخيمات' },
+  movements: { label: '🔄 حركات الأسر' },
+  distributions: { label: '📦 التوزيعات' },
+  registers: { label: '📋 السجلات' },
+  women: { label: '👩 النساء' },
+  children: { label: '🧒 سجل الأطفال' },
+  health_report: { label: '⚕️ كشف الحالات الصحية' },
+  education_status: { label: '🎒 الحالة الدراسية' },
+  analysis: { label: '📊 التحليل' },
+  needs_report: { label: '📋 تقارير الاحتياجات' },
+  camp_compare: { label: '🏕️ مقارنة المخيمات' },
+  export: { label: '📤 الاستيراد والتصدير' },
+  users: { label: '👥 المستخدمون' },
+  audit: { label: '📝 سجل التغييرات' },
+  alerts: { label: '🔔 التنبيهات' },
+  data: { label: '🛠️ إدارة البيانات' },
+  diagnostics: { label: '🩺 تشخيص النظام' },
+  security_audit: { label: '🛡️ الفحص الأمني' },
+  devices: { label: '📱 الأجهزة' },
+  sms: { label: '✉️ الرسائل' },
+  settings: { label: '⚙️ الإعدادات' },
+  subscription: { label: '💳 الاشتراكات' },
+  help: { label: '❓ المساعدة' },
+  pending_requests: { label: '📋 الطلبات المعلّقة' },
+};
+
 export default { hasPermission, getCreatableRoles };

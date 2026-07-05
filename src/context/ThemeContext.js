@@ -1,38 +1,18 @@
-import React, { createContext, useState, useCallback } from 'react';
-import { useColorScheme } from 'react-native';
-import { lightColors, darkColors } from '../theme/colors';
+import React, { createContext } from 'react';
+import colors from '../theme/colors';
 
-export const ThemeContext = createContext({});
+/**
+ * التصميم الأصلي (camp-registry-react) داكن فقط — لا يوجد وضع فاتح.
+ * نحافظ على نفس واجهة useTheme() المستخدمة بالشاشات لتقليل التغييرات.
+ */
+export const ThemeContext = createContext({ colors });
 
-export const ThemeProvider = ({ children }) => {
-  const systemColorScheme = useColorScheme();
-  const [isDark, setIsDark] = useState(systemColorScheme === 'dark');
+export const ThemeProvider = ({ children }) => (
+  <ThemeContext.Provider value={{ colors, isDark: true }}>
+    {children}
+  </ThemeContext.Provider>
+);
 
-  const colors = isDark ? darkColors : lightColors;
-
-  const toggleTheme = useCallback(() => {
-    setIsDark(prev => !prev);
-  }, []);
-
-  const value = {
-    isDark,
-    colors,
-    toggleTheme,
-  };
-
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
-  );
-};
-
-export const useTheme = () => {
-  const context = React.useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
-  }
-  return context;
-};
+export const useTheme = () => React.useContext(ThemeContext);
 
 export default ThemeContext;

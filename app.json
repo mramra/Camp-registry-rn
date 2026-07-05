@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTabletMode": true,
       "bundleIdentifier": "com.nabdmuhim.campregistry"
@@ -34,6 +36,9 @@
       "eas": {
         "projectId": "c8d89b81-f55b-4f80-8b43-abcb76529c5d"
       }
+    },
+    "experiments": {
+      "baseUrl": "/Camp-registry-rn"
     }
   }
 }

@@ -1,193 +1,243 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
+  Pressable,
   StyleSheet,
   SafeAreaView,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import Button from '../components/Button';
-import Card from '../components/Card';
-import Input from '../components/Input';
-import { showError, showSuccess } from '../utils/toast';
-import spacing from '../theme/spacing';
-import typography from '../theme/typography';
+import colors from '../theme/colors';
 
-const LoginScreen = () => {
-  const { login, loading } = useAuth();
-  const { colors, isDark } = useTheme();
-  const [email, setEmail] = useState('412617003@c.co');
-  const [password, setPassword] = useState('506641234');
-  const [errors, setErrors] = useState({});
+/**
+ * شاشة تسجيل الدخول — نسخة مطابقة للأصل (camp-registry-react/LoginPage.jsx):
+ * نفس الألوان، نفس الترتيب، نفس منطق القفل بعد المحاولات الفاشلة،
+ * نفس رسائل الانتظار التشجيعية وعداد الثواني وشريط التقدم.
+ */
+export default function LoginScreen() {
+  const [id, setId] = useState('');
+  const [pass, setPass] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [attempts, setAttempts] = useState(0);
+  const [lockUntil, setLockUntil] = useState(0);
+  const { login } = useAuth();
+  const timerRef = useRef(null);
 
-  const validateForm = () => {
-    const newErrors = {};
-    if (!email.trim()) newErrors.email = 'البريد الإلكتروني مطلوب';
-    if (!password.trim()) newErrors.password = 'كلمة المرور مطلوبة';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  function startTimer() {
+    setSeconds(0);
+    timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
+  }
+  function stopTimer() {
+    clearInterval(timerRef.current);
+    setSeconds(0);
+  }
+  useEffect(() => () => clearInterval(timerRef.current), []);
 
-  const handleLogin = async () => {
-    if (!validateForm()) return;
-
-    const result = await login(email.trim(), password);
-
-    if (!result.success) {
-      showError(result.error || 'فشل تسجيل الدخول');
-    } else {
-      showSuccess('تم تسجيل الدخول بنجاح');
+  async function handleSubmit() {
+    if (Date.now() < lockUntil) {
+      const wait = Math.ceil((lockUntil - Date.now()) / 1000);
+      setError(`⏳ انتظر ${wait} ثانية قبل المحاولة مجدداً`);
+      return;
     }
-  };
+    if (!id.trim() || !pass) {
+      setError('أدخل رقم الهوية وكلمة المرور');
+      return;
+    }
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.bg,
-    },
-    scrollContent: {
-      flexGrow: 1,
-      justifyContent: 'center',
-      paddingVertical: spacing.xl,
-    },
-    gradientHeader: {
-      paddingVertical: spacing['3xl'],
-      paddingHorizontal: spacing.lg,
-      alignItems: 'center',
-      marginBottom: spacing['3xl'],
-    },
-    logo: {
-      fontSize: 48,
-      marginBottom: spacing.md,
-    },
-    appName: {
-      ...typography.h1,
-      color: '#ffffff',
-      textAlign: 'center',
-      marginBottom: spacing.sm,
-    },
-    tagline: {
-      ...typography.body,
-      color: 'rgba(255, 255, 255, 0.8)',
-      textAlign: 'center',
-    },
-    formContainer: {
-      paddingHorizontal: spacing.lg,
-      marginBottom: spacing['2xl'],
-    },
-    formCard: {
-      padding: spacing.xl,
-    },
-    submitButton: {
-      marginTop: spacing.lg,
-    },
-    demoSection: {
-      marginTop: spacing.xl,
-      paddingTop: spacing.lg,
-      borderTopColor: colors.border,
-      borderTopWidth: 1,
-    },
-    demoTitle: {
-      ...typography.label,
-      color: colors.textSecondary,
-      marginBottom: spacing.sm,
-    },
-    demoText: {
-      ...typography.bodySmall,
-      color: colors.textMuted,
-      marginBottom: spacing.xs,
-    },
-    helperText: {
-      ...typography.bodySmall,
-      color: colors.textMuted,
-      textAlign: 'center',
-      marginTop: spacing.lg,
-      paddingHorizontal: spacing.lg,
-    },
-  });
+    setLoading(true);
+    startTimer();
+    setError('🔄 جارٍ الاتصال بالخادم...');
+
+    const email = `${id.trim()}@c.co`;
+    const result = await login(email, pass);
+
+    if (result.success) {
+      setError('✅ تم! جارٍ التحميل...');
+      stopTimer();
+    } else {
+      stopTimer();
+      const n = attempts + 1;
+      setAttempts(n);
+      if (n >= 5) setLockUntil(Date.now() + 60000);
+      else if (n >= 3) setLockUntil(Date.now() + 15000);
+      setError('❌ ' + (result.error || 'خطأ غير معروف'));
+    }
+    setLoading(false);
+  }
+
+  const waitMsg =
+    seconds < 3 ? 'جارٍ الاتصال...' :
+    seconds < 8 ? 'جارٍ التحقق من بيانات الدخول...' :
+    seconds < 14 ? 'الخادم يستجيب، انتظر قليلاً...' :
+    'الاتصال بطيء، لا تزال المحاولة جارية...';
+
+  const errStyle =
+    error.startsWith('✅') ? styles.msgGreen :
+    error.startsWith('❌') ? styles.msgRed :
+    styles.msgAccent;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Gradient Header */}
-          <LinearGradient
-            colors={[colors.primary, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.gradientHeader}
-          >
-            <Text style={styles.logo}>🏕️</Text>
-            <Text style={styles.appName}>نبض المخيم</Text>
-            <Text style={styles.tagline}>إدارة أسرية ذكية</Text>
-          </LinearGradient>
+        <ScrollView contentContainerStyle={styles.center} keyboardShouldPersistTaps="handled">
+          <View style={styles.card}>
+            {/* أيقونة */}
+            <View style={styles.iconBox}>
+              <Text style={styles.iconEmoji}>🏕️</Text>
+            </View>
+            <Text style={styles.title}>نبض المخيم</Text>
+            <Text style={styles.subtitle}>سجل دخول للمتابعة</Text>
 
-          {/* Form Card */}
-          <View style={styles.formContainer}>
-            <Card>
-              {/* Email Input */}
-              <Input
-                label="البريد الإلكتروني"
-                placeholder="أدخل بريدك الإلكتروني"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                editable={!loading}
-                error={errors.email}
-              />
+            {/* رقم الهوية */}
+            <Text style={styles.label}>رقم الهوية</Text>
+            <TextInput
+              value={id}
+              onChangeText={setId}
+              placeholder="1xxxxxxxxx"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              editable={!loading}
+              style={styles.input}
+            />
 
-              {/* Password Input */}
-              <Input
-                label="كلمة المرور"
-                placeholder="أدخل كلمة المرور"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                editable={!loading}
-                error={errors.password}
-              />
+            {/* كلمة المرور */}
+            <Text style={styles.label}>كلمة المرور</Text>
+            <TextInput
+              value={pass}
+              onChangeText={setPass}
+              placeholder="••••••••"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+              editable={!loading}
+              style={styles.input}
+            />
 
-              {/* Submit Button */}
-              <Button
-                text={loading ? 'جاري الدخول...' : 'دخول'}
-                variant="primary"
-                fullWidth
-                onPress={handleLogin}
-                disabled={loading}
-                loading={loading}
-                style={styles.submitButton}
-              />
+            {/* رسالة الحالة */}
+            {!!error && <Text style={[styles.msg, errStyle]}>{error}</Text>}
 
-              {/* Demo Credentials */}
-              <View style={styles.demoSection}>
-                <Text style={styles.demoTitle}>بيانات الاختبار:</Text>
-                <Text style={styles.demoText}>البريد: 412617003@c.co</Text>
-                <Text style={styles.demoText}>كلمة المرور: 506641234</Text>
+            {/* عداد الانتظار وشريط التقدم */}
+            {loading && seconds > 0 && (
+              <View style={styles.waitBox}>
+                <Text style={styles.waitMsg}>{waitMsg}</Text>
+                <View style={styles.progressRow}>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${Math.min(100, (seconds / 20) * 100)}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.secondsText}>{seconds}s</Text>
+                </View>
               </View>
-            </Card>
-          </View>
+            )}
 
-          {/* Helper Text */}
-          <Text style={styles.helperText}>
-            هل نسيت كلمة المرور؟ تواصل مع المسؤول
-          </Text>
+            {/* زر الدخول */}
+            <Pressable
+              onPress={handleSubmit}
+              disabled={loading || Date.now() < lockUntil}
+              style={({ pressed }) => [
+                styles.button,
+                (loading || Date.now() < lockUntil) && styles.buttonDisabled,
+                pressed && styles.buttonPressed,
+              ]}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? `⏳ جاري الدخول... (${seconds}s)` : 'تسجيل الدخول'}
+              </Text>
+            </Pressable>
+
+            <Text style={styles.hint}>كلمة المرور الأولى = رقم الجوال</Text>
+
+            {seconds > 10 && (
+              <View style={styles.slowBox}>
+                <Text style={styles.slowText}>
+                  الخادم بطيء. إذا استمر الانتظار أكثر من 20 ثانية سيظهر خطأ — حاول مرة أخرى.
+                </Text>
+              </View>
+            )}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-};
+}
 
-export default LoginScreen;
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg },
+  center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  card: {
+    width: '100%',
+    maxWidth: 384,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    padding: 32,
+  },
+  iconBox: {
+    width: 64,
+    height: 64,
+    backgroundColor: colors.accent,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  iconEmoji: { fontSize: 30 },
+  title: { color: colors.white, fontWeight: '900', fontSize: 20, textAlign: 'center', marginBottom: 4 },
+  subtitle: { color: colors.muted, fontSize: 12, textAlign: 'center', marginBottom: 28 },
+  label: { color: colors.muted, fontSize: 12, fontWeight: 'bold', marginBottom: 6, textAlign: 'right' },
+  input: {
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: colors.white,
+    fontSize: 14,
+    marginBottom: 16,
+    textAlign: 'right',
+  },
+  msg: { fontSize: 12, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12, textAlign: 'right', borderWidth: 1, overflow: 'hidden' },
+  msgGreen: { color: colors.green, backgroundColor: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.2)' },
+  msgRed: { color: colors.red, backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.2)' },
+  msgAccent: { color: colors.accent, backgroundColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.2)' },
+  waitBox: { marginBottom: 12 },
+  waitMsg: { color: colors.accent, fontSize: 12, fontWeight: 'bold', textAlign: 'center', marginBottom: 4 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  progressTrack: { flex: 1, backgroundColor: colors.surface2, borderRadius: 999, height: 6 },
+  progressFill: { backgroundColor: colors.accent, height: 6, borderRadius: 999 },
+  secondsText: { color: colors.muted, fontSize: 12, width: 32, textAlign: 'left' },
+  button: {
+    backgroundColor: colors.accent,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonPressed: { transform: [{ scale: 0.97 }] },
+  buttonText: { color: colors.bg, fontWeight: '900', fontSize: 14, textAlign: 'center' },
+  hint: { color: colors.muted, fontSize: 12, textAlign: 'center', marginTop: 24 },
+  slowBox: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: colors.surface2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  slowText: { color: colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 18 },
+});

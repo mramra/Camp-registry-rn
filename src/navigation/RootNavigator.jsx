@@ -17,6 +17,7 @@ import DistributionsScreen from '../screens/distributions/DistributionsScreen';
 import DistributionBatchesScreen from '../screens/distributions/DistributionBatchesScreen';
 import DistributionReceiveScreen from '../screens/distributions/DistributionReceiveScreen';
 import PermissionsAdminScreen from '../screens/permissions/PermissionsAdminScreen';
+import RegistersScreen from '../screens/registers/RegistersScreen';
 import UnderMigrationScreen from '../screens/UnderMigrationScreen';
 import colors from '../theme/colors';
 
@@ -88,6 +89,9 @@ const RootNavigator = () => {
 
             {/* إدارة الصلاحيات — منقولة بالكامل */}
             <Stack.Screen name="PermissionsAdmin" component={PermissionsAdminScreen} options={{ title: 'إدارة الصلاحيات' }} />
+
+            {/* السجلات — منقولة (أطفال/نساء/صحة) */}
+            <Stack.Screen name="Registers" component={RegistersScreen} options={{ title: 'السجلات' }} />
           </>
         )}
       </Stack.Navigator>

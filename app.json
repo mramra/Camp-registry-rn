@@ -50,6 +50,7 @@
         }
       ]
     ],
-    "owner": "mramra1980"
+    "owner": "mramra1980",
+    "jsEngine": "jsc"
   }
 }

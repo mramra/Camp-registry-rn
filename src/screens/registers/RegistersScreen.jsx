@@ -39,8 +39,20 @@ const AGE_GROUPS = [
 function normalizeHealthValue(raw, depth = 0) {
   if (!raw || depth > 3) return '';
   if (Array.isArray(raw)) {
-    const joined = raw.filter(Boolean).join('، ');
-    return joined;
+    // كل عنصر إما نص جاهز، أو كائن {type, detail} (شكل حقيقي بجدول family_members)
+    const parts = raw
+      .filter(Boolean)
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const type = item.type || '';
+          const detail = item.detail ? ` (${item.detail})` : '';
+          return type ? `${type}${detail}` : '';
+        }
+        return '';
+      })
+      .filter(Boolean);
+    return parts.join('، ');
   }
   if (typeof raw === 'string') {
     const trimmed = raw.trim();

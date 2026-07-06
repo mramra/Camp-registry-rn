@@ -53,6 +53,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       items: [
         { icon: '📈', label: 'التقارير والتحليلات', screen: 'Analysis' },
         { icon: '📋', label: 'تقارير الاحتياجات', screen: 'NeedsReport' },
+        { icon: '🏕️', label: 'مقارنة المخيمات', screen: 'CampCompare' },
       ],
     },
     {

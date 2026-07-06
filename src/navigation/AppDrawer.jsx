@@ -48,6 +48,11 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       items: [{ icon: '📋', label: 'السجلات', screen: 'Registers' }],
     },
     {
+      key: 'analysis',
+      title: '📊 التحليل والتقارير',
+      items: [{ icon: '📈', label: 'التقارير والتحليلات', screen: 'Analysis' }],
+    },
+    {
       key: 'comms',
       title: '💬 التواصل والحساب',
       items: [{ icon: '💬', label: 'الرسائل', screen: 'SMS' }],

@@ -11,7 +11,7 @@ export function calcAge(dob) {
   return age >= 0 && age < 120 ? age : null;
 }
 
-function parseArr(v) {
+export function parseArr(v) {
   if (Array.isArray(v)) return v;
   if (!v) return [];
   try {
@@ -22,6 +22,25 @@ function parseArr(v) {
   } catch {
     return [];
   }
+}
+
+/** هل يوجد قيمة فعلية بهذا الحقل (مصفوفة حالات صحية)؟ */
+export function hasHealthData(val) {
+  return parseArr(val).length > 0;
+}
+
+/** نص العرض المُجمَّع للمصفوفة (يدعم عناصر نصية أو كائنات بها type/detail) */
+export function arrLabel(val) {
+  const arr = parseArr(val);
+  if (!arr.length) return '';
+  return arr
+    .map((v) => {
+      if (typeof v === 'string') return v;
+      if (v && typeof v === 'object') return [v.type, v.label, v.detail].filter(Boolean).join(' - ');
+      return String(v);
+    })
+    .filter(Boolean)
+    .join('، ');
 }
 
 function isNoProviderFamily(family, members) {

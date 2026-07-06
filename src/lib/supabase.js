@@ -133,7 +133,7 @@ export const fetchOrgMembers = async (orgId) => {
     .select(
       'id, user_id, org_id, full_name, national_id, phone, role, camp_id, supervisor_id, ' +
       'can_add, can_edit, can_delete, can_export, can_import, bypass_approval, ' +
-      'can_review_approvals, is_active, created_at'
+      'can_review_approvals, is_active, must_change_pass, created_at'
     )
     .eq('org_id', orgId)
     .eq('_deleted', false);
@@ -300,6 +300,17 @@ export const createDistBatch = async (batchData) => {
   } catch (err) {
     return { success: false, error: err.message };
   }
+};
+
+export const fetchLastDistributionDate = async (orgId) => {
+  const { data, error } = await supabase
+    .from('camp_dist_families')
+    .select('received_at')
+    .eq('org_id', orgId)
+    .order('received_at', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return data?.[0]?.received_at || null;
 };
 
 // ── تسجيل استلام الأسر ضمن دفعة (camp_dist_families) ─────

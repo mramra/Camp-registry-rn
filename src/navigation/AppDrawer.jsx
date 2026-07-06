@@ -18,7 +18,10 @@ export default function AppDrawer({ visible, onClose, navigation }) {
     {
       key: 'home',
       title: '🏠 الرئيسية',
-      items: [{ icon: '🏠', label: 'الرئيسية', screen: 'Dashboard' }],
+      items: [
+        { icon: '🏠', label: 'الرئيسية', screen: 'Dashboard' },
+        { icon: '🔔', label: 'التنبيهات', screen: 'Alerts' },
+      ],
     },
     {
       key: 'families',

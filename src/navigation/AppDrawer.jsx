@@ -1,30 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
 
 /**
- * قائمة جانبية بسيطة (RTL — تنزلق من اليمين) لاختيار أي صفحة مباشرة.
+ * قائمة جانبية (RTL — تنزلق من اليمين) لاختيار أي صفحة مباشرة، بأقسام
+ * قابلة للطي/البسط (نفس سلوك القائمة الجانبية بالنسخة الأصلية للويب).
+ *
  * لا تعتمد على @react-navigation/drawer (يحتاج react-native-gesture-handler +
  * reanimated = مكتبات native جديدة تحتاج APK جديد) — بُنيت بـ Modal الأساسي
  * بـ React Native نفسه، فتعمل فوراً عبر تحديث OTA بدون أي بناء إضافي.
- *
- * الأقسام مطابقة لتجميع القائمة الجانبية بالنسخة الأصلية (camp-registry-react).
  */
 export default function AppDrawer({ visible, onClose, navigation }) {
   const { profile, logout, isOwner, isSuperAdmin } = useAuth();
 
-  const go = (screen) => {
-    onClose();
-    navigation.navigate(screen);
-  };
-
   const SECTIONS = [
     {
+      key: 'home',
       title: '🏠 الرئيسية',
       items: [{ icon: '🏠', label: 'الرئيسية', screen: 'Dashboard' }],
     },
     {
+      key: 'families',
       title: '👨‍👩‍👧 الأسر',
       items: [
         { icon: '👨‍👩‍👧‍👦', label: 'قائمة الأسر', screen: 'FamiliesList' },
@@ -33,6 +30,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       ],
     },
     {
+      key: 'camps',
       title: '🏕️ المخيمات والمستخدمون',
       items: [
         { icon: '🏕️', label: 'المخيمات', screen: 'CampsList' },
@@ -41,14 +39,32 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       ],
     },
     {
+      key: 'registers',
       title: '⚕️ السجلات الاجتماعية والصحية',
       items: [{ icon: '📋', label: 'السجلات', screen: 'Registers' }],
     },
     {
+      key: 'comms',
       title: '💬 التواصل والحساب',
       items: [{ icon: '💬', label: 'الرسائل', screen: 'SMS' }],
     },
   ];
+
+  // كل الأقسام مفتوحة افتراضياً أول مرة (نفس تجربة المستخدم بالويب)
+  const [collapsed, setCollapsed] = useState(new Set());
+
+  const toggleSection = (key) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const go = (screen) => {
+    onClose();
+    navigation.navigate(screen);
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -63,17 +79,25 @@ export default function AppDrawer({ visible, onClose, navigation }) {
           </View>
 
           <ScrollView style={styles.body}>
-            {SECTIONS.map((section) => (
-              <View key={section.title} style={styles.section}>
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-                {section.items.map((item) => (
-                  <Pressable key={item.screen} style={styles.item} onPress={() => go(item.screen)}>
-                    <Text style={styles.itemIcon}>{item.icon}</Text>
-                    <Text style={styles.itemLabel}>{item.label}</Text>
+            {SECTIONS.map((section) => {
+              const isCollapsed = collapsed.has(section.key);
+              return (
+                <View key={section.key} style={styles.section}>
+                  <Pressable style={styles.sectionHeader} onPress={() => toggleSection(section.key)}>
+                    <Text style={styles.sectionTitle}>{section.title}</Text>
+                    <Text style={styles.chevron}>{isCollapsed ? '◀' : '▼'}</Text>
                   </Pressable>
-                ))}
-              </View>
-            ))}
+
+                  {!isCollapsed &&
+                    section.items.map((item) => (
+                      <Pressable key={item.screen} style={styles.item} onPress={() => go(item.screen)}>
+                        <Text style={styles.itemIcon}>{item.icon}</Text>
+                        <Text style={styles.itemLabel}>{item.label}</Text>
+                      </Pressable>
+                    ))}
+                </View>
+              );
+            })}
           </ScrollView>
 
           <Pressable
@@ -99,8 +123,16 @@ const styles = StyleSheet.create({
   userName: { color: colors.accent, fontWeight: 'bold', fontSize: 13, marginTop: 8, textAlign: 'right' },
   roleTag: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
   body: { flex: 1, padding: 12 },
-  section: { marginBottom: 16 },
-  sectionTitle: { color: colors.muted, fontSize: 11, fontWeight: 'bold', marginBottom: 6, textAlign: 'right' },
+  section: { marginBottom: 8 },
+  sectionHeader: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  sectionTitle: { color: colors.muted, fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
+  chevron: { color: colors.muted, fontSize: 10 },
   item: {
     flexDirection: 'row-reverse',
     alignItems: 'center',

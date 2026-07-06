@@ -27,6 +27,38 @@ const AGE_GROUPS = [
   { key: '13-17', min: 13, max: 17 },
 ];
 
+/**
+ * قيم الحالات الصحية تختلف شكلها فعلياً حسب الجدول (تأكدنا من db.js الأصلي):
+ * - family_members.disabilities/injuries/chronic_diseases: مصفوفة Postgres حقيقية
+ *   (JS array فعلي عبر REST مباشرة)
+ * - families.head_disabilities/... : نص JSON (قد يصل كسلسلة نصية، أو أحياناً
+ *   يُفكّكه PostgREST تلقائياً حسب نوع العمود الفعلي بقاعدة البيانات)
+ * هذه الدالة تتعامل مع الحالتين بأمان بدل افتراض إنه نص دايماً (كان هذا
+ * بالضبط سبب خطأ 'trim is not a function' — القيمة كانت مصفوفة فعلية).
+ */
+function normalizeHealthValue(raw, depth = 0) {
+  if (!raw || depth > 3) return '';
+  if (Array.isArray(raw)) {
+    const joined = raw.filter(Boolean).join('، ');
+    return joined;
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === '[]' || trimmed === '""' || trimmed === 'null') return '';
+    try {
+      const parsed = JSON.parse(trimmed);
+      // ترميز مزدوج محتمل (نص JSON داخل نص JSON) — نطبّع بشكل متكرر بحد أقصى
+      if (Array.isArray(parsed) || typeof parsed === 'string') {
+        return normalizeHealthValue(parsed, depth + 1);
+      }
+    } catch {
+      // ليست JSON — نص عادي فعلي، نُرجعه كما هو
+    }
+    return trimmed;
+  }
+  return String(raw);
+}
+
 const HEALTH_TYPES = [
   { key: 'all', label: 'الكل', icon: '🏥' },
   { key: 'chronic', label: 'أمراض مزمنة', icon: '💊' },
@@ -114,7 +146,7 @@ export default function RegistersScreen() {
         type: 'رأس الأسرة',
         marital: f.head_marital || '—',
         status: f.head_female_status || '',
-        chronic: f.head_chronic_diseases || '',
+        chronic: normalizeHealthValue(f.head_chronic_diseases),
         camp: campMap[f.camp_id] || '—',
         camp_id: f.camp_id || '',
         tent: f.tent || '—',
@@ -130,7 +162,7 @@ export default function RegistersScreen() {
           type: m.relation || 'أنثى',
           marital: '—',
           status: '',
-          chronic: m.chronic_diseases || '',
+          chronic: normalizeHealthValue(m.chronic_diseases),
           camp: campMap[f.camp_id] || '—',
           camp_id: f.camp_id || '',
           tent: f.tent || '—',
@@ -165,8 +197,9 @@ export default function RegistersScreen() {
     families.forEach((f) => {
       const entries = healthType === 'all' ? Object.keys(FIELD_MAP) : [healthType];
       entries.forEach((key) => {
-        const val = f[FIELD_MAP[key].fField];
-        if (val?.trim()) {
+        const raw = f[FIELD_MAP[key].fField];
+        const val = normalizeHealthValue(raw);
+        if (val) {
           records.push({
             uid: 'f-' + f.id + key,
             famId: f.id,
@@ -187,8 +220,9 @@ export default function RegistersScreen() {
       const f = famMap[m.family_id] || {};
       const entries = healthType === 'all' ? Object.keys(FIELD_MAP) : [healthType];
       entries.forEach((key) => {
-        const val = m[FIELD_MAP[key].mField];
-        if (val?.trim()) {
+        const raw = m[FIELD_MAP[key].mField];
+        const val = normalizeHealthValue(raw);
+        if (val) {
           records.push({
             uid: 'm-' + m.id + key,
             famId: f.id,

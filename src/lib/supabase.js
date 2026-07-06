@@ -190,6 +190,18 @@ export const deleteCamp = async (campId) => {
   }
 };
 
+// ── سجل التغييرات الحقيقي (family_activity_log) ──────────
+export const fetchAuditLog = async (orgId, limit = 300) => {
+  const { data, error } = await supabase
+    .from('family_activity_log')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+};
+
 // ── صلاحيات الصفحات التفصيلية (page_permissions) ───────
 export const fetchAllPagePermissions = async (orgId) => {
   const { data, error } = await supabase.from('page_permissions').select('*').eq('org_id', orgId);

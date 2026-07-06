@@ -39,3 +39,21 @@ export const ECONOMIC_LEVELS = [
 export const REGIONS = ['شمال غزة', 'غزة', 'الوسطى', 'جنوب غزة', 'رفح'];
 
 export const GENDER_OPTIONS = ['ذكر', 'أنثى'];
+
+// تسميات عربية لحقول الأسرة — تُستخدم بشاشة سجل التغييرات (منقولة حرفياً من الأصل)
+export const TRACKED_FIELDS = {
+  head_name: 'اسم رب الأسرة',
+  head_id: 'رقم الهوية',
+  head_gender: 'الجنس',
+  head_dob: 'تاريخ الميلاد',
+  head_marital: 'الحالة الاجتماعية',
+  phone1: 'الهاتف 1',
+  phone2: 'الهاتف 2',
+  camp_id: 'المخيم',
+  tent: 'الخيمة',
+  original_address: 'العنوان الأصلي',
+  address_details: 'تفاصيل العنوان',
+  notes: 'ملاحظات',
+  economic_level: 'المستوى الاقتصادي',
+  status: 'الحالة',
+};

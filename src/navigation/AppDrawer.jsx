@@ -56,7 +56,10 @@ export default function AppDrawer({ visible, onClose, navigation }) {
           {
             key: 'admin',
             title: '⚙️ الإدارة والنظام',
-            items: [{ icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests' }],
+            items: [
+              { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests' },
+              { icon: '📝', label: 'سجل التغييرات', screen: 'Audit' },
+            ],
           },
         ]
       : []),

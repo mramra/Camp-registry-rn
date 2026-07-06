@@ -21,6 +21,7 @@ import RegistersScreen from '../screens/registers/RegistersScreen';
 import SMSScreen from '../screens/sms/SMSScreen';
 import PendingRequestsScreen from '../screens/pending/PendingRequestsScreen';
 import AlertsScreen from '../screens/alerts/AlertsScreen';
+import AuditScreen from '../screens/audit/AuditScreen';
 import AppDrawer from './AppDrawer';
 import colors from '../theme/colors';
 
@@ -112,6 +113,7 @@ const RootNavigator = () => {
             {/* الطلبات المعلّقة — منقولة بالكامل */}
             <Stack.Screen name="PendingRequests" component={PendingRequestsScreen} options={{ title: 'الطلبات المعلّقة' }} />
             <Stack.Screen name="Alerts" component={AlertsScreen} options={{ title: 'التنبيهات' }} />
+            <Stack.Screen name="Audit" component={AuditScreen} options={{ title: 'سجل التغييرات' }} />
           </>
         )}
       </Stack.Navigator>

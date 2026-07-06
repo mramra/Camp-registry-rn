@@ -69,6 +69,8 @@ export default function AppDrawer({ visible, onClose, navigation }) {
             items: [
               { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests' },
               { icon: '📝', label: 'سجل التغييرات', screen: 'Audit' },
+              { icon: '🩺', label: 'تشخيص النظام', screen: 'Diagnostics' },
+              ...(isOwner ? [{ icon: '🛡️', label: 'الفحص الأمني', screen: 'SecurityAudit' }] : []),
             ],
           },
         ]

@@ -83,6 +83,13 @@ export const PAGE_REGISTRY = {
  * منقول حرفياً من الأصل — يطابق منطق دالة SQL المستخدمة فعلياً بـ RLS،
  * هنا فقط لتصفية العرض بالواجهة (الحماية الحقيقية بقاعدة البيانات).
  */
+export const ROLE_LABELS = {
+  platform_owner: '👑 مالك المنصة',
+  super_admin: '🔴 مدير الإيواء',
+  camp_delegate: '🟠 مندوب المخيم',
+  assistant: '🟡 مساعد',
+};
+
 export function canUserReviewRequest(profile, requesterUser) {
   if (!profile || !requesterUser) return false;
   if (profile.role === 'platform_owner') return true;

@@ -1,6 +1,8 @@
 /**
  * utils.js — دوال مساعدة مشتركة
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // أسماء الأشهر العربية — مستخدمة بدل Intl.DateTimeFormat عمداً، لأن Hermes
 // على أندرويد له نفس فئة الأخطاء الموثّقة (facebook/hermes#867, #602) مع
@@ -50,26 +52,29 @@ export function randomPassword(length = 10) {
 // ════════════════════════════════════════════════════════════
 
 /** بصمة ثابتة لهذا المتصفح/الجهاز — تُولَّد مرة واحدة وتبقى مخزَّنة محلياً */
-export function getDeviceFingerprint() {
-  const KEY = 'device_fingerprint'
-  let fp = localStorage.getItem(KEY)
+/**
+ * بصمة جهاز ثابتة (تُخزَّن مرة واحدة وتبقى نفسها بكل مرة) —
+ * AsyncStorage بدل localStorage (غير موجود على React Native).
+ * أصبحت async بالضرورة (AsyncStorage غير متزامن)؛ عكس الأصل على الويب.
+ */
+export async function getDeviceFingerprint() {
+  const KEY = 'device_fingerprint';
+  let fp = await AsyncStorage.getItem(KEY);
   if (!fp) {
-    fp = generateId()
-    localStorage.setItem(KEY, fp)
+    fp = generateId();
+    await AsyncStorage.setItem(KEY, fp);
   }
-  return fp
+  return fp;
 }
 
-/** اسم وصفي لنظام الجهاز من user agent */
-export function getDeviceName(ua = navigator.userAgent) {
-  if (/Android/i.test(ua)) return '🤖 Android'
-  if (/iPhone|iPad|iPod/i.test(ua)) return '🍎 iOS'
-  if (/Windows/i.test(ua)) return '🖥️ Windows'
-  if (/Macintosh/i.test(ua)) return '💻 Mac'
-  return '🌐 جهاز غير معروف'
+/** اسم وصفي للجهاز — Platform.OS بدل تحليل user agent (غير موجود على الموبايل) */
+export function getDeviceName() {
+  if (Platform.OS === 'android') return '🤖 Android';
+  if (Platform.OS === 'ios') return '🍎 iOS';
+  return '🌐 جهاز غير معروف';
 }
 
-/** نوع الجهاز: mobile أو desktop */
-export function getDeviceType(ua = navigator.userAgent) {
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) ? 'mobile' : 'desktop'
+/** نوع الجهاز — على تطبيق React Native فعلي، دايماً "mobile" */
+export function getDeviceType() {
+  return 'mobile';
 }

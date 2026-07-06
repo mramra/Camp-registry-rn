@@ -190,6 +190,77 @@ export const deleteCamp = async (campId) => {
   }
 };
 
+// ── إدارة الأجهزة (devices) مع اعتماد هرمي ───────────────
+export const fetchDevices = async (orgId) => {
+  const { data, error } = await supabase
+    .from('devices')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('last_seen', { ascending: false });
+  if (error) throw error;
+  return data || [];
+};
+
+const logDeviceAudit = async (action, device, reviewer, orgId) => {
+  try {
+    await supabase.from('audit_logs').insert({
+      org_id: orgId,
+      user_id: reviewer?.user_id || reviewer?.id || null,
+      user_name: reviewer?.full_name || '—',
+      user_role: reviewer?.role || null,
+      device_id: device.id,
+      action,
+      target_id: device.user_id,
+      target_name: device.owner_name || null,
+    });
+  } catch (e) {
+    console.warn('[logDeviceAudit]', e.message);
+  }
+};
+
+export const approveDevice = async (device, reviewer, orgId) => {
+  const { error } = await supabase.from('devices').update({ is_approved: true, is_blocked: false }).eq('id', device.id);
+  if (error) throw error;
+  await logDeviceAudit('device_approved', device, reviewer, orgId);
+};
+
+export const blockDevice = async (device, reviewer, orgId) => {
+  const { error } = await supabase.from('devices').update({ is_blocked: true, is_approved: false }).eq('id', device.id);
+  if (error) throw error;
+  await logDeviceAudit('device_blocked', device, reviewer, orgId);
+};
+
+export const unblockDevice = async (device, reviewer, orgId) => {
+  const { error } = await supabase.from('devices').update({ is_blocked: false }).eq('id', device.id);
+  if (error) throw error;
+  await logDeviceAudit('device_unblocked', device, reviewer, orgId);
+};
+
+export const removeDevice = async (deviceId) => {
+  const { error } = await supabase.from('devices').delete().eq('id', deviceId);
+  if (error) throw error;
+};
+
+export const fetchDeviceAuditMap = async (orgId, deviceIds) => {
+  if (!deviceIds?.length) return {};
+  try {
+    const { data } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('org_id', orgId)
+      .in('device_id', deviceIds)
+      .order('created_at', { ascending: false });
+    const map = {};
+    (data || []).forEach((row) => {
+      if (!map[row.device_id]) map[row.device_id] = row;
+    });
+    return map;
+  } catch (e) {
+    console.warn('[fetchDeviceAuditMap]', e.message);
+    return {};
+  }
+};
+
 // ── سجل التغييرات الحقيقي (family_activity_log) ──────────
 export const fetchAuditLog = async (orgId, limit = 300) => {
   const { data, error } = await supabase

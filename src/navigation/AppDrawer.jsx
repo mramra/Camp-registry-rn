@@ -38,6 +38,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       items: [
         { icon: '🏕️', label: 'المخيمات', screen: 'CampsList' },
         { icon: '👥', label: 'المستخدمون', screen: 'UsersList' },
+        { icon: '📱', label: 'الأجهزة', screen: 'Devices' },
         ...(isOwner ? [{ icon: '🔐', label: 'إدارة الصلاحيات', screen: 'PermissionsAdmin' }] : []),
       ],
     },

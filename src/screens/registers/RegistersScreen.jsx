@@ -4,7 +4,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { calcAge } from '../../lib/helpers';
+import { calcAge, naturalCompare } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -95,7 +95,7 @@ export default function RegistersScreen() {
         return k.age >= g.min && k.age <= g.max;
       })
       .filter((k) => !search.trim() || (k.name || '').includes(search) || (k.famName || '').includes(search))
-      .sort((a, b) => (a.tent || '').localeCompare(b.tent || '', 'ar', { numeric: true }));
+      .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [members, famMap, campMap, filterCamp, ageFilter, search]);
 
   const ageGroupCounts = useMemo(() => {
@@ -140,7 +140,7 @@ export default function RegistersScreen() {
       .filter((w) => !filterCamp || w.camp_id === filterCamp)
       .filter((w) => !womenType || w.type === womenType)
       .filter((w) => !search.trim() || (w.name || '').includes(search))
-      .sort((a, b) => (a.tent || '').localeCompare(b.tent || '', 'ar', { numeric: true }));
+      .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [families, members, famMap, campMap, filterCamp, womenType, search]);
 
   const womenTypes = useMemo(() => [...new Set(womenData.map((w) => w.type))], [womenData]);
@@ -208,7 +208,7 @@ export default function RegistersScreen() {
     return records
       .filter((r) => !filterCamp || r.camp_id === filterCamp)
       .filter((r) => !search.trim() || (r.name || '').includes(search) || (r.val || '').includes(search))
-      .sort((a, b) => (a.tent || '').localeCompare(b.tent || '', 'ar', { numeric: true }));
+      .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [families, members, famMap, campMap, filterCamp, healthType, search]);
 
   const HEALTH_COLOR = { chronic: colors.accent, disability: colors.blue, injury: colors.red };

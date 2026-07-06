@@ -193,3 +193,34 @@ export function getMemberIcon(relation, gender) {
   if (isMale) return '👨';
   return '👤';
 }
+
+/**
+ * مقارنة نصوص "طبيعية" (تُبقي الأرقام بترتيبها الرقمي الصحيح: 2 قبل 10)
+ * بدون أي استخدام لـ localeCompare/Intl — عمداً، لأن Hermes على أندرويد
+ * له خطأ موثّق (facebook/hermes#867): استدعاءات نادرة لكن بطيئة جداً
+ * (حتى 8+ ثوانٍ للمقارنة الواحدة) عند استخدام localeCompare بمعامل لغة،
+ * ما يسبب تجمّد التطبيق فعلياً عند فرز قوائم بها مئات العناصر.
+ */
+export function naturalCompare(a, b) {
+  const sa = String(a || '');
+  const sb = String(b || '');
+  const re = /(\d+)|(\D+)/g;
+  const partsA = sa.match(re) || [];
+  const partsB = sb.match(re) || [];
+  const len = Math.max(partsA.length, partsB.length);
+
+  for (let i = 0; i < len; i++) {
+    const pa = partsA[i] || '';
+    const pb = partsB[i] || '';
+    const na = Number(pa);
+    const nb = Number(pb);
+    const bothNumeric = pa !== '' && pb !== '' && !isNaN(na) && !isNaN(nb);
+
+    if (bothNumeric) {
+      if (na !== nb) return na - nb;
+    } else if (pa !== pb) {
+      return pa < pb ? -1 : 1;
+    }
+  }
+  return 0;
+}

@@ -15,7 +15,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { checkFamilyIssues } from '../../lib/helpers';
+import { checkFamilyIssues, naturalCompare } from '../../lib/helpers';
 import { showError, showSuccess, showInfo } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -88,7 +88,7 @@ export default function SMSScreen() {
     if (filterCamp) list = list.filter((f) => f.camp_id === filterCamp);
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((f) => (f.head_name || '').toLowerCase().includes(q) || (f.phone1 || '').includes(q));
-    return [...list].sort((a, b) => (a.head_name || '').localeCompare(b.head_name || '', 'ar'));
+    return [...list].sort((a, b) => naturalCompare(a.head_name, b.head_name));
   }, [families, filterCamp, search]);
 
   const toggle = (id) => {

@@ -30,7 +30,8 @@ export async function exportXLSX(rows, sheetName, fileName) {
   // بناء الملف كـ base64 (متوافق مع نظام ملفات الموبايل)
   const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
 
-  const dateStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const finalName = `${fileName}_${dateStr}.xlsx`;
   const fileUri = FileSystem.cacheDirectory + finalName;
 

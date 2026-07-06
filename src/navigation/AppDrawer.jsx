@@ -48,6 +48,15 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       title: '💬 التواصل والحساب',
       items: [{ icon: '💬', label: 'الرسائل', screen: 'SMS' }],
     },
+    ...(isOwner || profile?.can_review_approvals
+      ? [
+          {
+            key: 'admin',
+            title: '⚙️ الإدارة والنظام',
+            items: [{ icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests' }],
+          },
+        ]
+      : []),
   ];
 
   // كل الأقسام مفتوحة افتراضياً أول مرة (نفس تجربة المستخدم بالويب)

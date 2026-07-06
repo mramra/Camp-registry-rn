@@ -408,3 +408,125 @@ export const saveFamilyMembers = async (familyId, members) => {
 };
 
 export default supabase;
+
+// ── نظام الموافقات (family_history) — منقول حرفياً من الأصل ──────
+// كل الدوال تأخذ orgId صراحة (بدل ثابت عام ORG_ID بالأصل، لأن هذا
+// المشروع يمرّر orgId من AuthContext بكل مكان بدل ثابت واحد).
+
+export const recordApprovalRequest = async ({
+  orgId, familyId, action, oldData, newData, changes, actorId, actorName, actorRole,
+}) => {
+  const { error } = await supabase.from('family_history').insert({
+    org_id: orgId,
+    family_id: familyId,
+    action,
+    changed_by: actorId || null,
+    user_name: actorName || '—',
+    user_role: actorRole || null,
+    old_data: oldData || null,
+    new_data: newData || null,
+    changes: changes || null,
+    status: 'pending',
+  });
+  if (error) throw error;
+  if (action === 'delete' && familyId) {
+    await supabase.from('families').update({ pending_delete: true }).eq('id', familyId);
+  }
+};
+
+export const fetchPendingRequests = async (orgId) => {
+  const { data, error } = await supabase
+    .from('family_history')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+};
+
+export const fetchDecisionLog = async (orgId, limit = 100) => {
+  const { data, error } = await supabase
+    .from('family_history')
+    .select('*')
+    .eq('org_id', orgId)
+    .in('status', ['approved', 'rejected'])
+    .order('reviewed_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+};
+
+export const approveRequest = async (req, reviewer) => {
+  try {
+    const { family_id, action, new_data, old_data } = req;
+
+    if (action === 'delete') {
+      await supabase.from('family_members').delete().eq('family_id', family_id);
+      await supabase.from('families').delete().eq('id', family_id);
+    } else if (action === 'camp_insert') {
+      await supabase.from('camps').insert(new_data);
+    } else if (action === 'camp_update') {
+      await supabase.from('camps').update(new_data).eq('id', new_data.id);
+    } else if (action === 'camp_delete') {
+      await supabase.from('camps').delete().eq('id', old_data.id);
+    } else if (action === 'user_insert') {
+      await callAdminAPI('create_user', new_data);
+    } else if (action === 'user_update') {
+      await supabase.from('org_members').update(new_data).eq('id', new_data.id);
+    } else if (action === 'user_delete') {
+      await callAdminAPI('delete_user', { user_id: old_data.user_id, member_id: old_data.id });
+    } else if (action?.startsWith('movement_')) {
+      await supabase.from('family_movements').insert(new_data);
+    } else {
+      await supabase.from('families').update({ review_status: 'approved' }).eq('id', family_id);
+    }
+
+    await supabase
+      .from('family_history')
+      .update({
+        status: 'approved',
+        reviewed_by: reviewer?.user_id || reviewer?.id || null,
+        reviewed_by_name: reviewer?.full_name || '—',
+        reviewed_by_role: reviewer?.role || null,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', req.id);
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+};
+
+export const rejectRequest = async (req, reviewer, note) => {
+  try {
+    const { family_id, action, old_data } = req;
+
+    if (action === 'insert') {
+      await supabase.from('families').update({ review_status: 'rejected' }).eq('id', family_id);
+    } else if (action === 'update' && old_data) {
+      const restoreData = { ...old_data };
+      delete restoreData.id;
+      await supabase.from('families').update(restoreData).eq('id', family_id);
+    } else if (action === 'delete') {
+      await supabase.from('families').update({ pending_delete: false }).eq('id', family_id);
+    }
+
+    await supabase
+      .from('family_history')
+      .update({
+        status: 'rejected',
+        reviewed_by: reviewer?.user_id || reviewer?.id || null,
+        reviewed_by_name: reviewer?.full_name || '—',
+        reviewed_by_role: reviewer?.role || null,
+        reviewed_at: new Date().toISOString(),
+        review_note: note || null,
+      })
+      .eq('id', req.id);
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+};

@@ -2,22 +2,32 @@
  * utils.js — دوال مساعدة مشتركة
  */
 
-export function formatDate(dateStr, locale = 'ar-EG') {
-  if (!dateStr) return '—'
-  try {
-    return new Date(dateStr).toLocaleDateString(locale, {
-      year: 'numeric', month: 'short', day: 'numeric'
-    })
-  } catch { return dateStr }
+// أسماء الأشهر العربية — مستخدمة بدل Intl.DateTimeFormat عمداً، لأن Hermes
+// على أندرويد له نفس فئة الأخطاء الموثّقة (facebook/hermes#867, #602) مع
+// أي واجهة Intl (بما فيها toLocaleDateString/toLocaleString بمعامل لغة) —
+// نفس السبب الجذري اللي عطّل شاشة السجلات سابقاً، فتجنّبناه هنا استباقياً
+// قبل ما يسبب نفس المشكلة بشاشات الحركات/التوزيعات/تفاصيل الأسرة.
+const AR_MONTHS_SHORT = [
+  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+];
+
+export function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return String(dateStr);
+  return `${d.getDate()} ${AR_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function formatDateTime(dateStr) {
-  if (!dateStr) return '—'
-  try {
-    return new Date(dateStr).toLocaleString('ar-EG', {
-      dateStyle: 'short', timeStyle: 'short'
-    })
-  } catch { return dateStr }
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return String(dateStr);
+  const h = d.getHours();
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  const period = h < 12 ? 'ص' : 'م';
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${formatDate(dateStr)} — ${hour12}:${minutes} ${period}`;
 }
 
 export function truncate(str, len = 30) {

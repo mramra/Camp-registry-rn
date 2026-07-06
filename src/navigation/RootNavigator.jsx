@@ -19,6 +19,7 @@ import DistributionReceiveScreen from '../screens/distributions/DistributionRece
 import PermissionsAdminScreen from '../screens/permissions/PermissionsAdminScreen';
 import RegistersScreen from '../screens/registers/RegistersScreen';
 import SMSScreen from '../screens/sms/SMSScreen';
+import PendingRequestsScreen from '../screens/pending/PendingRequestsScreen';
 import AppDrawer from './AppDrawer';
 import colors from '../theme/colors';
 
@@ -106,6 +107,9 @@ const RootNavigator = () => {
 
             {/* الرسائل — منقولة بالكامل */}
             <Stack.Screen name="SMS" component={SMSScreen} options={{ title: 'الرسائل' }} />
+
+            {/* الطلبات المعلّقة — منقولة بالكامل */}
+            <Stack.Screen name="PendingRequests" component={PendingRequestsScreen} options={{ title: 'الطلبات المعلّقة' }} />
           </>
         )}
       </Stack.Navigator>

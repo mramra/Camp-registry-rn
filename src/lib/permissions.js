@@ -78,4 +78,23 @@ export const PAGE_REGISTRY = {
   pending_requests: { label: '📋 الطلبات المعلّقة' },
 };
 
-export default { hasPermission, getCreatableRoles };
+/**
+ * هل هذا المستخدم (profile) مخوَّل لمراجعة طلب صادر عن مستخدم آخر (requesterUser)؟
+ * منقول حرفياً من الأصل — يطابق منطق دالة SQL المستخدمة فعلياً بـ RLS،
+ * هنا فقط لتصفية العرض بالواجهة (الحماية الحقيقية بقاعدة البيانات).
+ */
+export function canUserReviewRequest(profile, requesterUser) {
+  if (!profile || !requesterUser) return false;
+  if (profile.role === 'platform_owner') return true;
+  if (!profile.can_review_approvals) return false;
+
+  if (profile.role === 'camp_delegate' && requesterUser.role === 'assistant') {
+    return requesterUser.supervisor_id === profile.id;
+  }
+  if (profile.role === 'super_admin' && ['assistant', 'camp_delegate'].includes(requesterUser.role)) {
+    return true;
+  }
+  return false;
+}
+
+export default { hasPermission, getCreatableRoles, canUserReviewRequest };

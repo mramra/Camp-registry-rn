@@ -50,7 +50,10 @@ export default function AppDrawer({ visible, onClose, navigation }) {
     {
       key: 'analysis',
       title: '📊 التحليل والتقارير',
-      items: [{ icon: '📈', label: 'التقارير والتحليلات', screen: 'Analysis' }],
+      items: [
+        { icon: '📈', label: 'التقارير والتحليلات', screen: 'Analysis' },
+        { icon: '📋', label: 'تقارير الاحتياجات', screen: 'NeedsReport' },
+      ],
     },
     {
       key: 'comms',

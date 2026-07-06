@@ -24,6 +24,7 @@ import AlertsScreen from '../screens/alerts/AlertsScreen';
 import AuditScreen from '../screens/audit/AuditScreen';
 import DevicesScreen from '../screens/devices/DevicesScreen';
 import AnalysisScreen from '../screens/analysis/AnalysisScreen';
+import NeedsReportScreen from '../screens/needs/NeedsReportScreen';
 import AppDrawer from './AppDrawer';
 import colors from '../theme/colors';
 
@@ -118,6 +119,7 @@ const RootNavigator = () => {
             <Stack.Screen name="Audit" component={AuditScreen} options={{ title: 'سجل التغييرات' }} />
             <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'إدارة الأجهزة' }} />
             <Stack.Screen name="Analysis" component={AnalysisScreen} options={{ title: 'التقارير والتحليلات' }} />
+            <Stack.Screen name="NeedsReport" component={NeedsReportScreen} options={{ title: 'تقارير الاحتياجات' }} />
           </>
         )}
       </Stack.Navigator>

@@ -18,7 +18,7 @@ import colors from '../theme/colors';
  * نفس الألوان، نفس الترتيب، نفس منطق القفل بعد المحاولات الفاشلة،
  * نفس رسائل الانتظار التشجيعية وعداد الثواني وشريط التقدم.
  */
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }) {
   const [id, setId] = useState('');
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
@@ -158,6 +158,11 @@ export default function LoginScreen() {
             </Pressable>
 
             <Text style={styles.hint}>كلمة المرور الأولى = رقم الجوال</Text>
+
+            <Pressable onPress={() => navigation.navigate('FamilyPortal')} style={{ marginTop: 12 }}>
+              <Text style={styles.portalLink}>🏕️ أنا من عائلة مسجّلة — استعلام بوابة الأسرة</Text>
+            </Pressable>
+
             <Text style={styles.copyright}>© 2026 Mahmoud Rateb Ramadan</Text>
 
             {seconds > 10 && (
@@ -232,6 +237,7 @@ const styles = StyleSheet.create({
   buttonPressed: { transform: [{ scale: 0.97 }] },
   buttonText: { color: colors.bg, fontWeight: '900', fontSize: 14, textAlign: 'center' },
   hint: { color: colors.muted, fontSize: 12, textAlign: 'center', marginTop: 24 },
+  portalLink: { color: colors.accent, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
   copyright: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: 8, opacity: 0.6 },
   slowBox: {
     marginTop: 16,

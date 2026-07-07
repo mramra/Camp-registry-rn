@@ -4,6 +4,7 @@ import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
+import FamilyPortalScreen from '../screens/FamilyPortalScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import FamiliesListScreen from '../screens/families/FamiliesListScreen';
 import FamilyDetailScreen from '../screens/families/FamilyDetailScreen';
@@ -81,7 +82,10 @@ const RootNavigator = () => {
         }}
       >
         {!isAuthenticated ? (
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="FamilyPortal" component={FamilyPortalScreen} options={{ headerShown: false }} />
+          </>
         ) : (
           <>
             <Stack.Screen

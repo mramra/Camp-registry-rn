@@ -30,6 +30,7 @@ import DiagnosticsScreen from '../screens/diagnostics/DiagnosticsScreen';
 import SecurityAuditScreen from '../screens/diagnostics/SecurityAuditScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import SubscriptionScreen from '../screens/subscription/SubscriptionScreen';
+import HelpScreen from '../screens/help/HelpScreen';
 import AppDrawer from './AppDrawer';
 import colors from '../theme/colors';
 
@@ -130,6 +131,7 @@ const RootNavigator = () => {
             <Stack.Screen name="SecurityAudit" component={SecurityAuditScreen} options={{ title: 'الفحص الأمني' }} />
             <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'الإعدادات' }} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'الاشتراك والباقات' }} />
+            <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'المساعدة والدعم' }} />
           </>
         )}
       </Stack.Navigator>

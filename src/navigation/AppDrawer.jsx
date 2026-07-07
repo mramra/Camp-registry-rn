@@ -59,7 +59,10 @@ export default function AppDrawer({ visible, onClose, navigation }) {
     {
       key: 'comms',
       title: '💬 التواصل والحساب',
-      items: [{ icon: '💬', label: 'الرسائل', screen: 'SMS' }],
+      items: [
+        { icon: '💬', label: 'الرسائل', screen: 'SMS' },
+        { icon: '⚙️', label: 'الإعدادات', screen: 'Settings' },
+      ],
     },
     ...(isOwner || profile?.can_review_approvals
       ? [

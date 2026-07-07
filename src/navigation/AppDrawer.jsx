@@ -62,6 +62,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       items: [
         { icon: '💬', label: 'الرسائل', screen: 'SMS' },
         { icon: '⚙️', label: 'الإعدادات', screen: 'Settings' },
+        { icon: '💎', label: 'الاشتراك والباقات', screen: 'Subscription' },
       ],
     },
     ...(isOwner || profile?.can_review_approvals

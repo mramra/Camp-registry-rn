@@ -29,6 +29,7 @@ import CampCompareScreen from '../screens/campcompare/CampCompareScreen';
 import DiagnosticsScreen from '../screens/diagnostics/DiagnosticsScreen';
 import SecurityAuditScreen from '../screens/diagnostics/SecurityAuditScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
+import SubscriptionScreen from '../screens/subscription/SubscriptionScreen';
 import AppDrawer from './AppDrawer';
 import colors from '../theme/colors';
 
@@ -128,6 +129,7 @@ const RootNavigator = () => {
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'تشخيص النظام' }} />
             <Stack.Screen name="SecurityAudit" component={SecurityAuditScreen} options={{ title: 'الفحص الأمني' }} />
             <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'الإعدادات' }} />
+            <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'الاشتراك والباقات' }} />
           </>
         )}
       </Stack.Navigator>

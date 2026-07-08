@@ -157,10 +157,8 @@ export default function LoginScreen({ navigation }) {
               </Text>
             </Pressable>
 
-            <Text style={styles.hint}>كلمة المرور الأولى = رقم الجوال</Text>
-
-            <Pressable onPress={() => navigation.navigate('FamilyPortal')} style={{ marginTop: 12 }}>
-              <Text style={styles.portalLink}>🏕️ أنا من عائلة مسجّلة — استعلام بوابة الأسرة</Text>
+            <Pressable onPress={() => navigation.navigate('FamilyPortal')} style={styles.portalBtn}>
+              <Text style={styles.portalBtnText}>🏕️ أنا من عائلة مسجّلة — استعلام بوابة الأسرة</Text>
             </Pressable>
 
             <Text style={styles.copyright}>© 2026 Mahmoud Rateb Ramadan</Text>
@@ -236,8 +234,16 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonPressed: { transform: [{ scale: 0.97 }] },
   buttonText: { color: colors.bg, fontWeight: '900', fontSize: 14, textAlign: 'center' },
-  hint: { color: colors.muted, fontSize: 12, textAlign: 'center', marginTop: 24 },
-  portalLink: { color: colors.accent, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
+  portalBtn: {
+    marginTop: 24,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
+    backgroundColor: 'rgba(245,158,11,0.1)',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 12,
+  },
+  portalBtnText: { color: colors.accent, fontSize: 13, fontWeight: '900', textAlign: 'center' },
   copyright: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: 8, opacity: 0.6 },
   slowBox: {
     marginTop: 16,

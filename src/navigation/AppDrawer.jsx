@@ -57,6 +57,8 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         { icon: '📈', label: 'التقارير والتحليلات', screen: 'Analysis' },
         { icon: '📋', label: 'تقارير الاحتياجات', screen: 'NeedsReport' },
         { icon: '🏕️', label: 'مقارنة المخيمات', screen: 'CampCompare' },
+        { icon: '⚕️', label: 'كشف الحالات الصحية', screen: 'HealthReport' },
+        { icon: '💾', label: 'استيراد وتصدير', screen: 'Export' },
       ],
     },
     {
@@ -78,6 +80,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
               { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests' },
               { icon: '📝', label: 'سجل التغييرات', screen: 'Audit' },
               { icon: '🩺', label: 'تشخيص النظام', screen: 'Diagnostics' },
+              { icon: '🗄️', label: 'إدارة البيانات', screen: 'Data' },
               ...(isOwner ? [{ icon: '🛡️', label: 'الفحص الأمني', screen: 'SecurityAudit' }] : []),
             ],
           },

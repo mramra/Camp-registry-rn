@@ -8,6 +8,7 @@ import {
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as Location from 'expo-location';
@@ -47,6 +48,10 @@ export default function CampFormScreen() {
   const [status, setStatus] = useState('active');
   const [managerId, setManagerId] = useState(null);
   const [coordinates, setCoordinates] = useState('');
+  const [portalOpen, setPortalOpen] = useState(false);
+
+  // تفعيل/تعطيل بوابة الأسرة العامة: مالك المنصة، مدير الإيواء، ومندوب المخيم فقط
+  const canManagePortal = isOwner || isSuperAdmin || isCampDelegate;
 
   // مندوب مقيّد بمخيمه فقط عند الإضافة (لا يختار نوع/أب المخيم)
   const restrictedDelegate = !campId && isCampDelegate && !isOwner && !isSuperAdmin;
@@ -74,6 +79,7 @@ export default function CampFormScreen() {
           setStatus(data.status || 'active');
           setManagerId(data.manager_id || null);
           setCoordinates(data.latitude && data.longitude ? `${data.latitude},${data.longitude}` : '');
+          setPortalOpen(!!data.portal_open);
         }
         setLoading(false);
       }
@@ -138,6 +144,7 @@ export default function CampFormScreen() {
         manager_id: managerId || null,
         latitude,
         longitude,
+        portal_open: portalOpen,
         _deleted: false,
       };
 
@@ -264,6 +271,22 @@ export default function CampFormScreen() {
             ))}
           </View>
 
+          {canManagePortal && (
+            <View style={styles.portalBox}>
+              <View style={styles.portalRow}>
+                <Switch value={portalOpen} onValueChange={setPortalOpen} trackColor={{ true: colors.accent }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.portalTitle}>🏕️ بوابة الأسرة العامة</Text>
+                  <Text style={styles.portalSub}>
+                    {portalOpen
+                      ? '✅ مفعّلة — أسر هذا المخيم تقدر تستعلم عن بياناتها من بوابة الأسرة بدون تسجيل دخول'
+                      : '⛔ معطّلة — أسر هذا المخيم غير ظاهرة ببوابة الأسرة العامة'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
           <View style={styles.row}>
             <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={handleSave} disabled={saving}>
               {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>{campId ? '💾 حفظ' : '✅ إضافة'}</Text>}
@@ -300,6 +323,10 @@ const styles = StyleSheet.create({
   mapBtnText: { color: colors.blue, fontSize: 11 },
 
   row: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  portalBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 12 },
+  portalRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  portalTitle: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right' },
+  portalSub: { color: colors.muted, fontSize: 10, marginTop: 3, textAlign: 'right', lineHeight: 15 },
   saveBtn: { flex: 1, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   disabled: { opacity: 0.6 },
   saveBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },

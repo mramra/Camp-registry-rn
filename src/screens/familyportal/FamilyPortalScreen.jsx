@@ -159,15 +159,18 @@ export default function FamilyPortalScreen({ navigation }) {
                 {members.length > 0 && (
                   <View style={styles.infoCard}>
                     <Text style={styles.infoCardTitle}>👨‍👩‍👧‍👦 أفراد الأسرة ({members.length})</Text>
-                    {members.slice(0, 5).map((m) => (
+                    {members.map((m) => (
                       <View key={m.id} style={styles.memberRow}>
-                        <Text style={styles.memberName}>{m.name}</Text>
-                        <Text style={styles.memberRelation}>{m.relation}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.memberName}>{m.name}</Text>
+                          {!!m.national_id && <Text style={styles.memberId}>🪪 {m.national_id}</Text>}
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={styles.memberRelation}>{m.relation || '—'}</Text>
+                          {!!m.dob && <Text style={styles.memberDob}>{m.dob}</Text>}
+                        </View>
                       </View>
                     ))}
-                    {members.length > 5 && (
-                      <Text style={styles.moreText}>+{members.length - 5} أخرى</Text>
-                    )}
                   </View>
                 )}
               </View>
@@ -263,10 +266,11 @@ const styles = StyleSheet.create({
   tagText: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
   econText: { color: colors.muted, fontSize: 11, marginTop: 8, textAlign: 'right' },
 
-  memberRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border },
-  memberName: { color: colors.white, fontSize: 11 },
-  memberRelation: { color: colors.muted, fontSize: 10 },
-  moreText: { color: colors.muted, fontSize: 10, marginTop: 4, textAlign: 'right' },
+  memberRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border },
+  memberName: { color: colors.white, fontSize: 11, fontWeight: 'bold' },
+  memberId: { color: colors.muted, fontSize: 9, marginTop: 2 },
+  memberRelation: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
+  memberDob: { color: colors.muted, fontSize: 9, marginTop: 2 },
 
   footerText: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: 16 },
   backLink: { color: colors.accent, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },

@@ -624,3 +624,24 @@ export const rejectRequest = async (req, reviewer, note) => {
     return { success: false, error: e.message };
   }
 };
+
+/**
+ * آخر التعديلات على الأسر (إضافة/تعديل/حذف) — من جدول family_activity_log
+ * (موجود بالمخطط مسبقاً، RLS يحصر النتائج تلقائياً حسب المخيمات المسموحة
+ * لهذا المستخدم، فلا حاجة لفلترة إضافية بالتطبيق).
+ */
+export const fetchFamilyActivityLog = async (orgId, limit = 15) => {
+  try {
+    const { data, error } = await supabase
+      .from('family_activity_log')
+      .select('id, family_id, family_name, members_count, action, actor_name, created_at')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error('[fetchFamilyActivityLog]', err.message);
+    return [];
+  }
+};

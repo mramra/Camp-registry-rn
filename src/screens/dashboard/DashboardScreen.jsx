@@ -11,7 +11,7 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
-import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
+import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchFamilyActivityLog } from '../../lib/supabase';
 import { calcAge, isIncomplete } from '../../lib/helpers';
 import colors from '../../theme/colors';
 
@@ -26,16 +26,19 @@ export default function DashboardScreen() {
   const { getAllowedCampIds, filterLocal } = useDataScope();
 
   const [stats, setStats] = useState(null);
+  const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadStats = useCallback(async () => {
     if (!profile?.org_id) return;
     try {
-      const [famsRaw, camps] = await Promise.all([
+      const [famsRaw, camps, activityLog] = await Promise.all([
         fetchFamilies(profile.org_id),
         fetchCamps(profile.org_id),
+        fetchFamilyActivityLog(profile.org_id, 15),
       ]);
+      setActivity(activityLog);
       const fams = famsRaw.filter((f) => !f.review_status || f.review_status === 'approved');
       const campIds = getAllowedCampIds(camps);
       const filteredFams = filterLocal(fams, campIds);
@@ -229,6 +232,35 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        {/* آخر التعديلات على الأسر */}
+        {activity.length > 0 && (
+          <View style={styles.panelFull}>
+            <Text style={styles.quickTitle}>📝 آخر التعديلات على الأسر</Text>
+            {activity.map((a) => {
+              const meta =
+                a.action === 'insert' ? { icon: '➕', color: colors.green, label: 'إضافة' } :
+                a.action === 'delete' ? { icon: '🗑️', color: colors.red, label: 'حذف' } :
+                { icon: '✏️', color: colors.blue, label: 'تعديل' };
+              const when = new Date(a.created_at);
+              const timeStr = isNaN(when) ? '' : when.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+              return (
+                <View key={a.id} style={styles.activityRow}>
+                  <View style={[styles.activityIconBox, { backgroundColor: `${meta.color}22` }]}>
+                    <Text style={styles.activityIcon}>{meta.icon}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.activityLine}>
+                      <Text style={{ color: meta.color, fontWeight: 'bold' }}>{meta.label}</Text> — {a.family_name || 'أسرة'}
+                      {a.members_count ? ` (${a.members_count} فرد)` : ''}
+                    </Text>
+                    <Text style={styles.activityMeta}>👤 {a.actor_name || 'غير معروف'} · 🕒 {timeStr}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* لا بيانات */}
         {!loading && stats?.families === 0 && (
           <View style={styles.emptyBox}>
@@ -306,6 +338,11 @@ const styles = StyleSheet.create({
   },
   quickIcon: { fontSize: 18 },
   quickLabel: { color: colors.white, fontSize: 12, fontWeight: 'bold' },
+  activityRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+  activityIconBox: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  activityIcon: { fontSize: 14 },
+  activityLine: { color: colors.white, fontSize: 12, textAlign: 'right' },
+  activityMeta: { color: colors.muted, fontSize: 10, marginTop: 2, textAlign: 'right' },
   emptyBox: { alignItems: 'center', paddingVertical: 32 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { color: colors.white, fontWeight: 'bold', marginBottom: 4 },

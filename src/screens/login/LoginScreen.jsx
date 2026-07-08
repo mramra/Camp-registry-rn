@@ -10,8 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import colors from '../theme/colors';
+import { useAuth } from '../../context/AuthContext';
+import colors from '../../theme/colors';
 
 /**
  * شاشة تسجيل الدخول — نسخة مطابقة للأصل (camp-registry-react/LoginPage.jsx):

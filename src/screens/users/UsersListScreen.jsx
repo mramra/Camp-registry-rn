@@ -24,7 +24,7 @@ import colors from '../../theme/colors';
 
 // ── إعداد الأدوار (نفس ألوان/ترتيب الأصل) ─────────────────
 const ROLE_CONFIG = {
-  platform_owner: { icon: '👑', color: '#eab308', label: 'مالك المنصة' },
+  platform_owner: { icon: '👑', color: colors.accent, label: 'مالك المنصة' },
   super_admin: { icon: '🔴', color: colors.red, label: 'مدير الإيواء' },
   camp_delegate: { icon: '🟠', color: colors.accent, label: 'مندوب مخيم' },
   assistant: { icon: '🟡', color: colors.blue, label: 'مساعد' },

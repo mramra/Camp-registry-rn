@@ -342,7 +342,7 @@ export default function FamiliesListScreen() {
         </View>
 
         <View style={styles.badgesRow}>
-          {f.review_status === 'pending' && <Badge label="🔍 قيد المراجعة" color="#eab308" />}
+          {f.review_status === 'pending' && <Badge label="🔍 قيد المراجعة" color={colors.accent} />}
           {f.review_status === 'rejected' && <Badge label="❌ مرفوض" color={colors.red} />}
           {incomplete && <Badge label={`⚠️ ${issues.length} نقص`} color={colors.red} />}
           {isDupId && <Badge label="🔁 هوية" color={colors.purple} />}

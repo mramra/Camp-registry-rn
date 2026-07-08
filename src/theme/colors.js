@@ -13,6 +13,8 @@ export const colors = {
   red:      '#ef4444',
   blue:     '#3b82f6',
   purple:   '#8b5cf6',
+  orange:   '#fb923c',
+  pink:     '#f472b6',
   muted:    '#8b949e',
   white:    '#ffffff',
 };

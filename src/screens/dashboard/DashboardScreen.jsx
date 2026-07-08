@@ -9,11 +9,11 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useAuth } from '../context/AuthContext';
-import { useDataScope } from '../lib/useDataScope';
-import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../lib/supabase';
-import { calcAge, isIncomplete } from '../lib/helpers';
-import colors from '../theme/colors';
+import { useAuth } from '../../context/AuthContext';
+import { useDataScope } from '../../lib/useDataScope';
+import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
+import { calcAge, isIncomplete } from '../../lib/helpers';
+import colors from '../../theme/colors';
 
 /**
  * الرئيسية — نسخة مطابقة للأصل (camp-registry-react/Dashboard.jsx):
@@ -110,7 +110,7 @@ export default function DashboardScreen() {
     { icon: '👨‍👩‍👧‍👦', label: 'الأسر', value: stats?.families, color: colors.accent, screen: 'FamiliesList' },
     { icon: '👤', label: 'الأفراد', value: stats?.members, color: colors.blue, screen: 'FamiliesList' },
     { icon: '⛺', label: 'المخيمات', value: stats?.camps, color: colors.green, screen: 'CampsList' },
-    { icon: '⚠️', label: 'بيانات ناقصة', value: stats?.incomplete, color: (stats?.incomplete || 0) > 0 ? colors.red : '#6b7280', screen: 'FamiliesList' },
+    { icon: '⚠️', label: 'بيانات ناقصة', value: stats?.incomplete, color: (stats?.incomplete || 0) > 0 ? colors.red : colors.muted, screen: 'FamiliesList' },
   ];
 
   const quickActions = [

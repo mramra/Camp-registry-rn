@@ -10,9 +10,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { supabase } from '../lib/supabase';
-import { getFamilyCategories, CATEGORY_LABELS } from '../lib/helpers';
-import colors from '../theme/colors';
+import { supabase } from '../../lib/supabase';
+import { getFamilyCategories, CATEGORY_LABELS } from '../../lib/helpers';
+import colors from '../../theme/colors';
 
 // نفس معرّف المنظمة الثابت المستخدم بالنسخة الأصلية لبوابة الأسرة العامة
 // (هذه الشاشة تعمل بدون تسجيل دخول، فلا يوجد AuthContext لأخذ org_id منه)

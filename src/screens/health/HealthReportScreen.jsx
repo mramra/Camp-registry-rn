@@ -17,8 +17,8 @@ import colors from '../../theme/colors';
 const CATEGORIES = [
   { key: 'معاق', label: '🦽 إعاقة', color: colors.purple },
   { key: 'مصاب', label: '🩹 إصابة', color: colors.accent },
-  { key: 'مزمن', label: '💊 مرض مزمن', color: '#fb923c' },
-  { key: 'حامل', label: '🤰 حمل', color: '#f472b6' },
+  { key: 'مزمن', label: '💊 مرض مزمن', color: colors.orange },
+  { key: 'حامل', label: '🤰 حمل', color: colors.pink },
   { key: 'مرضع', label: '🤱 رضاعة', color: colors.green },
 ];
 
@@ -233,8 +233,8 @@ export default function HealthReportScreen() {
                     <View style={styles.badgeRow}>
                       {!!disStr && <View style={[styles.badge, { backgroundColor: 'rgba(139,92,246,0.2)' }]}><Text style={[styles.badgeText, { color: colors.purple }]}>🦽 {disStr}</Text></View>}
                       {!!injStr && <View style={[styles.badge, { backgroundColor: 'rgba(245,158,11,0.2)' }]}><Text style={[styles.badgeText, { color: colors.accent }]}>🩹 {injStr}</Text></View>}
-                      {!!chrStr && <View style={[styles.badge, { backgroundColor: 'rgba(251,146,60,0.2)' }]}><Text style={[styles.badgeText, { color: '#fb923c' }]}>💊 {chrStr}</Text></View>}
-                      {pregnant && <View style={[styles.badge, { backgroundColor: 'rgba(244,114,182,0.2)' }]}><Text style={[styles.badgeText, { color: '#f472b6' }]}>🤰 حامل</Text></View>}
+                      {!!chrStr && <View style={[styles.badge, { backgroundColor: 'rgba(251,146,60,0.2)' }]}><Text style={[styles.badgeText, { color: colors.orange }]}>💊 {chrStr}</Text></View>}
+                      {pregnant && <View style={[styles.badge, { backgroundColor: 'rgba(244,114,182,0.2)' }]}><Text style={[styles.badgeText, { color: colors.pink }]}>🤰 حامل</Text></View>}
                       {nursing && <View style={[styles.badge, { backgroundColor: 'rgba(16,185,129,0.2)' }]}><Text style={[styles.badgeText, { color: colors.green }]}>🤱 مرضع</Text></View>}
                     </View>
                   )}
@@ -257,8 +257,8 @@ const styles = StyleSheet.create({
   expAccentText: { color: colors.bg, fontWeight: '900', fontSize: 11 },
   expPurple: { flexGrow: 1, backgroundColor: 'rgba(139,92,246,0.1)', borderWidth: 1, borderColor: colors.purple, paddingVertical: 10, borderRadius: 12, alignItems: 'center', minWidth: 70 },
   expPurpleText: { color: colors.purple, fontWeight: 'bold', fontSize: 11 },
-  expOrange: { flexGrow: 1, backgroundColor: 'rgba(251,146,60,0.1)', borderWidth: 1, borderColor: '#fb923c', paddingVertical: 10, borderRadius: 12, alignItems: 'center', minWidth: 70 },
-  expOrangeText: { color: '#fb923c', fontWeight: 'bold', fontSize: 11 },
+  expOrange: { flexGrow: 1, backgroundColor: 'rgba(251,146,60,0.1)', borderWidth: 1, borderColor: colors.orange, paddingVertical: 10, borderRadius: 12, alignItems: 'center', minWidth: 70 },
+  expOrangeText: { color: colors.orange, fontWeight: 'bold', fontSize: 11 },
 
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, marginBottom: 8 },
   statBox: { width: '31%', backgroundColor: colors.surface2, borderWidth: 1, borderColor: 'transparent', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },

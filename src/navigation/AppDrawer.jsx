@@ -45,7 +45,10 @@ export default function AppDrawer({ visible, onClose, navigation }) {
     {
       key: 'registers',
       title: '⚕️ السجلات الاجتماعية والصحية',
-      items: [{ icon: '📋', label: 'السجلات', screen: 'Registers' }],
+      items: [
+        { icon: '📋', label: 'السجلات', screen: 'Registers' },
+        { icon: '🎓', label: 'الحالة الدراسية', screen: 'Education' },
+      ],
     },
     {
       key: 'analysis',
@@ -82,8 +85,24 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       : []),
   ];
 
-  // كل الأقسام مفتوحة افتراضياً أول مرة (نفس تجربة المستخدم بالويب)
-  const [collapsed, setCollapsed] = useState(new Set());
+  // كل الأقسام مطوية افتراضياً، إلا القسم اللي فيه الشاشة الحالية —
+  // يُعاد حسابه كل مرة تُفتح فيها القائمة (وليس فقط أول مرة).
+  const getActiveSectionKey = () => {
+    const state = navigation?.getState?.();
+    const current = state?.routes?.[state.index]?.name;
+    if (!current) return null;
+    const found = SECTIONS.find((s) => s.items.some((it) => it.screen === current));
+    return found?.key || null;
+  };
+
+  const [collapsed, setCollapsed] = useState(new Set(SECTIONS.map((s) => s.key)));
+
+  React.useEffect(() => {
+    if (!visible) return;
+    const activeKey = getActiveSectionKey();
+    setCollapsed(new Set(SECTIONS.filter((s) => s.key !== activeKey).map((s) => s.key)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   const toggleSection = (key) => {
     setCollapsed((prev) => {

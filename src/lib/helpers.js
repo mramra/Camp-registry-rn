@@ -243,3 +243,91 @@ export function naturalCompare(a, b) {
   }
   return 0;
 }
+
+// ════════════════════════════════════════════════════════════
+// المرحلة الدراسية المتوقعة حسب العمر (نظام التعليم الفلسطيني)
+// منقول حرفياً من camp-registry-react/src/lib/helpers.js
+// ════════════════════════════════════════════════════════════
+
+const GRADE_BY_AGE = {
+  4: 'روضة أولى', 5: 'روضة ثانية',
+  6: 'أول ابتدائي', 7: 'ثاني ابتدائي', 8: 'ثالث ابتدائي', 9: 'رابع ابتدائي', 10: 'خامس ابتدائي', 11: 'سادس ابتدائي',
+  12: 'أول اعدادي', 13: 'ثاني اعدادي', 14: 'ثالث اعدادي',
+  15: 'أول ثانوي', 16: 'ثاني ثانوي', 17: 'توجيهي',
+};
+
+/** المرحلة الدراسية المتوقعة لهذا العمر — null لو خارج نطاق سن الدراسة (أقل من 4) */
+export function getExpectedGrade(age) {
+  if (age == null) return null;
+  if (age > 17) return 'بعد الثانوية';
+  return GRADE_BY_AGE[age] || null;
+}
+
+/** هل هذا العمر بعمر الدراسة (روضة حتى توجيهي)؟ */
+export function isSchoolAge(age) {
+  return age != null && age >= 4 && age <= 17;
+}
+
+/** كل الصفوف الدراسية مرتَّبة (روضة أولى ← توجيهي) — لقائمة اختيار الصف الفعلي */
+export const GRADE_OPTIONS = [
+  'روضة أولى', 'روضة ثانية',
+  'أول ابتدائي', 'ثاني ابتدائي', 'ثالث ابتدائي', 'رابع ابتدائي', 'خامس ابتدائي', 'سادس ابتدائي',
+  'أول اعدادي', 'ثاني اعدادي', 'ثالث اعدادي',
+  'أول ثانوي', 'ثاني ثانوي', 'توجيهي',
+];
+
+/**
+ * مقدار التأخر الدراسي بالصفوف: الفرق بين الصف المتوقَّع لعمره الآن والصف الفعلي
+ * المُسجَّل له. 0 يعني غير متأخر (أو لا صف فعلي مسجَّل — يُعتبر مطابقاً للمتوقع).
+ */
+export function getGradeDelay(age, actualGrade) {
+  if (!actualGrade) return 0;
+  const expected = getExpectedGrade(age);
+  if (!expected) return 0;
+  const expIdx = GRADE_OPTIONS.indexOf(expected);
+  const actIdx = GRADE_OPTIONS.indexOf(actualGrade);
+  if (expIdx === -1 || actIdx === -1) return 0;
+  return Math.max(0, expIdx - actIdx);
+}
+
+/** فئة المرحلة الواسعة لهذا العمر — لعرض الأيقونات (روضة/ابتدائي/اعدادي/ثانوي) */
+export function getStageGroup(age) {
+  if (age == null) return null;
+  if (age >= 4 && age <= 5) return 'روضة';
+  if (age >= 6 && age <= 11) return 'ابتدائي';
+  if (age >= 12 && age <= 14) return 'اعدادي';
+  if (age >= 15 && age <= 17) return 'ثانوي';
+  return null;
+}
+
+/** الأيقونات الثماني الكاملة (مراحل الأطفال + مؤهلات البالغين) بترتيب العرض */
+export const STAGE_ICONS = [
+  { key: 'روضة', icon: '🧸', label: 'روضة' },
+  { key: 'ابتدائي', icon: '✏️', label: 'ابتدائي' },
+  { key: 'اعدادي', icon: '📘', label: 'اعدادي' },
+  { key: 'ثانوي', icon: '📙', label: 'ثانوي' },
+  { key: 'دبلوم', icon: '📜', label: 'دبلوم' },
+  { key: 'بكالوريوس', icon: '🎓', label: 'بكالوريوس' },
+  { key: 'ماجستير', icon: '📚', label: 'ماجستير' },
+  { key: 'دكتوراه', icon: '👨‍🎓', label: 'دكتوراه' },
+];
+
+/** خيارات المؤهل العلمي للبالغين (18+) — حقل اختياري، فاضي يعني غير مُسجَّل */
+export const QUALIFICATION_OPTIONS = ['دبلوم', 'بكالوريوس', 'ماجستير', 'دكتوراه'];
+
+/**
+ * مندوب المخيم (بالاسم/الجوال) — مفاضلة ثلاثية:
+ * 1. عضو منظمة دوره camp_delegate ومربوط بنفس المخيم
+ * 2. الشخص المُعرَّف manager_id بالمخيم
+ * 3. أي عضو آخر مرتبط بهذا المخيم — احتياط أخير
+ */
+export function getCampDelegateInfo(camp, orgMembers) {
+  if (!camp) return null;
+  let person = (orgMembers || []).find((m) => m.camp_id === camp.id && m.role === 'camp_delegate');
+  if (!person) person = (orgMembers || []).find((m) => m.id === camp.manager_id);
+  if (!person) person = (orgMembers || []).find((m) => m.camp_id === camp.id);
+  return {
+    name: person?.full_name || '',
+    phone: person?.phone || person?.national_id || '',
+  };
+}

@@ -17,7 +17,7 @@ import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, createFamily } from '../../lib/supabase';
 import { checkFamilyIssues, isIncomplete, isAgeInRange, getMembers, luhnCheck } from '../../lib/helpers';
 import { pickAndParseXLSX } from '../../lib/excelIO';
-import { showError, showSuccess, showInfo } from '../../utils/toast';
+import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';

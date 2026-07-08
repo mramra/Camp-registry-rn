@@ -15,9 +15,19 @@ import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
+import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
 
 const TIER_COLOR = { urgent: colors.red, need: colors.accent, ok: colors.green };
+
+const SORT_OPTIONS = [
+  { value: 'priority', label: '🎯 الأولوية أولاً' },
+  { value: 'alpha', label: '🔤 أبجدي' },
+  { value: 'size_desc', label: '👨‍👩‍👧‍👦 أكبر أسرة أولاً' },
+  { value: 'size_asc', label: '👤 أصغر أسرة أولاً' },
+  { value: 'tent_asc', label: '⛺ رقم خيمة (تصاعدي)' },
+  { value: 'tent_desc', label: '⛺ رقم خيمة (تنازلي)' },
+];
 
 export default function DistributionReceiveScreen() {
   const route = useRoute();
@@ -29,6 +39,7 @@ export default function DistributionReceiveScreen() {
   const [membersByFamily, setMembersByFamily] = useState({});
   const [receivedIds, setReceivedIds] = useState(new Set());
   const [tab, setTab] = useState('pending'); // pending | received
+  const [sortMode, setSortMode] = useState('priority');
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -72,16 +83,31 @@ export default function DistributionReceiveScreen() {
       list = list.filter((f) => (f.head_name || '').toLowerCase().includes(q) || (f.head_id || '').includes(q));
     }
 
-    // ترتيب حسب الأولوية (الأعجل أولاً) — نفس منطق الأصل
-    list.sort((a, b) => {
-      const order = { urgent: 0, need: 1, ok: 2 };
-      const pa = getFamilyPriority(a, membersByFamily[a.id]).tier;
-      const pb = getFamilyPriority(b, membersByFamily[b.id]).tier;
-      return order[pa] - order[pb];
+    // فرز حسب الوضع المختار — 6 أوضاع مطابقة للأصل
+    list = [...list].sort((a, b) => {
+      const am = (membersByFamily[a.id]?.length || 0) + 1;
+      const bm = (membersByFamily[b.id]?.length || 0) + 1;
+      switch (sortMode) {
+        case 'alpha':
+          return (a.head_name || '').localeCompare(b.head_name || '', 'ar');
+        case 'size_desc':
+          return bm - am;
+        case 'size_asc':
+          return am - bm;
+        case 'tent_asc':
+          return String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true });
+        case 'tent_desc':
+          return String(b.tent || '').localeCompare(String(a.tent || ''), 'ar', { numeric: true });
+        default: {
+          const pa = getFamilyPriority(a, membersByFamily[a.id]).score;
+          const pb = getFamilyPriority(b, membersByFamily[b.id]).score;
+          return pb - pa;
+        }
+      }
     });
 
     return list;
-  }, [families, receivedIds, tab, search, membersByFamily]);
+  }, [families, receivedIds, tab, search, membersByFamily, sortMode]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) => {
@@ -197,6 +223,12 @@ export default function DistributionReceiveScreen() {
               icon="✅"
               title={batch?.name || 'تسجيل الاستلام'}
               subtitle={<Text style={styles.headerSubtitle}>{receivedIds.size} استلم من أصل {families.length}</Text>}
+            />
+
+            <SelectField
+              value={SORT_OPTIONS.find((o) => o.value === sortMode)?.label}
+              options={SORT_OPTIONS}
+              onSelect={setSortMode}
             />
 
             <TextInput

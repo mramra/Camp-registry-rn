@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
@@ -20,6 +20,11 @@ const STATUS_MAP = {
   cancelled: { label: 'ملغي', color: colors.red },
 };
 
+const STATUS_FILTER_OPTIONS = [
+  { value: '', label: 'كل الحالات' },
+  ...Object.entries({ draft: 'مسودة', active: 'نشط', completed: 'مكتمل', cancelled: 'ملغي' }).map(([value, label]) => ({ value, label })),
+];
+
 export default function DistributionsScreen() {
   const navigation = useNavigation();
   const { orgId, canWrite } = useAuth();
@@ -29,6 +34,9 @@ export default function DistributionsScreen() {
   const [camps, setCamps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterCamp, setFilterCamp] = useState('');
   const [formVisible, setFormVisible] = useState(false);
   const [name, setName] = useState('');
   const [campId, setCampId] = useState(null);
@@ -56,6 +64,13 @@ export default function DistributionsScreen() {
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
   const campMap = Object.fromEntries(camps.map((c) => [c.id, c.name]));
+
+  const filtered = rounds.filter((r) => {
+    if (filterStatus && r.status !== filterStatus) return false;
+    if (filterCamp && r.camp_id !== filterCamp) return false;
+    if (search.trim() && !(r.name || '').toLowerCase().includes(search.trim().toLowerCase())) return false;
+    return true;
+  });
 
   const handleAddRound = async () => {
     if (!name.trim()) {
@@ -118,26 +133,64 @@ export default function DistributionsScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <FlatList
-        data={rounds}
+        data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderRound}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
-          <PageHeader
-            icon="📦"
-            title="التوزيعات"
-            subtitle={<Text style={styles.headerSubtitle}>{rounds.length} جولة</Text>}
-            action={
-              canWrite && (
-                <Pressable style={styles.addBtn} onPress={() => setFormVisible(true)}>
-                  <Text style={styles.addBtnText}>➕ جولة جديدة</Text>
-                </Pressable>
-              )
-            }
-          />
+          <View>
+            <PageHeader
+              icon="📦"
+              title="التوزيعات"
+              subtitle={<Text style={styles.headerSubtitle}>{filtered.length} من {rounds.length} جولة</Text>}
+              action={
+                canWrite && (
+                  <Pressable style={styles.addBtn} onPress={() => setFormVisible(true)}>
+                    <Text style={styles.addBtnText}>➕ جولة جديدة</Text>
+                  </Pressable>
+                )
+              }
+            />
+
+            <View style={styles.statsGrid}>
+              {Object.entries(STATUS_MAP).map(([key, meta]) => (
+                <View key={key} style={styles.statBox}>
+                  <Text style={[styles.statValue, { color: meta.color }]}>{rounds.filter((r) => r.status === key).length}</Text>
+                  <Text style={styles.statLabel}>{meta.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="🔍 بحث في الجولات..."
+              placeholderTextColor={colors.muted}
+              style={styles.searchInput}
+            />
+
+            <View style={styles.filtersRow}>
+              <View style={{ flex: 1 }}>
+                <SelectField
+                  value={STATUS_FILTER_OPTIONS.find((o) => o.value === filterStatus)?.label}
+                  placeholder="كل الحالات"
+                  options={STATUS_FILTER_OPTIONS}
+                  onSelect={setFilterStatus}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <SelectField
+                  value={filterCamp ? campMap[filterCamp] : undefined}
+                  placeholder="كل المخيمات"
+                  options={[{ value: '', label: 'كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))]}
+                  onSelect={setFilterCamp}
+                />
+              </View>
+            </View>
+          </View>
         }
-        ListEmptyComponent={<EmptyState icon="📦" title="لا توجد جولات توزيع بعد" />}
+        ListEmptyComponent={<EmptyState icon="📦" title="لا توجد جولات توزيع مطابقة" />}
       />
 
       <BottomSheetModal visible={formVisible} onClose={() => setFormVisible(false)} title="➕ جولة توزيع جديدة">
@@ -170,6 +223,17 @@ const styles = StyleSheet.create({
   headerSubtitle: { color: colors.muted, fontSize: 11 },
   addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
   addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
+
+  statsGrid: { flexDirection: 'row', gap: 6, marginBottom: 12 },
+  statBox: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
+  statValue: { fontSize: 16, fontWeight: '900' },
+  statLabel: { color: colors.muted, fontSize: 9, marginTop: 2 },
+
+  searchInput: {
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 10,
+  },
+  filtersRow: { flexDirection: 'row', gap: 8 },
 
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRadius: 12, padding: 14, marginBottom: 8 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

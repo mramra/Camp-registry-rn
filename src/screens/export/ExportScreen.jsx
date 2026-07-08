@@ -490,7 +490,7 @@ export default function ExportScreen() {
                 placeholderTextColor={colors.muted}
                 style={[styles.textInput, { marginTop: 8 }]}
               />
-              <View style={styles.pickerList}>
+              <ScrollView style={styles.pickerList} nestedScrollEnabled>
                 {cxList.length === 0 ? (
                   <Text style={styles.emptyListText}>لا توجد نتائج</Text>
                 ) : (
@@ -510,7 +510,7 @@ export default function ExportScreen() {
                     </Pressable>
                   ))
                 )}
-              </View>
+              </ScrollView>
             </View>
 
             <FieldPicker
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
   pickerHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   pickerTitle: { color: colors.accent, fontWeight: '900', fontSize: 12 },
   pickerCount: { color: colors.muted, fontWeight: 'normal' },
-  pickerList: { maxHeight: 220, marginTop: 8 },
+  pickerList: { maxHeight: 260, marginTop: 8, overflow: 'hidden' },
   emptyListText: { color: colors.muted, fontSize: 12, textAlign: 'center', paddingVertical: 16 },
   pickerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 8, borderRadius: 8, marginBottom: 2 },
   pickerRowActive: { backgroundColor: 'rgba(245,158,11,0.1)' },

@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   SafeAreaView,
   ScrollView,
@@ -36,6 +37,10 @@ export default function DashboardScreen() {
   const { getAllowedCampIds, filterLocal } = useDataScope();
 
   const [stats, setStats] = useState(null);
+  const [families, setFamilies] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [camps, setCamps] = useState([]);
+  const [search, setSearch] = useState('');
   const [activity, setActivity] = useState([]);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -57,6 +62,9 @@ export default function DashboardScreen() {
 
       const famIds = filteredFams.map((f) => f.id);
       const members = await fetchFamilyMembers(famIds);
+      setFamilies(filteredFams);
+      setMembers(members);
+      setCamps(filteredCamps);
 
       // نفس حسابات الأصل بالضبط
       const mByFam = {};
@@ -117,6 +125,42 @@ export default function DashboardScreen() {
 
   const onRefresh = () => { setRefreshing(true); loadStats(); };
 
+  // بحث ذكي بجزء من الاسم أو رقم الهوية — أرباب الأسر والأفراد معاً.
+  // يبدأ الفحص من حرفين فما فوق عشان ما يشتغل بلا داعي بأول حرف.
+  const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
+  const membersByFamily = useMemo(() => {
+    const map = {};
+    members.forEach((m) => { (map[m.family_id] ??= []).push(m); });
+    return map;
+  }, [members]);
+
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const results = [];
+
+    families.forEach((f) => {
+      if ((f.head_name || '').toLowerCase().includes(q) || (f.head_id || '').includes(q)) {
+        results.push({
+          key: 'f_' + f.id, familyId: f.id, name: f.head_name, national_id: f.head_id,
+          isHead: true, camp: campMap[f.camp_id], memberCount: (membersByFamily[f.id]?.length || 0) + 1,
+        });
+      }
+    });
+
+    members.forEach((m) => {
+      if ((m.name || '').toLowerCase().includes(q) || (m.national_id || '').includes(q)) {
+        const fam = families.find((f) => f.id === m.family_id);
+        results.push({
+          key: 'm_' + m.id, familyId: m.family_id, name: m.name, national_id: m.national_id,
+          isHead: false, relation: m.relation, headName: fam?.head_name, camp: campMap[fam?.camp_id],
+        });
+      }
+    });
+
+    return results.slice(0, 30);
+  }, [search, families, members, campMap, membersByFamily]);
+
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'صباح الخير' : hour < 17 ? 'مساء الخير' : 'مساء النور';
 
@@ -164,6 +208,41 @@ export default function DashboardScreen() {
         {/* ترحيب */}
         <Text style={styles.greet}>{greet}،</Text>
         <Text style={styles.userName}>{profile?.full_name || 'مرحباً'} 👋</Text>
+
+        {/* بحث ذكي — رباب الأسر والأفراد معاً */}
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="🔍 ابحث بالاسم أو رقم الهوية (أسر وأفراد)..."
+          placeholderTextColor={colors.muted}
+          style={styles.searchInput}
+        />
+
+        {search.trim().length >= 2 && (
+          <View style={styles.searchResultsBox}>
+            {searchResults.length === 0 ? (
+              <Text style={styles.searchEmptyText}>لا نتائج مطابقة</Text>
+            ) : (
+              searchResults.map((r) => (
+                <Pressable
+                  key={r.key}
+                  style={styles.searchRow}
+                  onPress={() => navigation.navigate('FamilyDetail', { familyId: r.familyId })}
+                >
+                  <Text style={styles.searchRowIcon}>{r.isHead ? '👨‍👩‍👧' : '👤'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.searchRowName}>{r.name || '—'}</Text>
+                    <Text style={styles.searchRowMeta}>
+                      {r.isHead ? `رب أسرة${r.memberCount ? ` · ${r.memberCount} فرد` : ''}` : `${r.relation || 'فرد'} — أسرة ${r.headName || '—'}`}
+                      {r.camp ? ` · ${r.camp}` : ''}
+                    </Text>
+                  </View>
+                  {!!r.national_id && <Text style={styles.searchRowId}>{r.national_id}</Text>}
+                </Pressable>
+              ))
+            )}
+          </View>
+        )}
 
         {/* إحصائيات رئيسية 2×2 */}
         <View style={styles.statsGrid}>
@@ -367,6 +446,18 @@ const styles = StyleSheet.create({
   greet: { color: colors.muted, fontSize: 14, textAlign: 'right' },
   userName: { color: colors.white, fontWeight: '900', fontSize: 20, textAlign: 'right', marginBottom: 16 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+
+  searchInput: {
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 11, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 8,
+  },
+  searchResultsBox: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 8, marginBottom: 16 },
+  searchEmptyText: { color: colors.muted, fontSize: 12, textAlign: 'center', paddingVertical: 14 },
+  searchRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
+  searchRowIcon: { fontSize: 16 },
+  searchRowName: { color: colors.white, fontWeight: 'bold', fontSize: 12, textAlign: 'right' },
+  searchRowMeta: { color: colors.muted, fontSize: 10, marginTop: 2, textAlign: 'right' },
+  searchRowId: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
   statCard: {
     width: '48.5%',
     backgroundColor: colors.surface,

@@ -89,31 +89,32 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       : []),
   ];
 
-  // كل الأقسام مطوية افتراضياً، إلا القسم اللي فيه الشاشة الحالية —
-  // يُعاد حسابه كل مرة تُفتح فيها القائمة (وليس فقط أول مرة).
-  const getActiveSectionKey = () => {
+  // القسم اللي فيه الشاشة الحالية يفتح لحاله، والباقي مطوي (نفس السابق) —
+  // بس الآن بمنطق أكورديون: قسم واحد بس مفتوح بأي وقت. فتح قسم جديد يطوي
+  // القديم تلقائياً.
+  const getCurrentScreen = () => {
     const state = navigation?.getState?.();
-    const current = state?.routes?.[state.index]?.name;
+    return state?.routes?.[state.index]?.name || null;
+  };
+  const getActiveSectionKey = () => {
+    const current = getCurrentScreen();
     if (!current) return null;
     const found = SECTIONS.find((s) => s.items.some((it) => it.screen === current));
     return found?.key || null;
   };
 
-  const [collapsed, setCollapsed] = useState(new Set(SECTIONS.map((s) => s.key)));
+  const [openKey, setOpenKey] = useState(null);
+  const [activeScreen, setActiveScreen] = useState(null);
 
   React.useEffect(() => {
     if (!visible) return;
-    const activeKey = getActiveSectionKey();
-    setCollapsed(new Set(SECTIONS.filter((s) => s.key !== activeKey).map((s) => s.key)));
+    setOpenKey(getActiveSectionKey());
+    setActiveScreen(getCurrentScreen());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const toggleSection = (key) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
+    setOpenKey((prev) => (prev === key ? null : key));
   };
 
   const go = (screen) => {
@@ -135,7 +136,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
 
           <ScrollView style={styles.body}>
             {SECTIONS.map((section) => {
-              const isCollapsed = collapsed.has(section.key);
+              const isCollapsed = openKey !== section.key;
               return (
                 <View key={section.key} style={styles.section}>
                   <Pressable style={styles.sectionHeader} onPress={() => toggleSection(section.key)}>
@@ -144,12 +145,20 @@ export default function AppDrawer({ visible, onClose, navigation }) {
                   </Pressable>
 
                   {!isCollapsed &&
-                    section.items.map((item) => (
-                      <Pressable key={item.screen} style={styles.item} onPress={() => go(item.screen)}>
-                        <Text style={styles.itemIcon}>{item.icon}</Text>
-                        <Text style={styles.itemLabel}>{item.label}</Text>
-                      </Pressable>
-                    ))}
+                    section.items.map((item) => {
+                      const isActive = item.screen === activeScreen;
+                      return (
+                        <Pressable
+                          key={item.screen}
+                          style={[styles.item, isActive && styles.itemActive]}
+                          onPress={() => go(item.screen)}
+                        >
+                          <Text style={styles.itemIcon}>{item.icon}</Text>
+                          <Text style={[styles.itemLabel, isActive && styles.itemLabelActive]}>{item.label}</Text>
+                          {isActive && <Text style={styles.activeDot}>●</Text>}
+                        </Pressable>
+                      );
+                    })}
                 </View>
               );
             })}
@@ -196,8 +205,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 10,
   },
+  itemActive: { backgroundColor: 'rgba(245,158,11,0.15)' },
   itemIcon: { fontSize: 18 },
-  itemLabel: { color: colors.white, fontSize: 14, fontWeight: 'bold' },
+  itemLabel: { flex: 1, color: colors.white, fontSize: 14, fontWeight: 'bold', textAlign: 'right' },
+  itemLabelActive: { color: colors.accent },
+  activeDot: { color: colors.accent, fontSize: 10 },
   logoutBtn: { padding: 16, borderTopWidth: 1, borderTopColor: colors.border },
   logoutText: { color: colors.red, fontWeight: 'bold', fontSize: 14, textAlign: 'center' },
 });

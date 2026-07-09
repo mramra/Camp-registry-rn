@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import { AuthProvider } from './src/context/AuthContext';
@@ -6,31 +7,48 @@ import { ThemeProvider } from './src/context/ThemeContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { showToast } from './src/utils/toast';
 
+// فحص صريح عن تحديثات — بدل الاعتماد على السلوك الافتراضي الصامت
+// (يحمّل التحديث بالخلفية لكن ما يطبّقه إلا بعد إعادة فتح ثانية).
+// هنا: لو فيه تحديث، نحمّله ونعيد تحميل التطبيق فوراً بنفس الجلسة.
+//
+// ملاحظة على showToast: هو تنبيه منبثق (Alert.alert) يحتاج ضغط "حسناً" لإغلاقه،
+// مو toast خفيف يختفي لحاله. لهيك ما نستخدمه للحالة العادية (لا يوجد تحديث)
+// لأنها تصير بكل مرة -- بيصير تنبيه مزعج يتكرر باستمرار. نستخدمه فقط
+// بالحالتين المفيدتين فعلاً: تحديث حقيقي موجود، أو فشل الفحص (عشان تعرف السبب
+// بدل ما يفشل بصمت وتبقى الحيرة "ليش ما تحدّث؟" -- خصوصاً إنه ما فيه وصول
+// لـ console على الموبايل).
+async function checkAndApplyUpdate() {
+  if (__DEV__ || !Updates.isEnabled) return;
+  try {
+    const result = await Updates.checkForUpdateAsync();
+    if (result.isAvailable) {
+      await Updates.fetchUpdateAsync();
+      showToast('✅ تحديث جديد تم تحميله، سيُعاد فتح التطبيق الآن', 'success');
+      await Updates.reloadAsync();
+    }
+  } catch (e) {
+    showToast('⚠️ فشل التحقق من التحديث: ' + e.message, 'error');
+  }
+}
+
 export default function App() {
-  // فحص صريح عن تحديثات عند كل إطلاق — بدل الاعتماد على السلوك الافتراضي
-  // الصامت (يحمّل التحديث بالخلفية لكن ما يطبّقه إلا بعد إعادة فتح ثانية).
-  // هنا: لو فيه تحديث، نحمّله ونعيد تحميل التطبيق فوراً بنفس الجلسة.
-  //
-  // ملاحظة على showToast: هو تنبيه منبثق (Alert.alert) يحتاج ضغط "حسناً" لإغلاقه،
-  // مو toast خفيف يختفي لحاله. لهيك ما نستخدمه للحالة العادية (لا يوجد تحديث)
-  // لأنها تصير بكل فتح تطبيق -- بيصير تنبيه مزعج يتكرر كل مرة. نستخدمه فقط
-  // بالحالتين المفيدتين فعلاً: تحديث حقيقي موجود، أو فشل الفحص (عشان تعرف السبب
-  // بدل ما يفشل بصمت وتبقى الحيرة "ليش ما تحدّث؟" -- خصوصاً إنه ما فيه وصول
-  // لـ console على الموبايل).
+  const appState = useRef(AppState.currentState);
+
   useEffect(() => {
-    (async () => {
-      if (__DEV__ || !Updates.isEnabled) return;
-      try {
-        const result = await Updates.checkForUpdateAsync();
-        if (result.isAvailable) {
-          await Updates.fetchUpdateAsync();
-          showToast('✅ تحديث جديد تم تحميله، سيُعاد فتح التطبيق الآن', 'success');
-          await Updates.reloadAsync();
-        }
-      } catch (e) {
-        showToast('⚠️ فشل التحقق من التحديث: ' + e.message, 'error');
+    // 1) عند أول فتح (Cold start)
+    checkAndApplyUpdate();
+
+    // 2) كل مرة يرجع فيها التطبيق من الخلفية للمقدمة -- بدون حاجة لـ force-stop،
+    // يكفي تصغّر التطبيق (Home / تبديل تطبيقات) وترجعله.
+    const sub = AppState.addEventListener('change', (nextState) => {
+      const wasBackground = appState.current.match(/inactive|background/);
+      if (wasBackground && nextState === 'active') {
+        checkAndApplyUpdate();
       }
-    })();
+      appState.current = nextState;
+    });
+
+    return () => sub.remove();
   }, []);
 
   return (

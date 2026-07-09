@@ -634,7 +634,7 @@ export const fetchFamilyActivityLog = async (orgId, limit = 15) => {
   try {
     const { data, error } = await supabase
       .from('family_activity_log')
-      .select('id, family_id, family_name, members_count, action, actor_name, created_at')
+      .select('id, family_id, family_name, members_count, action, actor_name, created_at, changes')
       .eq('org_id', orgId)
       .order('created_at', { ascending: false })
       .limit(limit);

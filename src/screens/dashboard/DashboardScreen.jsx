@@ -13,7 +13,17 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchFamilyActivityLog } from '../../lib/supabase';
 import { calcAge, isIncomplete } from '../../lib/helpers';
+import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import colors from '../../theme/colors';
+
+const ACTIVITY_FIELD_LABELS = {
+  head_name: 'اسم رب الأسرة', head_id: 'رقم الهوية', head_dob: 'تاريخ الميلاد',
+  head_gender: 'الجنس', head_marital: 'الحالة الاجتماعية', phone1: 'رقم الجوال',
+  phone2: 'جوال بديل', camp_id: 'المخيم', tent: 'رقم الخيمة', tent2: 'خيمة إضافية',
+  original_address: 'العنوان الأصلي', address_details: 'تفاصيل العنوان', notes: 'ملاحظات',
+  category_tags: 'الفئة الاجتماعية', economic_level: 'المستوى الاقتصادي',
+  review_status: 'حالة المراجعة', head_qualification: 'المؤهل العلمي',
+};
 
 /**
  * الرئيسية — نسخة مطابقة للأصل (camp-registry-react/Dashboard.jsx):
@@ -27,6 +37,7 @@ export default function DashboardScreen() {
 
   const [stats, setStats] = useState(null);
   const [activity, setActivity] = useState([]);
+  const [selectedActivity, setSelectedActivity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -244,7 +255,7 @@ export default function DashboardScreen() {
               const when = new Date(a.created_at);
               const timeStr = isNaN(when) ? '' : when.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
               return (
-                <View key={a.id} style={styles.activityRow}>
+                <Pressable key={a.id} style={styles.activityRow} onPress={() => setSelectedActivity(a)}>
                   <View style={[styles.activityIconBox, { backgroundColor: `${meta.color}22` }]}>
                     <Text style={styles.activityIcon}>{meta.icon}</Text>
                   </View>
@@ -255,7 +266,8 @@ export default function DashboardScreen() {
                     </Text>
                     <Text style={styles.activityMeta}>👤 {a.actor_name || 'غير معروف'} · 🕒 {timeStr}</Text>
                   </View>
-                </View>
+                  <Text style={styles.activityChevron}>‹</Text>
+                </Pressable>
               );
             })}
           </View>
@@ -273,6 +285,78 @@ export default function DashboardScreen() {
           </View>
         )}
       </ScrollView>
+
+      <BottomSheetModal
+        visible={!!selectedActivity}
+        onClose={() => setSelectedActivity(null)}
+        title="📝 تفاصيل الحركة"
+      >
+        {selectedActivity && (() => {
+          const a = selectedActivity;
+          const meta =
+            a.action === 'insert' ? { icon: '➕', color: colors.green, label: 'إضافة أسرة جديدة' } :
+            a.action === 'delete' ? { icon: '🗑️', color: colors.red, label: 'حذف أسرة' } :
+            { icon: '✏️', color: colors.blue, label: 'تعديل بيانات أسرة' };
+          const when = new Date(a.created_at);
+          const fullTime = isNaN(when)
+            ? '—'
+            : when.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+          const changeEntries = a.changes && typeof a.changes === 'object' ? Object.entries(a.changes) : [];
+
+          return (
+            <View>
+              <View style={[styles.detailBadge, { backgroundColor: `${meta.color}22` }]}>
+                <Text style={[styles.detailBadgeText, { color: meta.color }]}>{meta.icon} {meta.label}</Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>الأسرة</Text>
+                <Text style={styles.detailValue}>{a.family_name || '—'}</Text>
+              </View>
+              {!!a.members_count && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>عدد الأفراد</Text>
+                  <Text style={styles.detailValue}>{a.members_count}</Text>
+                </View>
+              )}
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>من قام بالإجراء</Text>
+                <Text style={styles.detailValue}>{a.actor_name || 'غير معروف'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>التاريخ والوقت</Text>
+                <Text style={styles.detailValue}>{fullTime}</Text>
+              </View>
+
+              {changeEntries.length > 0 && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={styles.detailChangesTitle}>التغييرات ({changeEntries.length})</Text>
+                  {changeEntries.map(([field, val]) => (
+                    <View key={field} style={styles.changeCard}>
+                      <Text style={styles.changeField}>{ACTIVITY_FIELD_LABELS[field] || field}</Text>
+                      <View style={styles.changeValuesRow}>
+                        <View style={styles.changeOld}>
+                          <Text style={styles.changeOldLabel}>القديم</Text>
+                          <Text style={styles.changeOldValue}>{(val?.old ?? val?.from) || '(فارغ)'}</Text>
+                        </View>
+                        <Text style={styles.changeArrow}>←</Text>
+                        <View style={styles.changeNew}>
+                          <Text style={styles.changeNewLabel}>الجديد</Text>
+                          <Text style={styles.changeNewValue}>{val?.new ?? val?.to ?? '(فارغ)'}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {a.action === 'insert' && changeEntries.length === 0 && (
+                <Text style={styles.detailNote}>سجل إضافة جديد — لا تفاصيل تغييرات مسجّلة لهذا الحدث.</Text>
+              )}
+            </View>
+          );
+        })()}
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -343,6 +427,26 @@ const styles = StyleSheet.create({
   activityIcon: { fontSize: 14 },
   activityLine: { color: colors.white, fontSize: 12, textAlign: 'right' },
   activityMeta: { color: colors.muted, fontSize: 10, marginTop: 2, textAlign: 'right' },
+  activityChevron: { color: colors.muted, fontSize: 18 },
+
+  detailBadge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 14 },
+  detailBadgeText: { fontWeight: '900', fontSize: 13 },
+  detailRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.border },
+  detailLabel: { color: colors.muted, fontSize: 12 },
+  detailValue: { color: colors.white, fontSize: 12, fontWeight: 'bold' },
+  detailChangesTitle: { color: colors.accent, fontWeight: '900', fontSize: 12, marginBottom: 8, textAlign: 'right' },
+  detailNote: { color: colors.muted, fontSize: 11, marginTop: 12, textAlign: 'right', lineHeight: 17 },
+
+  changeCard: { backgroundColor: colors.surface2, borderRadius: 12, padding: 10, marginBottom: 8 },
+  changeField: { color: colors.white, fontWeight: 'bold', fontSize: 12, marginBottom: 6, textAlign: 'right' },
+  changeValuesRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  changeOld: { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: 8 },
+  changeOldLabel: { color: colors.red, fontSize: 9, fontWeight: 'bold', textAlign: 'right' },
+  changeOldValue: { color: colors.white, fontSize: 11, marginTop: 2, textAlign: 'right' },
+  changeArrow: { color: colors.muted, fontSize: 14 },
+  changeNew: { flex: 1, backgroundColor: 'rgba(16,185,129,0.1)', borderRadius: 8, padding: 8 },
+  changeNewLabel: { color: colors.green, fontSize: 9, fontWeight: 'bold', textAlign: 'right' },
+  changeNewValue: { color: colors.white, fontSize: 11, marginTop: 2, textAlign: 'right' },
   emptyBox: { alignItems: 'center', paddingVertical: 32 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { color: colors.white, fontWeight: 'bold', marginBottom: 4 },

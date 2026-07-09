@@ -13,16 +13,33 @@ import FormSection from '../../components/ui/FormSection';
 import { showToast } from '../../utils/toast';
 import colors from '../../theme/colors';
 
-/** منتقي حقول قابل للطي — يستبدل نظام "رقم الترتيب اليدوي" الأصلي بلمسات
- * بسيطة (اختيار/إلغاء) أنسب للموبايل؛ الترتيب النهائي يتبع ترتيب القائمة نفسها. */
+/** منتقي حقول قابل للطي — كل حقل يبدأ غير محدد، وكل ما تضغط حقل ياخذ
+ * الرقم التسلسلي التالي حسب ترتيب ضغطك (مو ترتيب ثابت بالقائمة). لما تلغي
+ * تحديد حقل بالنص، يُعاد ترقيم الحقول اللي بعده عشان يضلوا متسلسلين بلا فجوات.
+ * ترتيب الأرقام هذا هو نفسه ترتيب الأعمدة بالملف المُصدَّر. */
 function FieldPicker({ title, cols, onChange }) {
   const [open, setOpen] = useState(false);
   const selectedCount = cols.filter((c) => c.order > 0).length;
 
   const toggle = (key) => {
-    onChange(cols.map((c) => (c.key === key ? { ...c, order: c.order > 0 ? 0 : 1 } : c)));
+    const current = cols.find((c) => c.key === key);
+    if (current.order > 0) {
+      // إلغاء التحديد: صفّر رقمه، وأنزل رقم كل حقل كان بعده بواحد
+      const removedOrder = current.order;
+      onChange(
+        cols.map((c) => {
+          if (c.key === key) return { ...c, order: 0 };
+          if (c.order > removedOrder) return { ...c, order: c.order - 1 };
+          return c;
+        })
+      );
+    } else {
+      // تحديد جديد: ياخذ الرقم التالي بعد آخر رقم مستخدم
+      const maxOrder = Math.max(0, ...cols.map((c) => c.order));
+      onChange(cols.map((c) => (c.key === key ? { ...c, order: maxOrder + 1 } : c)));
+    }
   };
-  const selectAll = () => onChange(cols.map((c) => ({ ...c, order: 1 })));
+  const selectAll = () => onChange(cols.map((c, i) => ({ ...c, order: i + 1 })));
   const selectNone = () => onChange(cols.map((c) => ({ ...c, order: 0 })));
 
   return (
@@ -44,6 +61,11 @@ function FieldPicker({ title, cols, onChange }) {
                 onPress={() => toggle(c.key)}
                 style={[styles.chip, c.order > 0 && styles.chipActive]}
               >
+                {c.order > 0 && (
+                  <View style={styles.chipOrderBadge}>
+                    <Text style={styles.chipOrderText}>{c.order}</Text>
+                  </View>
+                )}
                 <Text style={[styles.chipText, c.order > 0 && styles.chipTextActive]}>{c.label}</Text>
               </Pressable>
             ))}
@@ -53,6 +75,10 @@ function FieldPicker({ title, cols, onChange }) {
     </View>
   );
 }
+
+/** يفرز الحقول المحددة حسب رقم ترتيب اختيارها (تصاعدياً) -- هذا الترتيب
+ * هو ترتيب الأعمدة الفعلي بملف الإكسل المُصدَّر. */
+const orderedSelected = (cols) => cols.filter((c) => c.order > 0).sort((a, b) => a.order - b.order);
 
 export default function ExportScreen() {
   const { profile, orgId } = useAuth();
@@ -69,8 +95,8 @@ export default function ExportScreen() {
   const [importing, setImporting] = useState(false);
 
   // اختيار الحقول — التصدير السريع
-  const [famCols, setFamCols] = useState(() => FAM_COLS.map((c) => ({ ...c, order: c.def ? 1 : 0 })));
-  const [memCols, setMemCols] = useState(() => MEM_COLS.map((c) => ({ ...c, order: c.def ? 1 : 0 })));
+  const [famCols, setFamCols] = useState(() => FAM_COLS.map((c) => ({ ...c, order: 0 })));
+  const [memCols, setMemCols] = useState(() => MEM_COLS.map((c) => ({ ...c, order: 0 })));
 
   // ── التصدير المخصص ──
   const [allFamilies, setAllFamilies] = useState([]);
@@ -82,8 +108,8 @@ export default function ExportScreen() {
   const [cxAgeMax, setCxAgeMax] = useState('');
   const [cxSelected, setCxSelected] = useState(new Set());
   const [cxSheetName, setCxSheetName] = useState('كشف مخصص');
-  const [cxFamCols, setCxFamCols] = useState(() => FAM_COLS.map((c) => ({ ...c, order: c.def ? 1 : 0 })));
-  const [cxMemCols, setCxMemCols] = useState(() => MEM_COLS.map((c) => ({ ...c, order: c.def ? 1 : 0 })));
+  const [cxFamCols, setCxFamCols] = useState(() => FAM_COLS.map((c) => ({ ...c, order: 0 })));
+  const [cxMemCols, setCxMemCols] = useState(() => MEM_COLS.map((c) => ({ ...c, order: 0 })));
 
   const loadMeta = useCallback(async () => {
     if (!orgId) return;
@@ -133,7 +159,7 @@ export default function ExportScreen() {
   // ── تصدير سريع: رباب الأسر (بالحقول المختارة) ──
   const exportFamilies = async () => {
     if (!canExport) return showToast('لا تملك صلاحية التصدير', 'error');
-    const selectedCols = famCols.filter((c) => c.order > 0);
+    const selectedCols = orderedSelected(famCols);
     if (!selectedCols.length) return showToast('اختر حقلاً واحداً على الأقل', 'error');
     setLoading(true);
     try {
@@ -162,7 +188,7 @@ export default function ExportScreen() {
   // ── تصدير سريع: أفراد الأسر (بالحقول المختارة) ──
   const exportMembers = async () => {
     if (!canExport) return showToast('لا تملك صلاحية التصدير', 'error');
-    const selectedCols = memCols.filter((c) => c.order > 0);
+    const selectedCols = orderedSelected(memCols);
     if (!selectedCols.length) return showToast('اختر حقلاً واحداً على الأقل', 'error');
     setLoading(true);
     try {
@@ -350,7 +376,7 @@ export default function ExportScreen() {
 
   const doCustomExport = async () => {
     const isMem = cxMode === 'members';
-    const cols = (isMem ? cxMemCols : cxFamCols).filter((c) => c.order > 0);
+    const cols = orderedSelected(isMem ? cxMemCols : cxFamCols);
     if (!cols.length || !cxSelected.size) return showToast('اختر حقولاً وعناصر أولاً', 'error');
     setLoading(true);
     try {
@@ -610,10 +636,12 @@ const styles = StyleSheet.create({
   chevron: { color: colors.muted, fontSize: 10 },
   fieldPickerBody: { paddingHorizontal: 12, paddingBottom: 12 },
   chipsWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
-  chip: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  chip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   chipActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
   chipText: { color: colors.muted, fontSize: 11 },
   chipTextActive: { color: colors.accent, fontWeight: 'bold' },
+  chipOrderBadge: { backgroundColor: colors.accent, borderRadius: 999, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
+  chipOrderText: { color: colors.bg, fontSize: 9, fontWeight: '900' },
 
   miniBtn: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   miniBtnText: { color: colors.muted, fontSize: 10 },

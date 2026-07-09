@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
 
 const SUPABASE_URL = 'https://ojclpkenecicujkqhhlu.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_d6q8hoDDcohuZFHk3jxI7g_IBWWCmNu';
@@ -11,6 +12,19 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,
     detectSessionInUrl: false,
   },
+});
+
+// توصية Supabase الرسمية لـ React Native: autoRefreshToken وحده ما يكفي --
+// لازم ربطه صراحة بحالة التطبيق (نشط/خلفية)، وإلا رمز الجلسة ينتهي بصمت
+// وهو بالخلفية (التوكن ما يتجدد إلا لو التطبيق "نشط" فعلياً)، فيضطر
+// المستخدم يسجّل دخول من جديد رغم إن persistSession مفعّل وسليم.
+// راجع: https://supabase.com/docs/reference/javascript/auth-startautorefresh
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') {
+    supabase.auth.startAutoRefresh();
+  } else {
+    supabase.auth.stopAutoRefresh();
+  }
 });
 
 /** استدعاء Edge Function للعمليات الإدارية (إنشاء/حذف مستخدم، إعادة تعيين كلمة مرور) */

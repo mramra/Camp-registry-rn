@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchFamilyActivityLog } from '../../lib/supabase';
@@ -57,6 +58,12 @@ export default function DashboardScreen() {
   const loadStats = useCallback(async () => {
     if (!profile?.org_id) return;
     try {
+      // فحص الاتصال أولاً -- fetchFamilies/fetchCamps وغيرها تبتلع أخطاءها
+      // داخلياً وترجع مصفوفة فاضية بدل رمي استثناء، فالاعتماد على try/catch
+      // وحده يفشل يكتشف انقطاع النت (يوصلنا "نجاح" ببيانات فاضية = أصفار).
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+
       const [famsRaw, camps, activityLog] = await Promise.all([
         fetchFamilies(profile.org_id),
         fetchCamps(profile.org_id),

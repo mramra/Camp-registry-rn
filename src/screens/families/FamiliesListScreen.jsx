@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
@@ -69,6 +70,9 @@ export default function FamiliesListScreen() {
   const loadData = useCallback(async () => {
     if (!orgId) return;
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+
       const allowedCampIds = getAllowedCampIds(camps.length ? camps : await fetchCamps(orgId));
 
       const [famsRaw, campsData] = await Promise.all([

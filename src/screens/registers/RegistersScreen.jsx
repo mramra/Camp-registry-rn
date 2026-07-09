@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
@@ -102,6 +103,9 @@ export default function RegistersScreen() {
   const loadData = useCallback(async () => {
     if (!orgId) return;
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+
       const campsData = await fetchCamps(orgId);
       const allowedCampIds = getAllowedCampIds(campsData);
       const famsRaw = await fetchFamilies(orgId);

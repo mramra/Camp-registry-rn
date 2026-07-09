@@ -396,13 +396,23 @@ export default function FamilyFormScreen() {
         </FormSection>
 
         <FormSection title="🏕️ بيانات السكن">
-          <SelectField
-            value={camps.find((c) => c.id === campId)?.name}
-            options={camps.map((c) => ({ value: c.id, label: c.name }))}
-            onSelect={setCampId}
-            placeholder="اختر المخيم *"
-            error={errors.campId}
-          />
+          {familyId ? (
+            <View style={styles.campLockedBox}>
+              <View>
+                <Text style={styles.campLockedLabel}>المخيم</Text>
+                <Text style={styles.campLockedValue}>{camps.find((c) => c.id === campId)?.name || '—'}</Text>
+              </View>
+              <Text style={styles.campLockedHint}>🔒 لتغيير مخيم الأسرة استخدم "نقل" بصفحة حركات الأسر</Text>
+            </View>
+          ) : (
+            <SelectField
+              value={camps.find((c) => c.id === campId)?.name}
+              options={camps.map((c) => ({ value: c.id, label: c.name }))}
+              onSelect={setCampId}
+              placeholder="اختر المخيم *"
+              error={errors.campId}
+            />
+          )}
           <View style={styles.row}>
             <FormInput label="رقم الخيمة" value={tent} onChangeText={setTent} style={styles.halfInput} />
             <FormInput label="خيمة ثانية" value={tent2} onChangeText={setTent2} style={styles.halfInput} />
@@ -525,6 +535,10 @@ export default function FamilyFormScreen() {
 }
 
 const styles = StyleSheet.create({
+  campLockedBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 12 },
+  campLockedLabel: { color: colors.muted, fontSize: 11, textAlign: 'right' },
+  campLockedValue: { color: colors.white, fontWeight: 'bold', fontSize: 14, marginTop: 2, textAlign: 'right' },
+  campLockedHint: { color: colors.accent, fontSize: 10, marginTop: 8, textAlign: 'right' },
   screen: { flex: 1, backgroundColor: colors.bg },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 40 },

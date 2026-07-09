@@ -30,6 +30,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         { icon: '👨‍👩‍👧‍👦', label: 'قائمة الأسر', screen: 'FamiliesList' },
         { icon: '🚶', label: 'حركات الأسر', screen: 'Movements' },
         { icon: '📦', label: 'التوزيعات', screen: 'Distributions' },
+        ...(isOwner ? [{ icon: '🚪', label: 'الأسر الخارجة', screen: 'ExitedFamilies' }] : []),
       ],
     },
     {

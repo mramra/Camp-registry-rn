@@ -2,25 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
-import { fetchFamilies, createMovement } from '../../lib/supabase';
+import { fetchFamilies, transferFamily } from '../../lib/supabase';
 import { showError, showSuccess } from '../../utils/toast';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FormInput from '../../components/ui/FormInput';
 import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
 
-const TYPE_OPTIONS = [
-  { key: 'entry', label: '🟢 دخول' },
-  { key: 'exit', label: '🔴 خروج' },
-  { key: 'transfer', label: '🔵 نقل' },
-];
-
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 /**
- * ورقة تسجيل حركة أسرة (دخول/خروج/نقل) — مكوّن مستقل يُستخدم من
- * MovementsScreen. لا يستدعي نظام موافقات (مؤجّل)؛ التسجيل مباشر
- * لمن يملك صلاحية canWrite (نفس تبسيط الأسر/المخيمات بهذه المرحلة).
+ * ورقة "نقل أسرة لمخيم آخر" — الطريقة الوحيدة لتغيير مخيم أسرة بعد إضافتها
+ * (حقل المخيم مقفول بنموذج الأسرة نفسه). دخول الأسرة يُسجَّل تلقائياً عند
+ * الإضافة (بشاشة FamilyFormScreen)، وخروجها من صفحة تفاصيل الأسرة --
+ * فهذه الورقة مخصصة للنقل فقط، ولا تعرض خيار نوع حركة.
+ *
+ * عند الحفظ: يتحدّث camp_id وentry_date على الأسرة نفسها فعلياً (تاريخ
+ * النقل = دخول جديد)، مع تسجيل حركة "نقل" بجدول family_movements للأرشفة.
  */
 export default function MovementFormSheet({ visible, onClose, onSaved, camps, orgId }) {
   const { profile, user } = useAuth();
@@ -29,8 +27,6 @@ export default function MovementFormSheet({ visible, onClose, onSaved, camps, or
   const [families, setFamilies] = useState([]);
   const [search, setSearch] = useState('');
   const [familyId, setFamilyId] = useState(null);
-  const [type, setType] = useState('entry');
-  const [fromCamp, setFromCamp] = useState(null);
   const [toCamp, setToCamp] = useState(null);
   const [date, setDate] = useState(todayStr());
   const [reason, setReason] = useState('');
@@ -50,14 +46,14 @@ export default function MovementFormSheet({ visible, onClose, onSaved, camps, or
   const resetForm = () => {
     setFamilyId(null);
     setSearch('');
-    setType('entry');
-    setFromCamp(null);
     setToCamp(null);
     setDate(todayStr());
     setReason('');
     setNotes('');
     setErrors({});
   };
+
+  const selectedFamily = families.find((f) => f.id === familyId);
 
   const filteredFamilies = families.filter(
     (f) =>
@@ -69,6 +65,8 @@ export default function MovementFormSheet({ visible, onClose, onSaved, camps, or
   const validate = () => {
     const e = {};
     if (!familyId) e.familyId = 'اختر أسرة';
+    if (!toCamp) e.toCamp = 'اختر المخيم الجديد';
+    if (toCamp && selectedFamily && toCamp === selectedFamily.camp_id) e.toCamp = 'الأسرة أصلاً بهذا المخيم';
     if (!date) e.date = 'التاريخ مطلوب';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -78,23 +76,19 @@ export default function MovementFormSheet({ visible, onClose, onSaved, camps, or
     if (!validate()) return;
     setSaving(true);
     try {
-      const payload = {
-        org_id: orgId,
-        family_id: familyId,
-        type,
-        from_camp: type !== 'entry' ? fromCamp : null,
-        to_camp: type !== 'exit' ? toCamp : null,
+      const result = await transferFamily(selectedFamily, {
+        toCampId: toCamp,
         date,
         reason: reason.trim() || null,
         notes: notes.trim() || null,
-        created_by: profile?.id || user?.id || null,
-      };
-      const result = await createMovement(payload);
+        actorId: profile?.id || user?.id || null,
+        orgId,
+      });
       if (!result.success) {
-        showError(result.error || 'فشل تسجيل الحركة');
+        showError(result.error || 'فشل تسجيل النقل');
         return;
       }
-      showSuccess('تم تسجيل الحركة');
+      showSuccess('تم نقل الأسرة بنجاح');
       resetForm();
       onSaved();
     } catch (e) {
@@ -105,7 +99,7 @@ export default function MovementFormSheet({ visible, onClose, onSaved, camps, or
   };
 
   return (
-    <BottomSheetModal visible={visible} onClose={onClose} title="➕ تسجيل حركة">
+    <BottomSheetModal visible={visible} onClose={onClose} title="🔵 نقل أسرة لمخيم آخر">
       <FormInput
         label="بحث عن أسرة"
         placeholder="اسم رب الأسرة أو رقم الهوية..."
@@ -113,52 +107,36 @@ export default function MovementFormSheet({ visible, onClose, onSaved, camps, or
         onChangeText={setSearch}
       />
       <SelectField
-        value={families.find((f) => f.id === familyId)?.head_name}
+        value={selectedFamily?.head_name}
         options={filteredFamilies.slice(0, 50).map((f) => ({ value: f.id, label: f.head_name }))}
         onSelect={setFamilyId}
         placeholder="— اختر أسرة —"
         error={errors.familyId}
       />
 
-      <Text style={styles.fieldLabel}>نوع الحركة</Text>
-      <View style={styles.segmentRow}>
-        {TYPE_OPTIONS.map((opt) => (
-          <Pressable
-            key={opt.key}
-            style={[styles.segmentBtn, type === opt.key && styles.segmentBtnActive]}
-            onPress={() => setType(opt.key)}
-          >
-            <Text style={[styles.segmentText, type === opt.key && styles.segmentTextActive]}>{opt.label}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {(type === 'exit' || type === 'transfer') && (
-        <SelectField
-          label="من مخيم"
-          value={camps.find((c) => c.id === fromCamp)?.name}
-          options={camps.map((c) => ({ value: c.id, label: c.name }))}
-          onSelect={setFromCamp}
-          placeholder="— اختر —"
-        />
-      )}
-      {(type === 'entry' || type === 'transfer') && (
-        <SelectField
-          label="إلى مخيم"
-          value={camps.find((c) => c.id === toCamp)?.name}
-          options={camps.map((c) => ({ value: c.id, label: c.name }))}
-          onSelect={setToCamp}
-          placeholder="— اختر —"
-        />
+      {!!selectedFamily && (
+        <View style={styles.currentCampBox}>
+          <Text style={styles.currentCampLabel}>المخيم الحالي</Text>
+          <Text style={styles.currentCampValue}>{camps.find((c) => c.id === selectedFamily.camp_id)?.name || '— بلا مخيم —'}</Text>
+        </View>
       )}
 
-      <FormInput label="التاريخ (YYYY-MM-DD)" value={date} onChangeText={setDate} error={errors.date} />
-      <FormInput label="السبب" placeholder="سبب الحركة..." value={reason} onChangeText={setReason} />
+      <SelectField
+        label="المخيم الجديد"
+        value={camps.find((c) => c.id === toCamp)?.name}
+        options={camps.filter((c) => c.id !== selectedFamily?.camp_id).map((c) => ({ value: c.id, label: c.name }))}
+        onSelect={setToCamp}
+        placeholder="— اختر —"
+        error={errors.toCamp}
+      />
+
+      <FormInput label="تاريخ النقل (YYYY-MM-DD)" value={date} onChangeText={setDate} error={errors.date} />
+      <FormInput label="السبب" placeholder="سبب النقل..." value={reason} onChangeText={setReason} />
       <FormInput label="ملاحظات" value={notes} onChangeText={setNotes} multiline numberOfLines={2} />
 
       <View style={styles.row}>
         <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>✅ تسجيل</Text>}
+          {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>✅ تأكيد النقل</Text>}
         </Pressable>
         <Pressable style={styles.cancelBtn} onPress={onClose}>
           <Text style={styles.cancelBtnText}>إلغاء</Text>
@@ -169,12 +147,9 @@ export default function MovementFormSheet({ visible, onClose, onSaved, camps, or
 }
 
 const styles = StyleSheet.create({
-  fieldLabel: { color: colors.muted, fontSize: 12, fontWeight: 'bold', marginBottom: 6, marginTop: 4, textAlign: 'right' },
-  segmentRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  segmentBtn: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
-  segmentBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  segmentText: { color: colors.white, fontWeight: 'bold', fontSize: 12 },
-  segmentTextActive: { color: '#000' },
+  currentCampBox: { backgroundColor: colors.surface2, borderRadius: 12, padding: 10, marginBottom: 12 },
+  currentCampLabel: { color: colors.muted, fontSize: 10, textAlign: 'right' },
+  currentCampValue: { color: colors.white, fontWeight: 'bold', fontSize: 13, marginTop: 2, textAlign: 'right' },
   row: { flexDirection: 'row', gap: 8, marginTop: 8 },
   saveBtn: { flex: 1, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   disabled: { opacity: 0.6 },

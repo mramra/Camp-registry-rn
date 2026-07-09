@@ -7,27 +7,34 @@ import {
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
-import { fetchFamilyById, fetchFamilyMembers, deleteFamily, fetchCamps } from '../../lib/supabase';
+import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps } from '../../lib/supabase';
 import { calcAge, checkFamilyIssues, getMemberIcon } from '../../lib/helpers';
 import { formatDate } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import EmptyState from '../../components/ui/EmptyState';
+import BottomSheetModal from '../../components/ui/BottomSheetModal';
+import FormInput from '../../components/ui/FormInput';
 import colors from '../../theme/colors';
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function FamilyDetailScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const { familyId } = route.params || {};
-  const { canEdit, canDelete } = useAuth();
+  const { canEdit, canDelete, profile, user, orgId } = useAuth();
 
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
   const [campName, setCampName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [exitModalVisible, setExitModalVisible] = useState(false);
+  const [exitDate, setExitDate] = useState(todayStr());
+  const [exitReason, setExitReason] = useState('');
+  const [exitSaving, setExitSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!familyId) return;
@@ -61,23 +68,35 @@ export default function FamilyDetailScreen() {
     }, [load])
   );
 
-  const handleDelete = () => {
-    Alert.alert('حذف الأسرة', `هل تريد حذف أسرة "${family.head_name}" نهائياً؟`, [
-      { text: 'إلغاء', style: 'cancel' },
-      {
-        text: 'حذف',
-        style: 'destructive',
-        onPress: async () => {
-          const result = await deleteFamily(familyId);
-          if (result.success) {
-            showSuccess('تم حذف الأسرة');
-            navigation.goBack();
-          } else {
-            showError(result.error || 'فشل الحذف');
-          }
-        },
-      },
-    ]);
+  const handleExit = () => {
+    setExitDate(todayStr());
+    setExitReason('');
+    setExitModalVisible(true);
+  };
+
+  const confirmExit = async () => {
+    if (!exitDate) return showError('تاريخ الخروج مطلوب');
+    setExitSaving(true);
+    try {
+      const result = await exitFamily(family, {
+        date: exitDate,
+        reason: exitReason.trim() || null,
+        notes: null,
+        actorId: profile?.id || user?.id || null,
+        orgId: orgId || family.org_id,
+      });
+      if (result.success) {
+        showSuccess('تم تسجيل خروج الأسرة — انتقلت لقائمة "الأسر الخارجة"');
+        setExitModalVisible(false);
+        navigation.goBack();
+      } else {
+        showError(result.error || 'فشل تسجيل الخروج');
+      }
+    } catch (e) {
+      showError('خطأ: ' + e.message);
+    } finally {
+      setExitSaving(false);
+    }
   };
 
   if (loading) {
@@ -178,12 +197,28 @@ export default function FamilyDetailScreen() {
             </Pressable>
           )}
           {canDelete && (
-            <Pressable style={styles.deleteBtn} onPress={handleDelete}>
-              <Text style={styles.deleteBtnText}>🗑️ حذف</Text>
+            <Pressable style={styles.deleteBtn} onPress={handleExit}>
+              <Text style={styles.deleteBtnText}>🚪 تسجيل خروج</Text>
             </Pressable>
           )}
         </View>
       </ScrollView>
+
+      <BottomSheetModal visible={exitModalVisible} onClose={() => setExitModalVisible(false)} title="🚪 تسجيل خروج الأسرة">
+        <Text style={styles.exitWarnText}>
+          الأسرة "{family.head_name}" لن تُحذف — ستنتقل لقائمة "الأسر الخارجة" (تظهر لمالك المنصة فقط)، وتختفي من كل الشاشات العادية.
+        </Text>
+        <FormInput label="تاريخ الخروج (YYYY-MM-DD)" value={exitDate} onChangeText={setExitDate} />
+        <FormInput label="سبب الخروج" placeholder="مثال: عودة للمنزل، سفر..." value={exitReason} onChangeText={setExitReason} multiline numberOfLines={2} />
+        <View style={styles.exitActionsRow}>
+          <Pressable style={[styles.confirmExitBtn, exitSaving && { opacity: 0.6 }]} onPress={confirmExit} disabled={exitSaving}>
+            {exitSaving ? <ActivityIndicator color="#000" /> : <Text style={styles.confirmExitBtnText}>✅ تأكيد الخروج</Text>}
+          </Pressable>
+          <Pressable style={styles.cancelExitBtn} onPress={() => setExitModalVisible(false)}>
+            <Text style={styles.cancelExitBtnText}>إلغاء</Text>
+          </Pressable>
+        </View>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -253,4 +288,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   deleteBtnText: { color: colors.red, fontWeight: 'bold', fontSize: 13, textAlign: 'center' },
+
+  exitWarnText: { color: colors.muted, fontSize: 12, lineHeight: 19, marginBottom: 14, textAlign: 'right' },
+  exitActionsRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  confirmExitBtn: { flex: 1, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  confirmExitBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },
+  cancelExitBtn: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  cancelExitBtnText: { color: colors.white, fontWeight: 'bold', fontSize: 13 },
 });

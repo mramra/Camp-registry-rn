@@ -135,7 +135,7 @@ export default function MovementsScreen() {
               action={
                 canWrite && (
                   <Pressable style={styles.addBtn} onPress={() => setFormVisible(true)}>
-                    <Text style={styles.addBtnText}>➕ تسجيل</Text>
+                    <Text style={styles.addBtnText}>➕ نقل أسرة</Text>
                   </Pressable>
                 )
               }

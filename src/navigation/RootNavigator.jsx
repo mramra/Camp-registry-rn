@@ -9,6 +9,7 @@ import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import FamiliesListScreen from '../screens/families/FamiliesListScreen';
 import FamilyDetailScreen from '../screens/families/FamilyDetailScreen';
 import FamilyFormScreen from '../screens/families/FamilyFormScreen';
+import ExitedFamiliesScreen from '../screens/exited/ExitedFamiliesScreen';
 import CampsListScreen from '../screens/camps/CampsListScreen';
 import CampFormScreen from '../screens/camps/CampFormScreen';
 import UsersListScreen from '../screens/users/UsersListScreen';
@@ -99,6 +100,7 @@ const RootNavigator = () => {
             />
             {/* الأسر — منقولة بالكامل */}
             <Stack.Screen name="FamiliesList" component={FamiliesListScreen} options={{ title: 'قائمة الأسر' }} />
+            <Stack.Screen name="ExitedFamilies" component={ExitedFamiliesScreen} options={{ title: 'الأسر الخارجة' }} />
             <Stack.Screen name="FamilyDetail" component={FamilyDetailScreen} options={{ title: 'تفاصيل الأسرة' }} />
             <Stack.Screen name="FamilyForm" component={FamilyFormScreen} options={{ title: 'بيانات الأسرة' }} />
 

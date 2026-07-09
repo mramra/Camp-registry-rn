@@ -33,9 +33,10 @@ export const fetchFamilies = async (orgId, campId = null) => {
   try {
     let q = supabase
       .from('families')
-      .select('id, org_id, camp_id, head_name, head_id, head_gender, head_dob, head_marital, phone1, phone2, category_tags, economic_level, review_status, pending_delete, created_at, tent, head_female_status, head_chronic_diseases, head_disabilities, head_injuries')
+      .select('id, org_id, camp_id, head_name, head_id, head_gender, head_dob, head_marital, phone1, phone2, category_tags, economic_level, review_status, pending_delete, created_at, tent, head_female_status, head_chronic_diseases, head_disabilities, head_injuries, exit_date, entry_date')
       .eq('org_id', orgId)
       .eq('_deleted', false)
+      .is('exit_date', null)
       .order('created_at', { ascending: false });
 
     if (campId) q = q.eq('camp_id', campId);
@@ -643,5 +644,86 @@ export const fetchFamilyActivityLog = async (orgId, limit = 15) => {
   } catch (err) {
     console.error('[fetchFamilyActivityLog]', err.message);
     return [];
+  }
+};
+
+// ── الأسر الخارجة (Exited Families) ─────────────────────
+// الأسرة لا تُحذف نهائياً أبداً -- عند "الخروج" تُنقل لقائمة منفصلة
+// عبر exit_date/exit_reason (حقلان موجودان بالمخطط أصلاً)، وتختفي من
+// كل الشاشات العادية (fetchFamilies تستبعدها تلقائياً).
+
+export const fetchExitedFamilies = async (orgId) => {
+  try {
+    const { data, error } = await supabase
+      .from('families')
+      .select('id, org_id, camp_id, head_name, head_id, phone1, tent, exit_date, exit_reason, created_at')
+      .eq('org_id', orgId)
+      .eq('_deleted', false)
+      .not('exit_date', 'is', null)
+      .order('exit_date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error('[fetchExitedFamilies]', err.message);
+    return [];
+  }
+};
+
+/** تسجيل خروج أسرة -- تحديث فقط (exit_date + exit_reason)، بدون أي حذف.
+ * تُسجَّل أيضاً كحركة "خروج" بجدول family_movements للأرشفة. */
+export const exitFamily = async (family, { date, reason, notes, actorId, orgId }) => {
+  try {
+    const { error: updErr } = await supabase
+      .from('families')
+      .update({ exit_date: date, exit_reason: reason || null })
+      .eq('id', family.id);
+    if (updErr) throw updErr;
+
+    await supabase.from('family_movements').insert([{
+      family_id: family.id, org_id: orgId, type: 'exit',
+      from_camp: family.camp_id || null, to_camp: null,
+      date, reason: reason || null, notes: notes || null, created_by: actorId || null,
+    }]);
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/** إعادة قبول أسرة خارجة (تراجع عن الخروج) -- يمسح exit_date/exit_reason
+ * فترجع تظهر بالقوائم العادية من جديد. */
+export const reinstateExitedFamily = async (familyId) => {
+  try {
+    const { error } = await supabase.from('families').update({ exit_date: null, exit_reason: null }).eq('id', familyId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * نقل أسرة لمخيم آخر -- الطريقة الوحيدة لتغيير camp_id بعد الإضافة الأولى.
+ * تحدّث كلاً من camp_id وentry_date على الأسرة نفسها (تاريخ النقل = دخول جديد)،
+ * وتسجّل حركة "نقل" بجدول family_movements للأرشفة والتقارير.
+ */
+export const transferFamily = async (family, { toCampId, date, reason, notes, actorId, orgId }) => {
+  try {
+    const { error: updErr } = await supabase
+      .from('families')
+      .update({ camp_id: toCampId, entry_date: date })
+      .eq('id', family.id);
+    if (updErr) throw updErr;
+
+    await supabase.from('family_movements').insert([{
+      family_id: family.id, org_id: orgId, type: 'transfer',
+      from_camp: family.camp_id || null, to_camp: toCampId,
+      date, reason: reason || null, notes: notes || null, created_by: actorId || null,
+    }]);
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
   }
 };

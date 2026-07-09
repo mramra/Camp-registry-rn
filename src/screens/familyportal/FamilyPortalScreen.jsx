@@ -18,14 +18,6 @@ import colors from '../../theme/colors';
 // (هذه الشاشة تعمل بدون تسجيل دخول، فلا يوجد AuthContext لأخذ org_id منه)
 const ORG_ID = 'ddc8abe7-518f-40a4-8c3b-ee03bb0f47d5';
 
-const ECON_LABELS = {
-  extreme_poverty: 'فقر مدقع',
-  poor: 'فقير',
-  worker: 'عامل / متوسط',
-  employee: 'موظف / متوسط',
-  well_off: 'ميسور',
-};
-
 export default function FamilyPortalScreen({ navigation }) {
   const [nationalId, setNationalId] = useState('');
   const [dob, setDob] = useState('');
@@ -138,7 +130,7 @@ export default function FamilyPortalScreen({ navigation }) {
                   ))}
                 </View>
 
-                {(categories.length > 0 || family.economic_level) && (
+                {categories.length > 0 && (
                   <View style={styles.infoCard}>
                     <Text style={styles.infoCardTitle}>🏷️ الفئات</Text>
                     <View style={styles.tagsRow}>
@@ -148,11 +140,6 @@ export default function FamilyPortalScreen({ navigation }) {
                         </View>
                       ))}
                     </View>
-                    {!!family.economic_level && (
-                      <Text style={styles.econText}>
-                        💰 {ECON_LABELS[family.economic_level] || family.economic_level}
-                      </Text>
-                    )}
                   </View>
                 )}
 
@@ -264,7 +251,6 @@ const styles = StyleSheet.create({
   tagsRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
   tag: { backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   tagText: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
-  econText: { color: colors.muted, fontSize: 11, marginTop: 8, textAlign: 'right' },
 
   memberRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border },
   memberName: { color: colors.white, fontSize: 11, fontWeight: 'bold' },

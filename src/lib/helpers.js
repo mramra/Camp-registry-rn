@@ -72,7 +72,6 @@ export function getFamilyPriority(family, members) {
   if (cats.includes('martyr')) score += 3;
   if (cats.includes('captive')) score += 3;
   if (cats.includes('no_provider')) score += 2;
-  if (family?.economic_level === 'extreme_poverty') score += 2;
   if (cats.includes('large')) score += 1;
   const tier = score >= 3 ? 'urgent' : score >= 1 ? 'need' : 'ok';
   return { score, tier };

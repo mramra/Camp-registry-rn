@@ -26,7 +26,6 @@ import {
   HEALTH_OPTIONS,
   MARITAL_BY_GENDER,
   FAMILY_CATEGORIES,
-  ECONOMIC_LEVELS,
   REGIONS,
 } from '../../lib/formOptions';
 import { showError, showSuccess, showInfo } from '../../utils/toast';
@@ -91,12 +90,10 @@ export default function FamilyFormScreen() {
 
   const [campId, setCampId] = useState(null);
   const [tent, setTent] = useState('');
-  const [tent2, setTent2] = useState('');
   const [originalAddress, setOriginalAddress] = useState('');
   const [addressDetails, setAddressDetails] = useState('');
 
   const [categories, setCategories] = useState([]);
-  const [economicLevel, setEconomicLevel] = useState('');
   const [notes, setNotes] = useState('');
   const [members, setMembers] = useState([]);
 
@@ -130,10 +127,8 @@ export default function FamilyFormScreen() {
         setDobYear(d.year);
         setCampId(data.camp_id || null);
         setTent(data.tent || '');
-        setTent2(data.tent2 || '');
         setOriginalAddress(data.original_address || '');
         setAddressDetails(data.address_details || '');
-        setEconomicLevel(data.economic_level || '');
         setNotes(data.notes || '');
         try {
           const cats = typeof data.category_tags === 'string' ? JSON.parse(data.category_tags) : data.category_tags;
@@ -240,11 +235,9 @@ export default function FamilyFormScreen() {
         head_marital: headMarital || null,
         head_dob: dobStr,
         tent: tent.trim() || null,
-        tent2: tent2.trim() || null,
         original_address: originalAddress || null,
         address_details: addressDetails.trim() || null,
         category_tags: JSON.stringify(categories),
-        economic_level: economicLevel || null,
         notes: notes.trim() || null,
         _deleted: false,
       };
@@ -365,7 +358,11 @@ export default function FamilyFormScreen() {
               <Pressable
                 key={g}
                 style={[styles.segmentBtn, headGender === g && styles.segmentBtnActive]}
-                onPress={() => { setHeadGender(g); setHeadMarital(''); }}
+                onPress={() => {
+                  setHeadGender(g);
+                  setHeadMarital('');
+                  if (g !== 'أنثى') setCategories((prev) => prev.filter((c) => c !== 'martyr' && c !== 'captive'));
+                }}
               >
                 <Text style={[styles.segmentText, headGender === g && styles.segmentTextActive]}>{g}</Text>
               </Pressable>
@@ -413,10 +410,7 @@ export default function FamilyFormScreen() {
               error={errors.campId}
             />
           )}
-          <View style={styles.row}>
-            <FormInput label="رقم الخيمة" value={tent} onChangeText={setTent} style={styles.halfInput} />
-            <FormInput label="خيمة ثانية" value={tent2} onChangeText={setTent2} style={styles.halfInput} />
-          </View>
+          <FormInput label="رقم الخيمة" value={tent} onChangeText={setTent} />
           <SelectField
             label="المنطقة الأصلية"
             value={originalAddress}
@@ -502,20 +496,12 @@ export default function FamilyFormScreen() {
 
         <FormSection title="🏷️ الفئات الاجتماعية">
           <Text style={styles.fieldLabel}>فئة الأسرة</Text>
-          {FAMILY_CATEGORIES.map((cat) => (
+          {FAMILY_CATEGORIES.filter((cat) => !cat.femaleOnly || headGender === 'أنثى').map((cat) => (
             <Pressable key={cat.key} style={styles.checkboxRow} onPress={() => toggleCategory(cat.key)}>
               <Text style={styles.checkbox}>{categories.includes(cat.key) ? '☑️' : '⬜'}</Text>
               <Text style={styles.checkboxLabel}>{cat.label}</Text>
             </Pressable>
           ))}
-
-          <SelectField
-            label="المستوى الاقتصادي"
-            value={ECONOMIC_LEVELS.find((l) => l.key === economicLevel)?.label}
-            options={[{ value: '', label: '— غير محدد —' }, ...ECONOMIC_LEVELS.map((l) => ({ value: l.key, label: l.label }))]}
-            onSelect={setEconomicLevel}
-            placeholder="— غير محدد —"
-          />
         </FormSection>
 
         <FormSection title="📝 ملاحظات">

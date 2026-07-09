@@ -23,17 +23,12 @@ export const MARITAL_BY_GENDER = {
   'أنثى': ['متزوجة', 'عزباء', 'مطلقة', 'أرملة'],
 };
 
+// فئتا "أسرة شهيد" و"أسرة أسير" تظهران فقط لما رب الأسرة أنثى (أرملة الشهيد
+// أو زوجة الأسير هي المسجَّلة كرب أسرة بهذي الحالات) — femaleOnly تُفحص
+// بواجهة النموذج قبل عرض الخيار.
 export const FAMILY_CATEGORIES = [
-  { key: 'martyr', label: '🕊️ أسرة شهيد' },
-  { key: 'captive', label: '⛓️ أسرة أسير' },
-];
-
-export const ECONOMIC_LEVELS = [
-  { key: 'extreme_poverty', label: '🔴 فقر مدقع' },
-  { key: 'poor', label: '🟠 فقير' },
-  { key: 'worker', label: '🟡 عامل / متوسط' },
-  { key: 'employee', label: '🟢 موظف / متوسط' },
-  { key: 'well_off', label: '🔵 ميسور' },
+  { key: 'martyr', label: '🕊️ أسرة شهيد', femaleOnly: true },
+  { key: 'captive', label: '⛓️ أسرة أسير', femaleOnly: true },
 ];
 
 export const REGIONS = ['شمال غزة', 'غزة', 'الوسطى', 'جنوب غزة', 'رفح'];
@@ -54,6 +49,5 @@ export const TRACKED_FIELDS = {
   original_address: 'العنوان الأصلي',
   address_details: 'تفاصيل العنوان',
   notes: 'ملاحظات',
-  economic_level: 'المستوى الاقتصادي',
   status: 'الحالة',
 };

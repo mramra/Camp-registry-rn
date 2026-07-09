@@ -5,7 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { getFamilyCategories, getOrphanCount, hasHealthData } from '../../lib/helpers';
-import { ECONOMIC_LEVELS } from '../../lib/formOptions';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -47,10 +46,8 @@ export default function NeedsReportScreen() {
   const [camps, setCamps] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
   const [filterCat, setFilterCat] = useState('');
-  const [filterEcon, setFilterEcon] = useState('');
   const [filterHealth, setFilterHealth] = useState('');
   const [campPickerVisible, setCampPickerVisible] = useState(false);
-  const [econPickerVisible, setEconPickerVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -91,14 +88,13 @@ export default function NeedsReportScreen() {
     return families.filter((f) => {
       if (filterCamp && f.camp_id !== filterCamp) return false;
       if (filterCat && !getFamilyCategories(f, memsByFamily[f.id]).includes(filterCat)) return false;
-      if (filterEcon && f.economic_level !== filterEcon) return false;
       if (filterHealth) {
         const mems = memsByFamily[f.id] || [];
         if (!mems.some((m) => memberHealthKeys(m).includes(filterHealth))) return false;
       }
       return true;
     });
-  }, [families, filterCamp, filterCat, filterEcon, filterHealth, memsByFamily]);
+  }, [families, filterCamp, filterCat, filterHealth, memsByFamily]);
 
   const quickStats = useMemo(() => {
     const s = {};
@@ -123,7 +119,6 @@ export default function NeedsReportScreen() {
         المخيم: campMap[f.camp_id] || '',
         'عدد الأفراد': mems.length + 1,
         الفئات: getFamilyCategories(f, mems).map((c) => CAT_LABELS[c]?.label || c).join(' | '),
-        'المستوى الاقتصادي': ECONOMIC_LEVELS.find((l) => l.key === f.economic_level)?.label.replace(/^\S+\s/, '') || '',
         الأيتام: getOrphanCount(f, mems),
       };
     });
@@ -220,11 +215,6 @@ export default function NeedsReportScreen() {
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
               />
-              <FilterChip
-                label={filterEcon ? ECONOMIC_LEVELS.find((l) => l.key === filterEcon)?.label : '💰 كل المستويات'}
-                selected={!!filterEcon}
-                onPress={() => setEconPickerVisible(true)}
-              />
             </View>
             <View style={styles.chipsRow}>
               <FilterChip label="🏥 الكل" selected={!filterHealth} onPress={() => setFilterHealth('')} />
@@ -249,17 +239,6 @@ export default function NeedsReportScreen() {
         {camps.map((c) => (
           <Pressable key={c.id} style={styles.pickerOption} onPress={() => { setFilterCamp(c.id); setCampPickerVisible(false); }}>
             <Text style={styles.pickerOptionText}>{c.name}</Text>
-          </Pressable>
-        ))}
-      </BottomSheetModal>
-
-      <BottomSheetModal visible={econPickerVisible} onClose={() => setEconPickerVisible(false)} title="المستوى الاقتصادي">
-        <Pressable style={styles.pickerOption} onPress={() => { setFilterEcon(''); setEconPickerVisible(false); }}>
-          <Text style={styles.pickerOptionText}>كل المستويات</Text>
-        </Pressable>
-        {ECONOMIC_LEVELS.map((l) => (
-          <Pressable key={l.key} style={styles.pickerOption} onPress={() => { setFilterEcon(l.key); setEconPickerVisible(false); }}>
-            <Text style={styles.pickerOptionText}>{l.label}</Text>
           </Pressable>
         ))}
       </BottomSheetModal>

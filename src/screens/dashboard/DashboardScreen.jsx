@@ -20,9 +20,9 @@ import colors from '../../theme/colors';
 const ACTIVITY_FIELD_LABELS = {
   head_name: 'اسم رب الأسرة', head_id: 'رقم الهوية', head_dob: 'تاريخ الميلاد',
   head_gender: 'الجنس', head_marital: 'الحالة الاجتماعية', phone1: 'رقم الجوال',
-  phone2: 'جوال بديل', camp_id: 'المخيم', tent: 'رقم الخيمة', tent2: 'خيمة إضافية',
+  phone2: 'جوال بديل', camp_id: 'المخيم', tent: 'رقم الخيمة',
   original_address: 'العنوان الأصلي', address_details: 'تفاصيل العنوان', notes: 'ملاحظات',
-  category_tags: 'الفئة الاجتماعية', economic_level: 'المستوى الاقتصادي',
+  category_tags: 'الفئة الاجتماعية',
   review_status: 'حالة المراجعة', head_qualification: 'المؤهل العلمي',
 };
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import * as Updates from 'expo-updates';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../utils/toast';
@@ -21,6 +22,29 @@ export default function SettingsScreen() {
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [saving, setSaving] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  const checkForUpdate = async () => {
+    if (!Updates.isEnabled) {
+      return showToast('التحديثات التلقائية غير مفعّلة على هذه النسخة (مثلاً نسخة الويب)', 'warning');
+    }
+    setCheckingUpdate(true);
+    try {
+      const result = await Updates.checkForUpdateAsync();
+      if (!result.isAvailable) {
+        showToast('✅ التطبيق محدّث لآخر إصدار متاح', 'success');
+        return;
+      }
+      showToast('⬇️ يوجد تحديث جديد، جاري التحميل...', 'info');
+      await Updates.fetchUpdateAsync();
+      showToast('✅ تم التحميل، سيُعاد فتح التطبيق الآن', 'success');
+      await Updates.reloadAsync();
+    } catch (err) {
+      showToast('⚠️ فشل التحقق: ' + err.message, 'error');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   const changePassword = async () => {
     if (newPass.length < 8) return showToast('كلمة المرور يجب أن تكون 8 أحرف على الأقل', 'error');
@@ -93,6 +117,19 @@ export default function SettingsScreen() {
             <Text style={styles.logoutBtnText}>تسجيل الخروج</Text>
           </Pressable>
         </FormSection>
+
+        <FormSection title="🔄 التحديثات">
+          <Text style={styles.updateNote}>
+            التطبيق يفحص التحديثات تلقائياً عند فتحه. لو تشك إن تحديث معيّن ما وصلك، اضغط الزر تحت للتأكد مباشرة.
+          </Text>
+          <Pressable style={[styles.checkUpdateBtn, checkingUpdate && styles.btnDisabled]} onPress={checkForUpdate} disabled={checkingUpdate}>
+            {checkingUpdate ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : (
+              <Text style={styles.checkUpdateBtnText}>🔄 التحقق من التحديثات الآن</Text>
+            )}
+          </Pressable>
+        </FormSection>
       </ScrollView>
     </SafeAreaView>
   );
@@ -128,4 +165,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutBtnText: { color: colors.red, fontWeight: 'bold', fontSize: 13 },
+
+  updateNote: { color: colors.muted, fontSize: 11, lineHeight: 17, marginBottom: 10, textAlign: 'right' },
+  checkUpdateBtn: { backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  checkUpdateBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 13 },
 });

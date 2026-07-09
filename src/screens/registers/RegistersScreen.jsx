@@ -13,6 +13,8 @@ import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
 import colors from '../../theme/colors';
+import { cacheData, getCachedData } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 
 const TABS = [
   { id: 'children', label: '👶 الأطفال' },
@@ -80,7 +82,7 @@ const HEALTH_TYPES = [
 
 export default function RegistersScreen() {
   const navigation = useNavigation();
-  const { orgId } = useAuth();
+  const { orgId, profile } = useAuth();
   const { getAllowedCampIds, getVisibleCamps } = useDataScope();
 
   const [tab, setTab] = useState('children');
@@ -95,6 +97,7 @@ export default function RegistersScreen() {
   const [healthType, setHealthType] = useState('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
@@ -103,12 +106,24 @@ export default function RegistersScreen() {
       const allowedCampIds = getAllowedCampIds(campsData);
       const famsRaw = await fetchFamilies(orgId);
       const fams = allowedCampIds === null ? famsRaw : famsRaw.filter((f) => allowedCampIds.includes(f.camp_id));
+      const mems = await fetchFamilyMembers(fams.map((f) => f.id));
+      const visibleCamps = getVisibleCamps(campsData);
 
-      setCamps(getVisibleCamps(campsData));
+      setCamps(visibleCamps);
       setFamilies(fams);
-      setMembers(await fetchFamilyMembers(fams.map((f) => f.id)));
+      setMembers(mems);
+      setOfflineInfo(null);
+      cacheData('registers', profile?.id, { families: fams, members: mems, camps: visibleCamps });
     } catch (e) {
-      showError('تعذّر تحميل السجلات');
+      const cached = await getCachedData('registers', profile?.id);
+      if (cached?.data) {
+        setFamilies(cached.data.families || []);
+        setMembers(cached.data.members || []);
+        setCamps(cached.data.camps || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      } else {
+        showError('تعذّر تحميل السجلات');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -359,6 +374,14 @@ export default function RegistersScreen() {
               }
             />
 
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
+                </Text>
+              </View>
+            )}
+
             <View style={styles.chipsRow}>
               <FilterChip
                 label={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
@@ -455,6 +478,11 @@ const getStyles = () =>
     screen: { flex: 1, backgroundColor: colors.bg },
     loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     listContent: { padding: 16, paddingBottom: 32 },
+    offlineBanner: {
+      backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+      borderRadius: 12, padding: 10, marginBottom: 12,
+    },
+    offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
     tabsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
 

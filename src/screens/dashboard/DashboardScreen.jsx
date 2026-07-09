@@ -14,6 +14,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchFamilyActivityLog } from '../../lib/supabase';
 import { calcAge, isIncomplete } from '../../lib/helpers';
+import { cacheData, getCachedData } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import colors from '../../theme/colors';
 
@@ -37,6 +39,7 @@ export default function DashboardScreen() {
   const { getAllowedCampIds, filterLocal } = useDataScope();
 
   const [stats, setStats] = useState(null);
+  const [offlineInfo, setOfflineInfo] = useState(null);
   const [families, setFamilies] = useState([]);
   const [members, setMembers] = useState([]);
   const [camps, setCamps] = useState([]);
@@ -100,7 +103,7 @@ export default function DashboardScreen() {
           pct: Math.round(((campCount[c.id] || 0) / Math.max(filteredFams.length, 1)) * 100),
         }));
 
-      setStats({
+      const finalStats = {
         families: filteredFams.length,
         members: filteredFams.length + members.length,
         camps: filteredCamps.length,
@@ -111,9 +114,21 @@ export default function DashboardScreen() {
         noAge,
         total,
         campBars,
-      });
+      };
+      setStats(finalStats);
+      setOfflineInfo(null);
+      cacheData('dashboard_stats', profile?.id, { stats: finalStats, families: filteredFams, members, camps: filteredCamps, activityLog });
     } catch (e) {
-      // بدون console — الشاشة تعرض حالة "لا بيانات" مع زر إعادة تحميل
+      // فشل الاتصال -- نرجع لآخر نسخة محفوظة محلياً (لو موجودة) بدل شاشة فاضية
+      const cached = await getCachedData('dashboard_stats', profile?.id);
+      if (cached?.data) {
+        setStats(cached.data.stats);
+        setActivity(cached.data.activityLog || []);
+        setFamilies(cached.data.families || []);
+        setMembers(cached.data.members || []);
+        setCamps(cached.data.camps || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -208,6 +223,14 @@ export default function DashboardScreen() {
         {/* ترحيب */}
         <Text style={styles.greet}>{greet}،</Text>
         <Text style={styles.userName}>{profile?.full_name || 'مرحباً'} 👋</Text>
+
+        {!!offlineInfo && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>
+              📡 لا يوجد اتصال بالإنترنت — تُعرض بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
+            </Text>
+          </View>
+        )}
 
         {/* بحث ذكي — رباب الأسر والأفراد معاً */}
         <TextInput
@@ -445,6 +468,11 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 32 },
   greet: { color: colors.muted, fontSize: 14, textAlign: 'right' },
   userName: { color: colors.white, fontWeight: '900', fontSize: 20, textAlign: 'right', marginBottom: 16 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
 
   searchInput: {

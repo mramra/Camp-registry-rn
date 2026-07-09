@@ -14,6 +14,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { checkFamilyIssues, isIncomplete, isAgeInRange, getMembers } from '../../lib/helpers';
+import { cacheData, getCachedData } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -61,29 +63,43 @@ export default function FamiliesListScreen() {
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
   const [campPickerVisible, setCampPickerVisible] = useState(false);
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   // ── تحميل البيانات (مباشرة من Supabase — بدون طبقة SQLite وسيطة) ──
   const loadData = useCallback(async () => {
     if (!orgId) return;
-    const allowedCampIds = getAllowedCampIds(camps.length ? camps : await fetchCamps(orgId));
+    try {
+      const allowedCampIds = getAllowedCampIds(camps.length ? camps : await fetchCamps(orgId));
 
-    const [famsRaw, campsData] = await Promise.all([
-      fetchFamilies(orgId),
-      fetchCamps(orgId),
-    ]);
-    const fams =
-      allowedCampIds === null
-        ? famsRaw
-        : famsRaw.filter((f) => allowedCampIds.includes(f.camp_id));
+      const [famsRaw, campsData] = await Promise.all([
+        fetchFamilies(orgId),
+        fetchCamps(orgId),
+      ]);
+      const fams =
+        allowedCampIds === null
+          ? famsRaw
+          : famsRaw.filter((f) => allowedCampIds.includes(f.camp_id));
 
-    setCamps(campsData);
-    setFamilies(fams);
+      setCamps(campsData);
+      setFamilies(fams);
 
-    const members = await fetchFamilyMembers(fams.map((f) => f.id));
-    setAllMembers(members);
-
-    setLoading(false);
-    setRefreshing(false);
+      const members = await fetchFamilyMembers(fams.map((f) => f.id));
+      setAllMembers(members);
+      setOfflineInfo(null);
+      cacheData('families_list', profile?.id, { families: fams, members, camps: campsData });
+    } catch (e) {
+      // فشل الاتصال -- نرجع لآخر نسخة محفوظة محلياً بدل شاشة فاضية
+      const cached = await getCachedData('families_list', profile?.id);
+      if (cached?.data) {
+        setFamilies(cached.data.families || []);
+        setAllMembers(cached.data.members || []);
+        setCamps(cached.data.camps || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [orgId]);
 
   // ملاحظة: الاستيراد الجماعي من Excel صار حصراً بشاشة "استيراد وتصدير"
@@ -313,6 +329,13 @@ export default function FamiliesListScreen() {
               }
             />
 
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة (لا يمكن الإضافة/التعديل/الحذف الآن)
+                </Text>
+              </View>
+            )}
             {/* البحث */}
             <TextInput
               value={search}
@@ -444,6 +467,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
   addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
 

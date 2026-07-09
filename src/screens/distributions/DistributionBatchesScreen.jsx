@@ -40,7 +40,6 @@ export default function DistributionBatchesScreen() {
   const [formVisible, setFormVisible] = useState(false);
   const [name, setName] = useState('');
   const [campId, setCampId] = useState(round?.camp_id || null);
-  const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -92,9 +91,8 @@ export default function DistributionBatchesScreen() {
       const result = await createDistBatch({
         org_id: orgId,
         round_id: round.id,
-        name: name.trim(),
+        description: name.trim(),
         camp_id: campId || round.camp_id || null,
-        notes: notes.trim() || null,
         status: 'pending',
       });
       if (!result.success) {
@@ -104,7 +102,6 @@ export default function DistributionBatchesScreen() {
       showSuccess('تمت إضافة الدفعة');
       setFormVisible(false);
       setName('');
-      setNotes('');
       loadData();
     } catch (e) {
       showError('خطأ: ' + e.message);
@@ -124,9 +121,8 @@ export default function DistributionBatchesScreen() {
       >
         <View style={styles.cardTop}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.batchName}>📋 {b.name}</Text>
+            <Text style={styles.batchName}>📋 {b.description}</Text>
             {!!b.camp_id && <Text style={styles.metaLine}>🏕️ {campMap[b.camp_id] || '—'}</Text>}
-            {!!b.notes && <Text style={styles.metaLine}>{b.notes}</Text>}
             <Text style={styles.dateLine}>{formatDate(b.created_at)}</Text>
           </View>
           <Text style={[styles.statusBadge, { color: st.color, backgroundColor: `${st.color}22` }]}>{st.label}</Text>
@@ -214,7 +210,6 @@ export default function DistributionBatchesScreen() {
           onSelect={setCampId}
           placeholder="— اختر المخيم —"
         />
-        <FormInput label="ملاحظات" value={notes} onChangeText={setNotes} multiline numberOfLines={2} />
         <View style={styles.row}>
           <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={handleAddBatch} disabled={saving}>
             {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>✅ إضافة</Text>}

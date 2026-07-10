@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { StackActions } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
 
@@ -117,13 +118,14 @@ export default function AppDrawer({ visible, onClose, navigation }) {
     setOpenKey((prev) => (prev === key ? null : key));
   };
 
-  // push (مو navigate) عمداً: navigate يرجع لنسخة قديمة من نفس الشاشة لو
-  // موجودة بتاريخ التنقل، وهذا يمسح أي شاشات بينهم بصمت -- فيصير زر الرجوع
-  // يقفز فجأة لصفحة بعيدة (غالباً الرئيسية) بدل الشاشة اللي كنت فيها فعلاً.
-  // push يضمن كل ضغطة بالقائمة تضيف خطوة جديدة بتاريخ حقيقي ومتسلسل.
+  // dispatch(StackActions.push) -- مرجع NavigationContainer (اللي وصل هنا
+  // كـ navigation) ما يدعم navigation.push() مباشرة، هذي متاحة بس بـ navigation
+  // prop لشاشة داخل الـ Stack. push بدل navigate عمداً: navigate يرجع لنسخة
+  // قديمة من نفس الشاشة لو موجودة بتاريخ التنقل، وهذا يمسح أي شاشات بينهم
+  // بصمت -- فيصير زر الرجوع يقفز فجأة لصفحة بعيدة بدل الشاشة اللي كنت فيها فعلاً.
   const go = (screen) => {
     onClose();
-    navigation.push(screen);
+    navigation.dispatch(StackActions.push(screen));
   };
 
   return (

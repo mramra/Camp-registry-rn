@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, SafeAreaView, ActivityIndicator, Switch } from 'react-native';
 import { supabase, fetchCamps, fetchOrgMembers, createFamily } from '../../lib/supabase';
+import NetInfo from '@react-native-community/netinfo';
+import { cacheData, getCachedData } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
@@ -110,27 +113,48 @@ export default function ExportScreen() {
   const [cxSheetName, setCxSheetName] = useState('كشف مخصص');
   const [cxFamCols, setCxFamCols] = useState(() => FAM_COLS.map((c) => ({ ...c, order: 0 })));
   const [cxMemCols, setCxMemCols] = useState(() => MEM_COLS.map((c) => ({ ...c, order: 0 })));
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const loadMeta = useCallback(async () => {
     if (!orgId) return;
-    const [c, om] = await Promise.all([fetchCamps(orgId), fetchOrgMembers(orgId)]);
-    const allCamps = c || [];
-    const campIds = getAllowedCampIds(allCamps);
-    setCamps(getVisibleCamps(allCamps));
-    setOrgMembers(om || []);
+    try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
 
-    // تحميل كل الأسر والأفراد ضمن النطاق المسموح — للتصدير المخصص
-    const { data: fams } = await supabase
-      .from('families')
-      .select('*, family_members(*)')
-      .eq('org_id', orgId)
-      .eq('_deleted', false);
-    const scopedFams = filterLocal(fams || [], campIds);
-    const mems = [];
-    scopedFams.forEach((f) => (f.family_members || []).forEach((m) => mems.push({ ...m, family_id: f.id })));
-    setAllFamilies(scopedFams);
-    setAllMembers(mems);
-  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps]);
+      const [c, om] = await Promise.all([fetchCamps(orgId), fetchOrgMembers(orgId)]);
+      const allCamps = c || [];
+      const campIds = getAllowedCampIds(allCamps);
+      const visibleCamps = getVisibleCamps(allCamps);
+
+      // تحميل كل الأسر والأفراد ضمن النطاق المسموح — لكل من التصدير السريع والمخصص
+      const { data: fams } = await supabase
+        .from('families')
+        .select('*, family_members(*)')
+        .eq('org_id', orgId)
+        .eq('_deleted', false);
+      const scopedFams = filterLocal(fams || [], campIds);
+      const mems = [];
+      scopedFams.forEach((f) => (f.family_members || []).forEach((m) => mems.push({ ...m, family_id: f.id })));
+
+      setCamps(visibleCamps);
+      setOrgMembers(om || []);
+      setAllFamilies(scopedFams);
+      setAllMembers(mems);
+      setOfflineInfo(null);
+      cacheData('export_meta', profile?.id, { camps: visibleCamps, orgMembers: om || [], families: scopedFams, members: mems });
+    } catch (e) {
+      const cached = await getCachedData('export_meta', profile?.id);
+      if (cached?.data) {
+        setCamps(cached.data.camps || []);
+        setOrgMembers(cached.data.orgMembers || []);
+        setAllFamilies(cached.data.families || []);
+        setAllMembers(cached.data.members || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      } else {
+        showToast('تعذّر تحميل البيانات ولا توجد نسخة محفوظة', 'error');
+      }
+    }
+  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps, profile?.id]);
 
   useEffect(() => { loadMeta(); }, [loadMeta]);
 
@@ -145,15 +169,12 @@ export default function ExportScreen() {
   const bannerNote = (campInfo) =>
     showBanner && campInfo ? `${campInfo.name} — ${campInfo.delegateName || '—'} — ${campInfo.delegatePhone || '—'}` : null;
 
+  // بدل إعادة الطلب من السيرفر كل مرة، نفلتر من allFamilies المحمّلة أصلاً
+  // (بواسطة loadMeta) — هذا يخلي التصدير السريع يشتغل حتى بدون اتصال، طالما
+  // الشاشة فُتحت أونلاين قبل مرة بنفس الجلسة أو فيه نسخة محفوظة محلياً.
   const getFullData = async () => {
-    const allCamps = await fetchCamps(orgId);
-    const campIds = getAllowedCampIds(allCamps);
-    let q = supabase.from('families').select('*, camps!camp_id(id,name), family_members(*)').eq('org_id', orgId).eq('_deleted', false);
-    if (filterCamp) q = q.eq('camp_id', filterCamp);
-    const { data, error } = await q;
-    if (error) throw error;
-    const scoped = campIds === null ? data : (data || []).filter((f) => campIds.includes(f.camp_id));
-    return scoped || [];
+    const list = filterCamp ? allFamilies.filter((f) => f.camp_id === filterCamp) : allFamilies;
+    return list.map((f) => ({ ...f, camps: { id: f.camp_id, name: campMap[f.camp_id] || '' } }));
   };
 
   // ── تصدير سريع: رباب الأسر (بالحقول المختارة) ──
@@ -425,6 +446,14 @@ export default function ExportScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <PageHeader icon="💾" title="استيراد وتصدير" />
 
+        {!!offlineInfo && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>
+              📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة (الاستيراد غير متاح الآن)
+            </Text>
+          </View>
+        )}
+
         <SelectField
           value={campOptions.find((o) => o.value === filterCamp)?.label}
           placeholder="🏕️ كل المخيمات"
@@ -554,7 +583,7 @@ export default function ExportScreen() {
         )}
 
         <FormSection title="📤 استيراد Excel">
-          {canImport ? (
+          {canImport && !offlineInfo ? (
             <>
               <Pressable style={styles.btnOutline} onPress={downloadTemplate}>
                 <Text style={styles.btnOutlineText}>📋 تحميل قالب الاستيراد</Text>
@@ -597,7 +626,9 @@ export default function ExportScreen() {
               )}
             </>
           ) : (
-            <Text style={styles.lockedText}>🔒 لا تملك صلاحية الاستيراد</Text>
+            <Text style={styles.lockedText}>
+              {!canImport ? '🔒 لا تملك صلاحية الاستيراد' : '📡 الاستيراد يتطلب اتصالاً بالإنترنت'}
+            </Text>
           )}
         </FormSection>
 
@@ -612,6 +643,11 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 32 },
 
   bannerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 12 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   bannerLabel: { color: colors.white, fontSize: 12, fontWeight: 'bold' },
 
   btnPrimary: { backgroundColor: colors.accent, paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginBottom: 8 },

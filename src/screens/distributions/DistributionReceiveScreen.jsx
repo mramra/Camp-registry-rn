@@ -6,11 +6,12 @@ import { useDataScope } from '../../lib/useDataScope';
 import {
   fetchFamilies,
   fetchFamilyMembers,
-  fetchDistReceivedFamilyIds,
-  markFamilyReceived,
-  unmarkFamilyReceived,
+  fetchCamps,
+  fetchDistRounds,
+  fetchDistReceivedFamilyIdsByRound,
+  markFamilyReceivedByRound,
+  unmarkFamilyReceivedByRound,
 } from '../../lib/supabase';
-import { getFamilyPriority, TIER_LABELS } from '../../lib/helpers';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -18,40 +19,49 @@ import FilterChip from '../../components/ui/FilterChip';
 import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
 
-const TIER_COLOR = { urgent: colors.red, need: colors.accent, ok: colors.green };
-
 const SORT_OPTIONS = [
-  { value: 'priority', label: '🎯 الأولوية أولاً' },
+  { value: 'size_asc', label: '👤 عدد أفراد الأسرة (تصاعدي)' },
+  { value: 'tent_asc', label: '⛺ رقم الخيمة' },
   { value: 'alpha', label: '🔤 أبجدي' },
-  { value: 'size_desc', label: '👨‍👩‍👧‍👦 أكبر أسرة أولاً' },
-  { value: 'size_asc', label: '👤 أصغر أسرة أولاً' },
-  { value: 'tent_asc', label: '⛺ رقم خيمة (تصاعدي)' },
-  { value: 'tent_desc', label: '⛺ رقم خيمة (تنازلي)' },
 ];
 
+/**
+ * شاشة جولة توزيع واحدة — تُفتح مباشرة من قائمة الجولات (بدون أي شاشة
+ * "دفعات" وسيطة). قائمتان: مستلمين/غير مستلمين. أربع فلاتر بالترتيب
+ * المطلوب بالضبط: (1) المخيم، (2) جولة سابقة -- تعرض فقط من لم يستلم
+ * منها، (3) ترتيب حسب عدد الأفراد تصاعدياً أو رقم الخيمة، (4) بحث بالاسم
+ * أو الهوية. الاختيار بالنقر على الاسم (تحديد متعدد)، وزر "استلام" بالأسفل.
+ */
 export default function DistributionReceiveScreen() {
   const route = useRoute();
-  const { batch, round } = route.params || {};
+  const { round } = route.params || {};
   const { orgId, canWrite } = useAuth();
-  const { getAllowedCampIds, filterLocal } = useDataScope();
+  const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
 
   const [families, setFamilies] = useState([]);
   const [membersByFamily, setMembersByFamily] = useState({});
+  const [camps, setCamps] = useState([]);
+  const [otherRounds, setOtherRounds] = useState([]);
   const [receivedIds, setReceivedIds] = useState(new Set());
+  const [otherRoundReceivedIds, setOtherRoundReceivedIds] = useState(null);
+
   const [tab, setTab] = useState('pending'); // pending | received
-  const [sortMode, setSortMode] = useState('priority');
+  const [filterCamp, setFilterCamp] = useState('');
+  const [filterOtherRound, setFilterOtherRound] = useState('');
+  const [sortMode, setSortMode] = useState('size_asc');
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [bulkSaving, setBulkSaving] = useState(false);
 
   const loadData = useCallback(async () => {
-    if (!batch?.id || !orgId) return;
+    if (!round?.id || !orgId) return;
     try {
-      const campId = batch.camp_id || round?.camp_id;
-      const allowedCampIds = getAllowedCampIds([{ id: campId }]);
+      const campsData = await fetchCamps(orgId);
+      const allowedCampIds = getAllowedCampIds(campsData);
+      setCamps(getVisibleCamps(campsData));
 
-      const famsRaw = await fetchFamilies(orgId, campId || null);
+      const famsRaw = await fetchFamilies(orgId);
       const fams = filterLocal(famsRaw, allowedCampIds);
       setFamilies(fams);
 
@@ -63,51 +73,64 @@ export default function DistributionReceiveScreen() {
       });
       setMembersByFamily(grouped);
 
-      const received = await fetchDistReceivedFamilyIds(batch.id);
+      const [received, roundsData] = await Promise.all([
+        fetchDistReceivedFamilyIdsByRound(round.id),
+        fetchDistRounds(orgId),
+      ]);
       setReceivedIds(received);
+      setOtherRounds(roundsData.filter((r) => r.id !== round.id));
     } catch (e) {
       showError('تعذّر تحميل قائمة الأسر');
     } finally {
       setLoading(false);
     }
-  }, [batch?.id, orgId]);
+  }, [round?.id, orgId]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
+  // فلتر "جولة سابقة" -- يجيب مين استلم من هذي الجولة تحديداً، عشان نستبعدهم
+  // (نعرض بس اللي لم يستلموا منها)
+  useEffect(() => {
+    if (!filterOtherRound) {
+      setOtherRoundReceivedIds(null);
+      return;
+    }
+    fetchDistReceivedFamilyIdsByRound(filterOtherRound).then(setOtherRoundReceivedIds).catch(() => setOtherRoundReceivedIds(null));
+  }, [filterOtherRound]);
+
+  const campMap = Object.fromEntries(camps.map((c) => [c.id, c.name]));
+
   const filtered = useMemo(() => {
     let list = families.filter((f) => (tab === 'received' ? receivedIds.has(f.id) : !receivedIds.has(f.id)));
+
+    if (filterCamp) list = list.filter((f) => f.camp_id === filterCamp);
+
+    if (filterOtherRound && otherRoundReceivedIds) {
+      list = list.filter((f) => !otherRoundReceivedIds.has(f.id));
+    }
 
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((f) => (f.head_name || '').toLowerCase().includes(q) || (f.head_id || '').includes(q));
     }
 
-    // فرز حسب الوضع المختار — 6 أوضاع مطابقة للأصل
     list = [...list].sort((a, b) => {
-      const am = (membersByFamily[a.id]?.length || 0) + 1;
-      const bm = (membersByFamily[b.id]?.length || 0) + 1;
       switch (sortMode) {
         case 'alpha':
           return (a.head_name || '').localeCompare(b.head_name || '', 'ar');
-        case 'size_desc':
-          return bm - am;
-        case 'size_asc':
-          return am - bm;
         case 'tent_asc':
           return String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true });
-        case 'tent_desc':
-          return String(b.tent || '').localeCompare(String(a.tent || ''), 'ar', { numeric: true });
         default: {
-          const pa = getFamilyPriority(a, membersByFamily[a.id]).score;
-          const pb = getFamilyPriority(b, membersByFamily[b.id]).score;
-          return pb - pa;
+          const am = (membersByFamily[a.id]?.length || 0) + 1;
+          const bm = (membersByFamily[b.id]?.length || 0) + 1;
+          return am - bm;
         }
       }
     });
 
     return list;
-  }, [families, receivedIds, tab, search, membersByFamily, sortMode]);
+  }, [families, receivedIds, tab, filterCamp, filterOtherRound, otherRoundReceivedIds, search, membersByFamily, sortMode]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) => {
@@ -125,7 +148,7 @@ export default function DistributionReceiveScreen() {
     const already = receivedIds.has(family.id);
     try {
       if (already) {
-        await unmarkFamilyReceived(batch.id, family.id);
+        await unmarkFamilyReceivedByRound(round.id, family.id);
         setReceivedIds((prev) => {
           const next = new Set(prev);
           next.delete(family.id);
@@ -133,7 +156,7 @@ export default function DistributionReceiveScreen() {
         });
         showSuccess('تم إلغاء الاستلام');
       } else {
-        await markFamilyReceived(batch.id, orgId, family.id);
+        await markFamilyReceivedByRound(round.id, orgId, family.id);
         setReceivedIds((prev) => new Set(prev).add(family.id));
         showSuccess('تم تسجيل الاستلام');
       }
@@ -155,7 +178,7 @@ export default function DistributionReceiveScreen() {
     try {
       const ids = [...selectedIds];
       for (const famId of ids) {
-        await markFamilyReceived(batch.id, orgId, famId);
+        await markFamilyReceivedByRound(round.id, orgId, famId);
       }
       setReceivedIds((prev) => {
         const next = new Set(prev);
@@ -172,15 +195,13 @@ export default function DistributionReceiveScreen() {
   };
 
   const renderFamily = ({ item: f }) => {
-    const priority = getFamilyPriority(f, membersByFamily[f.id]);
     const memberCount = 1 + (membersByFamily[f.id]?.length || 0);
     const selected = selectedIds.has(f.id);
 
     return (
       <Pressable
-        style={[styles.card, { borderRightColor: TIER_COLOR[priority.tier] }, selected && styles.cardSelected]}
+        style={[styles.card, selected && styles.cardSelected]}
         onPress={() => (tab === 'pending' ? toggleSelect(f.id) : toggleReceive(f))}
-        onLongPress={() => toggleReceive(f)}
       >
         <View style={styles.cardRow}>
           {tab === 'pending' && (
@@ -188,7 +209,9 @@ export default function DistributionReceiveScreen() {
           )}
           <View style={{ flex: 1 }}>
             <Text style={styles.familyName}>{f.head_name || '—'}</Text>
-            <Text style={styles.metaLine}>{memberCount} أفراد · {TIER_LABELS[priority.tier]}</Text>
+            <Text style={styles.metaLine}>
+              {memberCount} أفراد{f.tent ? ` · ⛺ ${f.tent}` : ''}{f.camp_id ? ` · 🏕️ ${campMap[f.camp_id] || '—'}` : ''}
+            </Text>
           </View>
           {tab === 'received' && (
             <Pressable style={styles.undoBtn} onPress={() => toggleReceive(f)}>
@@ -221,22 +244,8 @@ export default function DistributionReceiveScreen() {
           <View>
             <PageHeader
               icon="✅"
-              title={batch?.name || 'تسجيل الاستلام'}
+              title={round?.name || 'جولة توزيع'}
               subtitle={<Text style={styles.headerSubtitle}>{receivedIds.size} استلم من أصل {families.length}</Text>}
-            />
-
-            <SelectField
-              value={SORT_OPTIONS.find((o) => o.value === sortMode)?.label}
-              options={SORT_OPTIONS}
-              onSelect={setSortMode}
-            />
-
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="🔍 بحث بالاسم أو رقم الهوية..."
-              placeholderTextColor={colors.muted}
-              style={styles.searchInput}
             />
 
             <View style={styles.chipsRow}>
@@ -252,19 +261,51 @@ export default function DistributionReceiveScreen() {
               />
             </View>
 
+            {/* 1) فلتر المخيم */}
+            <SelectField
+              value={filterCamp ? campMap[filterCamp] : undefined}
+              placeholder="🏕️ كل المخيمات"
+              options={[{ value: '', label: 'كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))]}
+              onSelect={setFilterCamp}
+            />
+
+            {/* 2) فلتر جولة سابقة -- من لم يستلم منها */}
+            <SelectField
+              value={filterOtherRound ? `لم يستلم من: ${otherRounds.find((r) => r.id === filterOtherRound)?.name || ''}` : undefined}
+              placeholder="🔁 كل الجولات (بدون فلترة)"
+              options={[{ value: '', label: 'بدون فلترة' }, ...otherRounds.map((r) => ({ value: r.id, label: `لم يستلم من: ${r.name}` }))]}
+              onSelect={setFilterOtherRound}
+            />
+
+            {/* 3) الترتيب */}
+            <SelectField
+              value={SORT_OPTIONS.find((o) => o.value === sortMode)?.label}
+              options={SORT_OPTIONS}
+              onSelect={setSortMode}
+            />
+
+            {/* 4) البحث */}
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="🔍 بحث بالاسم أو رقم الهوية..."
+              placeholderTextColor={colors.muted}
+              style={styles.searchInput}
+            />
+
             {tab === 'pending' && (
-              <Text style={styles.hint}>اضغط لتحديد أسرة، اضغط مطولاً لتسجيل استلامها مباشرة</Text>
+              <Text style={styles.hint}>اضغط على اسم الأسرة لتحديدها، ثم اضغط "استلام" بالأسفل</Text>
             )}
           </View>
         }
-        ListEmptyComponent={<EmptyState icon="✅" title={tab === 'pending' ? 'كل الأسر استلمت' : 'لا توجد أسر مستلمة بعد'} />}
+        ListEmptyComponent={<EmptyState icon="✅" title={tab === 'pending' ? 'كل الأسر استلمت أو لا نتائج مطابقة' : 'لا توجد أسر مستلمة بعد'} />}
       />
 
       {tab === 'pending' && selectedIds.size > 0 && canWrite && (
         <View style={styles.bulkBar}>
           <Text style={styles.bulkText}>{selectedIds.size} محددة</Text>
           <Pressable style={[styles.bulkBtn, bulkSaving && styles.disabled]} onPress={bulkMarkReceived} disabled={bulkSaving}>
-            {bulkSaving ? <ActivityIndicator color="#000" /> : <Text style={styles.bulkBtnText}>✅ تسجيل الاستلام</Text>}
+            {bulkSaving ? <ActivityIndicator color="#000" /> : <Text style={styles.bulkBtnText}>✅ استلام</Text>}
           </Pressable>
         </View>
       )}
@@ -289,10 +330,10 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginBottom: 10,
   },
-  chipsRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  chipsRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   hint: { color: colors.muted, fontSize: 10, marginBottom: 10, textAlign: 'right' },
 
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRadius: 12, padding: 12, marginBottom: 8 },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRightColor: colors.accent, borderRadius: 12, padding: 12, marginBottom: 8 },
   cardSelected: { backgroundColor: 'rgba(245,158,11,0.1)' },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkbox: { fontSize: 16 },

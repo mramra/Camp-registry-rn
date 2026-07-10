@@ -16,7 +16,6 @@ import UsersListScreen from '../screens/users/UsersListScreen';
 import UserFormScreen from '../screens/users/UserFormScreen';
 import MovementsScreen from '../screens/movements/MovementsScreen';
 import DistributionsScreen from '../screens/distributions/DistributionsScreen';
-import DistributionBatchesScreen from '../screens/distributions/DistributionBatchesScreen';
 import DistributionReceiveScreen from '../screens/distributions/DistributionReceiveScreen';
 import PermissionsAdminScreen from '../screens/permissions/PermissionsAdminScreen';
 import RegistersScreen from '../screens/registers/RegistersScreen';
@@ -117,7 +116,6 @@ const RootNavigator = () => {
 
             {/* التوزيعات — منقولة بالكامل */}
             <Stack.Screen name="Distributions" component={DistributionsScreen} options={{ title: 'التوزيعات' }} />
-            <Stack.Screen name="DistributionBatches" component={DistributionBatchesScreen} options={{ title: 'الدفعات' }} />
             <Stack.Screen name="DistributionReceive" component={DistributionReceiveScreen} options={{ title: 'تسجيل الاستلام' }} />
 
             {/* إدارة الصلاحيات — منقولة بالكامل */}

@@ -25,6 +25,13 @@ const STATUS_FILTER_OPTIONS = [
   ...Object.entries({ draft: 'مسودة', active: 'نشط', completed: 'مكتمل', cancelled: 'ملغي' }).map(([value, label]) => ({ value, label })),
 ];
 
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * قائمة جولات التوزيع — جولة = كيان واحد فقط (اسم + تاريخ يحدده المستخدم +
+ * ملاحظات)، بدون أي مفهوم "دفعة" وسيط. فتح الجولة يوديك مباشرة لشاشة تسجيل
+ * الاستلام (مستلمين/غير مستلمين) — لا شاشة وسيطة بينهم.
+ */
 export default function DistributionsScreen() {
   const navigation = useNavigation();
   const { orgId, canWrite } = useAuth();
@@ -36,10 +43,9 @@ export default function DistributionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterCamp, setFilterCamp] = useState('');
   const [formVisible, setFormVisible] = useState(false);
   const [name, setName] = useState('');
-  const [campId, setCampId] = useState(null);
+  const [roundDate, setRoundDate] = useState(todayStr());
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -48,7 +54,9 @@ export default function DistributionsScreen() {
     try {
       const [roundsData, campsData] = await Promise.all([fetchDistRounds(orgId), fetchCamps(orgId)]);
       const campIds = getAllowedCampIds(campsData);
-      setRounds(filterLocal(roundsData, campIds));
+      // الجولة نفسها غير مرتبطة بمخيم -- تظهر لكل المستخدمين المصرَّح لهم
+      // بأي مخيم ضمن المنظمة (فلترة المخيم تصير داخل شاشة الاستلام نفسها).
+      setRounds(roundsData);
       setCamps(getVisibleCamps(campsData));
     } catch (e) {
       showError('تعذّر تحميل جولات التوزيع');
@@ -56,18 +64,15 @@ export default function DistributionsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps]);
+  }, [orgId, getAllowedCampIds, getVisibleCamps]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
-  const campMap = Object.fromEntries(camps.map((c) => [c.id, c.name]));
-
   const filtered = rounds.filter((r) => {
     if (filterStatus && r.status !== filterStatus) return false;
-    if (filterCamp && r.camp_id !== filterCamp) return false;
     if (search.trim() && !(r.name || '').toLowerCase().includes(search.trim().toLowerCase())) return false;
     return true;
   });
@@ -77,12 +82,16 @@ export default function DistributionsScreen() {
       showError('اسم الجولة مطلوب');
       return;
     }
+    if (!roundDate) {
+      showError('تاريخ الجولة مطلوب');
+      return;
+    }
     setSaving(true);
     try {
       const result = await createDistRound({
         org_id: orgId,
         name: name.trim(),
-        camp_id: campId || null,
+        round_date: roundDate,
         notes: notes.trim() || null,
         status: 'draft',
       });
@@ -93,7 +102,7 @@ export default function DistributionsScreen() {
       showSuccess('تمت إضافة الجولة');
       setFormVisible(false);
       setName('');
-      setCampId(null);
+      setRoundDate(todayStr());
       setNotes('');
       loadData();
     } catch (e) {
@@ -106,13 +115,15 @@ export default function DistributionsScreen() {
   const renderRound = ({ item: r }) => {
     const st = STATUS_MAP[r.status] || { label: r.status, color: colors.muted };
     return (
-      <Pressable style={[styles.card, { borderRightColor: st.color }]} onPress={() => navigation.navigate('DistributionBatches', { round: r })}>
+      <Pressable
+        style={[styles.card, { borderRightColor: st.color }]}
+        onPress={() => navigation.navigate('DistributionReceive', { round: r })}
+      >
         <View style={styles.cardTop}>
           <View style={{ flex: 1 }}>
             <Text style={styles.roundName}>📦 {r.name}</Text>
-            {!!r.camp_id && <Text style={styles.metaLine}>🏕️ {campMap[r.camp_id] || '—'}</Text>}
             {!!r.notes && <Text style={styles.metaLine}>{r.notes}</Text>}
-            <Text style={styles.dateLine}>{formatDate(r.created_at)}</Text>
+            <Text style={styles.dateLine}>📅 {formatDate(r.round_date || r.created_at)}</Text>
           </View>
           <Text style={[styles.statusBadge, { color: st.color, backgroundColor: `${st.color}22` }]}>{st.label}</Text>
         </View>
@@ -170,24 +181,12 @@ export default function DistributionsScreen() {
               style={styles.searchInput}
             />
 
-            <View style={styles.filtersRow}>
-              <View style={{ flex: 1 }}>
-                <SelectField
-                  value={STATUS_FILTER_OPTIONS.find((o) => o.value === filterStatus)?.label}
-                  placeholder="كل الحالات"
-                  options={STATUS_FILTER_OPTIONS}
-                  onSelect={setFilterStatus}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <SelectField
-                  value={filterCamp ? campMap[filterCamp] : undefined}
-                  placeholder="كل المخيمات"
-                  options={[{ value: '', label: 'كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))]}
-                  onSelect={setFilterCamp}
-                />
-              </View>
-            </View>
+            <SelectField
+              value={STATUS_FILTER_OPTIONS.find((o) => o.value === filterStatus)?.label}
+              placeholder="كل الحالات"
+              options={STATUS_FILTER_OPTIONS}
+              onSelect={setFilterStatus}
+            />
           </View>
         }
         ListEmptyComponent={<EmptyState icon="📦" title="لا توجد جولات توزيع مطابقة" />}
@@ -195,13 +194,7 @@ export default function DistributionsScreen() {
 
       <BottomSheetModal visible={formVisible} onClose={() => setFormVisible(false)} title="➕ جولة توزيع جديدة">
         <FormInput label="اسم الجولة *" placeholder="توزيع شتوي 2026" value={name} onChangeText={setName} />
-        <SelectField
-          label="المخيم (اختياري)"
-          value={camps.find((c) => c.id === campId)?.name}
-          options={[{ value: '', label: '— كل المخيمات —' }, ...camps.map((c) => ({ value: c.id, label: c.name }))]}
-          onSelect={(v) => setCampId(v || null)}
-          placeholder="— كل المخيمات —"
-        />
+        <FormInput label="تاريخ الجولة * (YYYY-MM-DD)" value={roundDate} onChangeText={setRoundDate} />
         <FormInput label="ملاحظات" value={notes} onChangeText={setNotes} multiline numberOfLines={2} />
         <View style={styles.row}>
           <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={handleAddRound} disabled={saving}>
@@ -233,7 +226,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 10,
   },
-  filtersRow: { flexDirection: 'row', gap: 8 },
 
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRadius: 12, padding: 14, marginBottom: 8 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

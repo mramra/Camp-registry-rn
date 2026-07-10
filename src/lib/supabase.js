@@ -383,26 +383,6 @@ export const updateDistRoundStatus = async (roundId, status) => {
 };
 
 // ── دفعات التوزيع لكل مخيم ضمن جولة (camp_distributions) ──
-export const fetchDistBatches = async (roundId) => {
-  const { data, error } = await supabase
-    .from('camp_distributions')
-    .select('*')
-    .eq('round_id', roundId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
-};
-
-export const createDistBatch = async (batchData) => {
-  try {
-    const { data, error } = await supabase.from('camp_distributions').insert([batchData]).select();
-    if (error) throw error;
-    return { success: true, data: data[0] };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-};
-
 export const fetchLastDistributionDate = async (orgId) => {
   const { data, error } = await supabase
     .from('camp_dist_families')
@@ -415,27 +395,31 @@ export const fetchLastDistributionDate = async (orgId) => {
 };
 
 // ── تسجيل استلام الأسر ضمن دفعة (camp_dist_families) ─────
-export const fetchDistReceivedFamilyIds = async (distributionId) => {
+// ── نسخة مرتبطة بالجولة مباشرة (round_id) -- بدون طبقة "دفعات" وسيطة ──
+// نظام التوزيعات أُعيد تبسيطه: جولة = كيان واحد (اسم + تاريخ + ملاحظات)،
+// لا يوجد أي مفهوم "دفعة" منفصل. الاستلام يُسجَّل مباشرة على الجولة.
+
+export const fetchDistReceivedFamilyIdsByRound = async (roundId) => {
   const { data, error } = await supabase
     .from('camp_dist_families')
     .select('family_id')
-    .eq('distribution_id', distributionId);
+    .eq('round_id', roundId);
   if (error) throw error;
   return new Set((data || []).map((r) => r.family_id));
 };
 
-export const markFamilyReceived = async (distributionId, orgId, familyId, notes = null) => {
+export const markFamilyReceivedByRound = async (roundId, orgId, familyId, notes = null) => {
   const { error } = await supabase.from('camp_dist_families').insert([
-    { distribution_id: distributionId, family_id: familyId, org_id: orgId, received_at: new Date().toISOString(), notes },
+    { round_id: roundId, family_id: familyId, org_id: orgId, received_at: new Date().toISOString(), notes },
   ]);
   if (error) throw error;
 };
 
-export const unmarkFamilyReceived = async (distributionId, familyId) => {
+export const unmarkFamilyReceivedByRound = async (roundId, familyId) => {
   const { error } = await supabase
     .from('camp_dist_families')
     .delete()
-    .eq('distribution_id', distributionId)
+    .eq('round_id', roundId)
     .eq('family_id', familyId);
   if (error) throw error;
 };

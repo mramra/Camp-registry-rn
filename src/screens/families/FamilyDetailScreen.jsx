@@ -70,7 +70,22 @@ export default function FamilyDetailScreen() {
         setCampName(cached.data.campName || '');
         setOfflineInfo({ savedAt: cached.savedAt });
       } else {
-        showError('تعذّر تحميل بيانات الأسرة ولا توجد نسخة محفوظة');
+        // احتياط: لو ما فُتحت هذي الأسرة تحديداً أونلاين قبل، نجرّب نلقاها
+        // بنسخة قائمة الأسر المحفوظة (فيها كل الأسر + كل الأفراد ضمن نطاقك) --
+        // بعض الحقول الإضافية (كالملاحظات) ممكن ما تكون موجودة بهذي النسخة،
+        // لكنها كافية لعرض بيانات الأسرة الأساسية وأفرادها.
+        const listCached = await getCachedData('families_list', profile?.id);
+        const famFromList = listCached?.data?.families?.find((f) => f.id === familyId);
+        if (famFromList) {
+          const memsFromList = (listCached.data.members || []).filter((m) => m.family_id === familyId);
+          const campFromList = listCached.data.camps?.find((c) => c.id === famFromList.camp_id)?.name || '';
+          setFamily(famFromList);
+          setMembers(memsFromList);
+          setCampName(campFromList);
+          setOfflineInfo({ savedAt: listCached.savedAt });
+        } else {
+          showError('تعذّر تحميل بيانات الأسرة ولا توجد نسخة محفوظة');
+        }
       }
     } finally {
       setLoading(false);

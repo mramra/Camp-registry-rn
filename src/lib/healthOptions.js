@@ -55,3 +55,33 @@ export function emptyHealthFields() {
     female_status: [],
   }
 }
+
+/**
+ * فك ترميز آمن لحقل صحي قادم من قاعدة البيانات — بعض السجلات القديمة
+ * كانت تُخزَّن بترميز JSON مضاعف (نص JSON داخل عمود jsonb) بدل مصفوفة
+ * مباشرة. هذي الدالة تتعامل مع الحالتين بأمان.
+ */
+export function normalizeHealthValue(val) {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/** ملخص عددي قصير لكل الحالات الصحية المسجّلة (لعرضه على زر/شارة) */
+export function healthSummaryCount(fields) {
+  if (!fields) return 0;
+  return (
+    normalizeHealthValue(fields.disabilities).length +
+    normalizeHealthValue(fields.injuries).length +
+    normalizeHealthValue(fields.chronic_diseases).length +
+    normalizeHealthValue(fields.female_status).length +
+    (fields.orphan_status ? 1 : 0)
+  );
+}

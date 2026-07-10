@@ -29,6 +29,8 @@ import {
   REGIONS,
 } from '../../lib/formOptions';
 import { showError, showSuccess, showInfo } from '../../utils/toast';
+import { emptyHealthFields, healthSummaryCount } from '../../lib/healthOptions';
+import HealthStatusModal from '../../components/ui/HealthStatusModal';
 import FormSection from '../../components/ui/FormSection';
 import FormInput from '../../components/ui/FormInput';
 import SelectField from '../../components/ui/SelectField';
@@ -64,6 +66,7 @@ const emptyMember = () => ({
   month: null,
   year: null,
   health: 'سليم',
+  ...emptyHealthFields(),
 });
 
 export default function FamilyFormScreen() {
@@ -96,6 +99,8 @@ export default function FamilyFormScreen() {
   const [categories, setCategories] = useState([]);
   const [notes, setNotes] = useState('');
   const [members, setMembers] = useState([]);
+  const [headHealth, setHeadHealth] = useState(emptyHealthFields());
+  const [healthModalFor, setHealthModalFor] = useState(null); // null | 'head' | localId
 
   const currentYear = new Date().getFullYear();
   const years = useMemo(() => {
@@ -130,6 +135,14 @@ export default function FamilyFormScreen() {
         setOriginalAddress(data.original_address || '');
         setAddressDetails(data.address_details || '');
         setNotes(data.notes || '');
+        setHeadHealth({
+          orphan_status: data.head_orphan_status || null,
+          orphan_cause: data.head_orphan_cause || null,
+          disabilities: data.head_disabilities || [],
+          injuries: data.head_injuries || [],
+          chronic_diseases: data.head_chronic_diseases || [],
+          female_status: data.head_female_status || [],
+        });
         try {
           const cats = typeof data.category_tags === 'string' ? JSON.parse(data.category_tags) : data.category_tags;
           setCategories(Array.isArray(cats) ? cats : []);
@@ -151,6 +164,12 @@ export default function FamilyFormScreen() {
               month: d2.month,
               year: d2.year,
               health: m.health || 'سليم',
+              orphan_status: m.orphan_status || null,
+              orphan_cause: m.orphan_cause || null,
+              disabilities: m.disabilities || [],
+              injuries: m.injuries || [],
+              chronic_diseases: m.chronic_diseases || [],
+              female_status: m.female_status || [],
             };
           })
         );
@@ -239,6 +258,12 @@ export default function FamilyFormScreen() {
         address_details: addressDetails.trim() || null,
         category_tags: JSON.stringify(categories),
         notes: notes.trim() || null,
+        head_orphan_status: headHealth.orphan_status || null,
+        head_orphan_cause: headHealth.orphan_cause || null,
+        head_disabilities: headHealth.disabilities || [],
+        head_injuries: headHealth.injuries || [],
+        head_chronic_diseases: headHealth.chronic_diseases || [],
+        head_female_status: headHealth.female_status || [],
         _deleted: false,
       };
 
@@ -271,6 +296,12 @@ export default function FamilyFormScreen() {
             dob: joinDob(m.day, m.month, m.year),
             gender: m.gender || null,
             health: m.health || null,
+            orphan_status: m.orphan_status || null,
+            orphan_cause: m.orphan_cause || null,
+            disabilities: m.disabilities || [],
+            injuries: m.injuries || [],
+            chronic_diseases: m.chronic_diseases || [],
+            female_status: m.female_status || [],
           }))
         );
       } catch (memErr) {
@@ -390,6 +421,12 @@ export default function FamilyFormScreen() {
             </View>
           </View>
           {!!errors.dob && <Text style={styles.errorText}>{errors.dob}</Text>}
+
+          <Pressable style={styles.healthBtn} onPress={() => setHealthModalFor('head')}>
+            <Text style={styles.healthBtnText}>
+              🩺 حالات صحية تفصيلية{healthSummaryCount(headHealth) > 0 ? ` (${healthSummaryCount(headHealth)})` : ''}
+            </Text>
+          </Pressable>
         </FormSection>
 
         <FormSection title="🏕️ بيانات السكن">
@@ -485,6 +522,12 @@ export default function FamilyFormScreen() {
                   options={HEALTH_OPTIONS.map((h) => ({ value: h.v, label: h.label }))}
                   onSelect={(v) => updateMember(m.localId, 'health', v)}
                 />
+
+                <Pressable style={styles.healthBtn} onPress={() => setHealthModalFor(m.localId)}>
+                  <Text style={styles.healthBtnText}>
+                    🩺 حالات صحية تفصيلية{healthSummaryCount(m) > 0 ? ` (${healthSummaryCount(m)})` : ''}
+                  </Text>
+                </Pressable>
               </View>
             );
           })}
@@ -516,6 +559,31 @@ export default function FamilyFormScreen() {
           )}
         </Pressable>
       </ScrollView>
+
+      <HealthStatusModal
+        visible={healthModalFor === 'head'}
+        onClose={() => setHealthModalFor(null)}
+        subjectName={headName || 'رب الأسرة'}
+        gender={headGender}
+        dob={joinDob(dobDay, dobMonth, dobYear)}
+        initial={headHealth}
+        onSave={setHeadHealth}
+      />
+
+      {members.map((m) =>
+        healthModalFor === m.localId ? (
+          <HealthStatusModal
+            key={m.localId}
+            visible
+            onClose={() => setHealthModalFor(null)}
+            subjectName={m.name || 'فرد'}
+            gender={m.gender}
+            dob={joinDob(m.day, m.month, m.year)}
+            initial={m}
+            onSave={(fields) => setMembers((prev) => prev.map((mm) => (mm.localId === m.localId ? { ...mm, ...fields } : mm)))}
+          />
+        ) : null
+      )}
     </SafeAreaView>
   );
 }
@@ -578,4 +646,9 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
   saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { color: '#000', fontWeight: '900', fontSize: 14 },
+  healthBtn: {
+    backgroundColor: 'rgba(139,92,246,0.1)', borderWidth: 1, borderColor: 'rgba(139,92,246,0.3)',
+    borderRadius: 12, paddingVertical: 11, alignItems: 'center', marginTop: 4,
+  },
+  healthBtnText: { color: colors.purple, fontWeight: 'bold', fontSize: 12 },
 });

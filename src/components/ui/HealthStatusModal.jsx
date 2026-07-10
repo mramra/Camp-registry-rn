@@ -4,14 +4,20 @@ import BottomSheetModal from './BottomSheetModal';
 import SelectField from './SelectField';
 import { calcAge } from '../../lib/helpers';
 import {
-  DISABILITY_TYPES, INJURY_TYPES, CHRONIC_DISEASES,
+  DISABILITY_TYPES, INJURY_TYPES, CHRONIC_DISEASES, NEEDS_TYPES,
   FEMALE_STATUSES, ORPHAN_TYPES, ORPHAN_CAUSES, normalizeHealthValue,
 } from '../../lib/healthOptions';
 import colors from '../../theme/colors';
 
-/** صف اختيار متعدد مع تفصيل اختياري (إعاقة/إصابة/مرض مزمن) */
-function MultiSelectWithDetails({ typesList, items, onChange }) {
+/**
+ * اختيار متعدد بأسلوب شرائح (chips) — نفس نمط اختيار الحقول بشاشة الاستيراد
+ * والتصدير: ضغطة على الشريحة تختارها/تلغيها (بدل صف بعلامة صح). لكل نوع
+ * مختار وعنده تفاصيل محدَّدة مسبقاً (details.length > 0)، يظهر منتقي تفصيل
+ * مختصر تحت الشرائح مباشرة، موسوم باسم النوع نفسه.
+ */
+function ChipMultiSelectWithDetails({ typesList, items, onChange }) {
   const list = Array.isArray(items) ? items : [];
+  const selectedTypes = typesList.filter((t) => list.some((i) => i.type === t.label));
 
   const toggle = (label) => {
     const exists = list.find((i) => i.type === label);
@@ -23,34 +29,69 @@ function MultiSelectWithDetails({ typesList, items, onChange }) {
   };
 
   return (
-    <View style={{ gap: 8 }}>
-      {typesList.map((t) => {
-        const current = list.find((i) => i.type === t.label);
-        const checked = !!current;
-        return (
-          <View key={t.key} style={styles.optionCard}>
-            <Pressable style={styles.optionRow} onPress={() => toggle(t.label)}>
-              <Text style={styles.checkbox}>{checked ? '☑️' : '⬜'}</Text>
-              <Text style={styles.optionLabel}>{t.label}</Text>
+    <View>
+      <View style={styles.chipsWrap}>
+        {typesList.map((t) => {
+          const checked = list.some((i) => i.type === t.label);
+          return (
+            <Pressable key={t.key} onPress={() => toggle(t.label)} style={[styles.chip, checked && styles.chipActive]}>
+              <Text style={[styles.chipText, checked && styles.chipTextActive]}>{t.label}</Text>
             </Pressable>
-            {checked && t.details.length > 0 && (
-              <SelectField
-                value={current.detail}
-                options={t.details}
-                onSelect={(v) => setDetail(t.label, v)}
-                placeholder="تفاصيل (اختياري)"
-              />
-            )}
-            {checked && t.details.length === 0 && (
-              <TextInput
-                value={current.detail || ''}
-                onChangeText={(v) => setDetail(t.label, v)}
-                placeholder="تفاصيل (اختياري)"
-                placeholderTextColor={colors.muted}
-                style={styles.detailInput}
-              />
-            )}
-          </View>
+          );
+        })}
+      </View>
+
+      {selectedTypes.length > 0 && (
+        <View style={{ marginTop: 8, gap: 8 }}>
+          {selectedTypes.map((t) => {
+            const current = list.find((i) => i.type === t.label);
+            if (t.details.length === 0) {
+              return (
+                <View key={t.key} style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>{t.label}</Text>
+                  <TextInput
+                    value={current?.detail || ''}
+                    onChangeText={(v) => setDetail(t.label, v)}
+                    placeholder="تفاصيل (اختياري)"
+                    placeholderTextColor={colors.muted}
+                    style={styles.detailInput}
+                  />
+                </View>
+              );
+            }
+            return (
+              <View key={t.key} style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t.label}</Text>
+                <View style={{ flex: 1 }}>
+                  <SelectField
+                    value={current?.detail}
+                    options={t.details}
+                    onSelect={(v) => setDetail(t.label, v)}
+                    placeholder="تفاصيل (اختياري)"
+                  />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** اختيار متعدد بشرائح بسيطة بلا تفاصيل (احتياجات مساعدة / حالات نسائية) */
+function ChipMultiSelectSimple({ options, items, onChange }) {
+  const list = Array.isArray(items) ? items : [];
+  const toggle = (v) => onChange(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+
+  return (
+    <View style={styles.chipsWrap}>
+      {options.map((opt) => {
+        const checked = list.includes(opt);
+        return (
+          <Pressable key={opt} onPress={() => toggle(opt)} style={[styles.chip, checked && styles.chipActive]}>
+            <Text style={[styles.chipText, checked && styles.chipTextActive]}>{opt}</Text>
+          </Pressable>
         );
       })}
     </View>
@@ -59,8 +100,8 @@ function MultiSelectWithDetails({ typesList, items, onChange }) {
 
 /**
  * مودال الحالات الصحية التفصيلية — لرب الأسرة (subjectKind='head') وكل فرد.
- * نفس منطق وخيارات النسخة الأصلية: إعاقات/إصابات/أمراض مزمنة (متعدد الاختيار
- * مع تفصيل اختياري)، يُتم (للقاصرين فقط)، حالات نسائية (للإناث فقط).
+ * إعاقات/إصابات/أمراض مزمنة/احتياجات مساعدة (شرائح اختيار متعدد)، يُتم
+ * (للقاصرين فقط)، حالات نسائية (للإناث فقط).
  */
 export default function HealthStatusModal({ visible, onClose, subjectName, gender, dob, initial, onSave }) {
   const [orphanStatus, setOrphanStatus] = useState(initial?.orphan_status || '');
@@ -69,13 +110,11 @@ export default function HealthStatusModal({ visible, onClose, subjectName, gende
   const [injuries, setInjuries] = useState(normalizeHealthValue(initial?.injuries));
   const [chronics, setChronics] = useState(normalizeHealthValue(initial?.chronic_diseases));
   const [femaleStatus, setFemaleStatus] = useState(normalizeHealthValue(initial?.female_status));
+  const [needs, setNeeds] = useState(normalizeHealthValue(initial?.needs));
 
   const age = useMemo(() => calcAge(dob), [dob]);
   const isMinor = age !== null && age < 18;
   const isFemale = (gender || '').includes('أنثى');
-
-  const toggleFemale = (s) =>
-    setFemaleStatus((fs) => (fs.includes(s) ? fs.filter((x) => x !== s) : [...fs, s]));
 
   const handleSave = () => {
     onSave({
@@ -85,13 +124,14 @@ export default function HealthStatusModal({ visible, onClose, subjectName, gende
       injuries,
       chronic_diseases: chronics,
       female_status: femaleStatus,
+      needs,
     });
     onClose();
   };
 
   return (
     <BottomSheetModal visible={visible} onClose={onClose} title={`🩺 حالات صحية — ${subjectName || ''}`}>
-      <ScrollView style={{ maxHeight: 460 }}>
+      <ScrollView style={{ maxHeight: 480 }}>
         {isMinor && (
           <View style={{ marginBottom: 16 }}>
             <Text style={styles.sectionTitle}>👶 حالة اليتم</Text>
@@ -124,32 +164,28 @@ export default function HealthStatusModal({ visible, onClose, subjectName, gende
 
         <View style={{ marginBottom: 16 }}>
           <Text style={styles.sectionTitle}>🦽 الإعاقات</Text>
-          <MultiSelectWithDetails typesList={DISABILITY_TYPES} items={disabilities} onChange={setDisabilities} />
+          <ChipMultiSelectWithDetails typesList={DISABILITY_TYPES} items={disabilities} onChange={setDisabilities} />
         </View>
 
         <View style={{ marginBottom: 16 }}>
           <Text style={styles.sectionTitle}>🩹 إصابات الحرب</Text>
-          <MultiSelectWithDetails typesList={INJURY_TYPES} items={injuries} onChange={setInjuries} />
+          <ChipMultiSelectWithDetails typesList={INJURY_TYPES} items={injuries} onChange={setInjuries} />
         </View>
 
         <View style={{ marginBottom: 16 }}>
           <Text style={styles.sectionTitle}>💊 الأمراض المزمنة</Text>
-          <MultiSelectWithDetails typesList={CHRONIC_DISEASES} items={chronics} onChange={setChronics} />
+          <ChipMultiSelectWithDetails typesList={CHRONIC_DISEASES} items={chronics} onChange={setChronics} />
+        </View>
+
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.sectionTitle}>🦯 احتياجات مساعدة</Text>
+          <ChipMultiSelectSimple options={NEEDS_TYPES} items={needs} onChange={setNeeds} />
         </View>
 
         {isFemale && (
           <View style={{ marginBottom: 8 }}>
             <Text style={styles.sectionTitle}>♀️ حالات خاصة</Text>
-            <View style={{ gap: 6 }}>
-              {FEMALE_STATUSES.map((s) => (
-                <Pressable key={s} style={styles.optionCard} onPress={() => toggleFemale(s)}>
-                  <View style={styles.optionRow}>
-                    <Text style={styles.checkbox}>{femaleStatus.includes(s) ? '☑️' : '⬜'}</Text>
-                    <Text style={styles.optionLabel}>{s}</Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
+            <ChipMultiSelectSimple options={FEMALE_STATUSES} items={femaleStatus} onChange={setFemaleStatus} />
           </View>
         )}
       </ScrollView>
@@ -168,16 +204,26 @@ export default function HealthStatusModal({ visible, onClose, subjectName, gende
 
 const styles = StyleSheet.create({
   sectionTitle: { color: colors.muted, fontWeight: 'bold', fontSize: 12, marginBottom: 8, textAlign: 'right' },
+
+  chipsWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
+  chip: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  chipActive: { backgroundColor: 'rgba(139,92,246,0.15)', borderColor: colors.purple },
+  chipText: { color: colors.muted, fontSize: 12 },
+  chipTextActive: { color: colors.purple, fontWeight: 'bold' },
+
+  detailRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: colors.surface2, borderRadius: 10, padding: 8 },
+  detailLabel: { color: colors.white, fontSize: 11, fontWeight: 'bold', width: 90, textAlign: 'right' },
+  detailInput: {
+    flex: 1, backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 7, color: colors.white, fontSize: 12, textAlign: 'right',
+  },
+
   optionCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10 },
   optionRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  checkbox: { fontSize: 16 },
   radio: { fontSize: 14 },
   optionLabel: { color: colors.white, fontSize: 13 },
   optionLabelMuted: { color: colors.muted, fontSize: 13 },
-  detailInput: {
-    backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 8, color: colors.white, fontSize: 12, marginTop: 8, textAlign: 'right',
-  },
+
   actionsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   saveBtn: { flex: 1, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   saveBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },

@@ -12,7 +12,7 @@ import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/nativ
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps } from '../../lib/supabase';
-import { calcAge, checkFamilyIssues, getMemberIcon } from '../../lib/helpers';
+import { calcAge, checkFamilyIssues, getMemberIcon, arrLabel } from '../../lib/helpers';
 import { formatDate, formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import EmptyState from '../../components/ui/EmptyState';
@@ -22,6 +22,26 @@ import colors from '../../theme/colors';
 import { cacheData, getCachedData } from '../../lib/offlineCache';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
+
+const ORPHAN_LABELS = { father: 'يتيم الأب', mother: 'يتيم الأم', both: 'يتيم الأبوين' };
+
+/** يبني قائمة شارات الحالة الصحية لشخص (رب أسرة أو فرد) — تُعرض فقط لو
+ * عنده حالة واحدة على الأقل مسجَّلة. */
+function buildHealthBadges({ disabilities, injuries, chronic_diseases, female_status, needs, orphan_status }) {
+  const badges = [];
+  const dis = arrLabel(disabilities);
+  const inj = arrLabel(injuries);
+  const chr = arrLabel(chronic_diseases);
+  const fem = arrLabel(female_status);
+  const nds = arrLabel(needs);
+  if (dis) badges.push({ icon: '🦽', label: dis, color: colors.purple });
+  if (inj) badges.push({ icon: '🩹', label: inj, color: colors.accent });
+  if (chr) badges.push({ icon: '💊', label: chr, color: '#fb923c' });
+  if (fem) badges.push({ icon: '♀️', label: fem, color: '#f472b6' });
+  if (nds) badges.push({ icon: '🦯', label: nds, color: colors.blue });
+  if (orphan_status) badges.push({ icon: '👶', label: ORPHAN_LABELS[orphan_status] || orphan_status, color: colors.red });
+  return badges;
+}
 
 export default function FamilyDetailScreen() {
   const route = useRoute();
@@ -198,6 +218,25 @@ export default function FamilyDetailScreen() {
               </View>
             ))}
           </View>
+          {(() => {
+            const headBadges = buildHealthBadges({
+              disabilities: family.head_disabilities,
+              injuries: family.head_injuries,
+              chronic_diseases: family.head_chronic_diseases,
+              female_status: family.head_female_status,
+              needs: family.head_needs,
+              orphan_status: family.head_orphan_status,
+            });
+            return headBadges.length > 0 ? (
+              <View style={[styles.badgesRow, { marginTop: 10 }]}>
+                {headBadges.map((b, i) => (
+                  <View key={i} style={[styles.badge, { backgroundColor: `${b.color}22` }]}>
+                    <Text style={[styles.badgeText, { color: b.color }]}>{b.icon} {b.label}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null;
+          })()}
         </View>
 
         <View style={styles.panel}>
@@ -205,18 +244,36 @@ export default function FamilyDetailScreen() {
           {members.length === 0 ? (
             <Text style={styles.noMembers}>لا يوجد أفراد مسجّلون</Text>
           ) : (
-            members.map((m) => (
-              <View key={m.id} style={styles.memberRow}>
-                <Text style={styles.memberIcon}>{getMemberIcon(m.relation, m.gender)}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.memberName}>{m.name}</Text>
-                  <Text style={styles.memberMeta}>
-                    {m.relation || '—'}
-                    {m.dob ? ` · ${calcAge(m.dob)} سنة` : ''}
-                  </Text>
-                </View>
-              </View>
-            ))
+            [...members]
+              .sort((a, b) => {
+                if (!a.dob) return 1;
+                if (!b.dob) return -1;
+                return a.dob.localeCompare(b.dob); // تصاعدي: الأكبر سناً أولاً
+              })
+              .map((m) => {
+                const badges = buildHealthBadges(m);
+                return (
+                  <View key={m.id} style={styles.memberRow}>
+                    <Text style={styles.memberIcon}>{getMemberIcon(m.relation, m.gender)}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.memberName}>{m.name}</Text>
+                      <Text style={styles.memberMeta}>
+                        {m.relation || '—'}
+                        {m.dob ? ` · ${calcAge(m.dob)} سنة` : ''}
+                      </Text>
+                      {badges.length > 0 && (
+                        <View style={styles.badgesRow}>
+                          {badges.map((b, i) => (
+                            <View key={i} style={[styles.badge, { backgroundColor: `${b.color}22` }]}>
+                              <Text style={[styles.badgeText, { color: b.color }]}>{b.icon} {b.label}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })
           )}
         </View>
 
@@ -318,6 +375,9 @@ const styles = StyleSheet.create({
   memberIcon: { fontSize: 20 },
   memberName: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right' },
   memberMeta: { color: colors.muted, fontSize: 11, textAlign: 'right', marginTop: 2 },
+  badgesRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeText: { fontSize: 10, fontWeight: 'bold' },
 
   notes: { color: colors.white, fontSize: 12, textAlign: 'right', lineHeight: 20 },
 

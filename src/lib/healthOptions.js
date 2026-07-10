@@ -36,6 +36,13 @@ export const CHRONIC_DISEASES = [
 
 export const FEMALE_STATUSES = ['حامل']
 
+// احتياجات مساعدة — فئة مستقلة عن الإعاقة/الإصابة/المرض المزمن (شخص واحد
+// ممكن يحتاج أكثر من احتياج بنفس الوقت، بلا تفصيل إضافي مطلوب).
+export const NEEDS_TYPES = [
+  'نظارة طبية', 'سماعة أذن', 'كرسي متحرك', 'عكاز',
+  'جهاز مشي', 'أطراف صناعية', 'حفاضات', 'أدوية مزمنة', 'جهاز تنفس', 'أخرى',
+]
+
 export const ORPHAN_TYPES = [
   { key:'father', label:'يتيم الأب' },
   { key:'mother', label:'يتيم الأم' },
@@ -53,6 +60,7 @@ export function emptyHealthFields() {
     injuries: [],
     chronic_diseases: [],
     female_status: [],
+    needs: [],
   }
 }
 
@@ -82,6 +90,7 @@ export function healthSummaryCount(fields) {
     normalizeHealthValue(fields.injuries).length +
     normalizeHealthValue(fields.chronic_diseases).length +
     normalizeHealthValue(fields.female_status).length +
+    normalizeHealthValue(fields.needs).length +
     (fields.orphan_status ? 1 : 0)
   );
 }

@@ -142,6 +142,7 @@ export default function FamilyFormScreen() {
           injuries: data.head_injuries || [],
           chronic_diseases: data.head_chronic_diseases || [],
           female_status: data.head_female_status || [],
+          needs: data.head_needs || [],
         });
         try {
           const cats = typeof data.category_tags === 'string' ? JSON.parse(data.category_tags) : data.category_tags;
@@ -170,6 +171,7 @@ export default function FamilyFormScreen() {
               injuries: m.injuries || [],
               chronic_diseases: m.chronic_diseases || [],
               female_status: m.female_status || [],
+              needs: m.needs || [],
             };
           })
         );
@@ -264,6 +266,7 @@ export default function FamilyFormScreen() {
         head_injuries: headHealth.injuries || [],
         head_chronic_diseases: headHealth.chronic_diseases || [],
         head_female_status: headHealth.female_status || [],
+        head_needs: headHealth.needs || [],
         _deleted: false,
       };
 
@@ -302,6 +305,7 @@ export default function FamilyFormScreen() {
             injuries: m.injuries || [],
             chronic_diseases: m.chronic_diseases || [],
             female_status: m.female_status || [],
+            needs: m.needs || [],
           }))
         );
       } catch (memErr) {

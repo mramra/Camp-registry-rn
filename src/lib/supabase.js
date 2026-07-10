@@ -50,7 +50,7 @@ export const fetchFamilies = async (orgId, campId = null) => {
   try {
     let q = supabase
       .from('families')
-      .select('id, org_id, camp_id, head_name, head_id, head_gender, head_dob, head_marital, phone1, phone2, category_tags, review_status, pending_delete, created_at, tent, head_female_status, head_chronic_diseases, head_disabilities, head_injuries, exit_date, entry_date')
+      .select('id, org_id, camp_id, head_name, head_id, head_gender, head_dob, head_marital, phone1, phone2, category_tags, review_status, pending_delete, created_at, tent, head_female_status, head_chronic_diseases, head_disabilities, head_injuries, head_needs, head_orphan_status, exit_date, entry_date')
       .eq('org_id', orgId)
       .eq('_deleted', false)
       .is('exit_date', null)
@@ -74,7 +74,7 @@ export const fetchFamilyMembers = async (familyIds) => {
       .from('family_members')
       .select(
         'id, family_id, name, relation, national_id, dob, gender, health, ' +
-        'orphan_status, orphan_cause, disabilities, injuries, chronic_diseases, female_status'
+        'orphan_status, orphan_cause, disabilities, injuries, chronic_diseases, female_status, needs'
       )
       .in('family_id', familyIds)
       .eq('_deleted', false);
@@ -512,6 +512,7 @@ export const saveFamilyMembers = async (familyId, members) => {
     injuries: m.injuries || [],
     chronic_diseases: m.chronic_diseases || [],
     female_status: m.female_status || [],
+    needs: m.needs || [],
   }));
 
   const { data, error } = await supabase.from('family_members').insert(rows).select();

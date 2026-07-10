@@ -9,15 +9,17 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps } from '../../lib/supabase';
 import { calcAge, checkFamilyIssues, getMemberIcon } from '../../lib/helpers';
-import { formatDate } from '../../lib/utils';
+import { formatDate, formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import EmptyState from '../../components/ui/EmptyState';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FormInput from '../../components/ui/FormInput';
 import colors from '../../theme/colors';
+import { cacheData, getCachedData } from '../../lib/offlineCache';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -35,10 +37,14 @@ export default function FamilyDetailScreen() {
   const [exitDate, setExitDate] = useState(todayStr());
   const [exitReason, setExitReason] = useState('');
   const [exitSaving, setExitSaving] = useState(false);
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const load = useCallback(async () => {
     if (!familyId) return;
     try {
+      const net = await NetInfo.fetch();
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+
       const data = await fetchFamilyById(familyId);
       if (!data) {
         showError('لم يتم العثور على الأسرة');
@@ -51,10 +57,21 @@ export default function FamilyDetailScreen() {
         fetchFamilyMembers([familyId]),
         data.org_id ? fetchCamps(data.org_id) : Promise.resolve([]),
       ]);
+      const resolvedCampName = camps.find((c) => c.id === data.camp_id)?.name || '';
       setMembers(mems);
-      setCampName(camps.find((c) => c.id === data.camp_id)?.name || '');
+      setCampName(resolvedCampName);
+      setOfflineInfo(null);
+      cacheData(`family_detail_${familyId}`, profile?.id, { family: data, members: mems, campName: resolvedCampName });
     } catch (e) {
-      showError('تعذّر تحميل بيانات الأسرة');
+      const cached = await getCachedData(`family_detail_${familyId}`, profile?.id);
+      if (cached?.data) {
+        setFamily(cached.data.family);
+        setMembers(cached.data.members || []);
+        setCampName(cached.data.campName || '');
+        setOfflineInfo({ savedAt: cached.savedAt });
+      } else {
+        showError('تعذّر تحميل بيانات الأسرة ولا توجد نسخة محفوظة');
+      }
     } finally {
       setLoading(false);
     }
@@ -138,6 +155,14 @@ export default function FamilyDetailScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
+        {!!offlineInfo && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>
+              📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة (التعديل/تسجيل الخروج غير متاح الآن)
+            </Text>
+          </View>
+        )}
+
         {issues.length > 0 && (
           <View style={styles.warnBox}>
             <Text style={styles.warnTitle}>⚠️ {issues.length} نقص في بيانات الأسرة</Text>
@@ -190,14 +215,19 @@ export default function FamilyDetailScreen() {
         <View style={styles.actionsRow}>
           {canEdit && (
             <Pressable
-              style={styles.editBtn}
-              onPress={() => navigation.navigate('FamilyForm', { familyId })}
+              style={[styles.editBtn, !!offlineInfo && styles.btnDisabled]}
+              onPress={() => !offlineInfo && navigation.navigate('FamilyForm', { familyId })}
+              disabled={!!offlineInfo}
             >
               <Text style={styles.editBtnText}>✏️ تعديل</Text>
             </Pressable>
           )}
           {canDelete && (
-            <Pressable style={styles.deleteBtn} onPress={handleExit}>
+            <Pressable
+              style={[styles.deleteBtn, !!offlineInfo && styles.btnDisabled]}
+              onPress={handleExit}
+              disabled={!!offlineInfo}
+            >
               <Text style={styles.deleteBtnText}>🚪 تسجيل خروج</Text>
             </Pressable>
           )}
@@ -288,6 +318,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   deleteBtnText: { color: colors.red, fontWeight: 'bold', fontSize: 13, textAlign: 'center' },
+  btnDisabled: { opacity: 0.4 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
 
   exitWarnText: { color: colors.muted, fontSize: 12, lineHeight: 19, marginBottom: 14, textAlign: 'right' },
   exitActionsRow: { flexDirection: 'row', gap: 8, marginTop: 8 },

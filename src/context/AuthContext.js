@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { hasPermission } from '../lib/permissions';
+import { cacheData, getCachedData } from '../lib/offlineCache';
 
 export const AuthContext = createContext({});
 
@@ -66,8 +67,15 @@ export const AuthProvider = ({ children }) => {
 
       if (error) throw error;
       setProfile(data);
+      cacheData('user_profile', userId, data);
     } catch (err) {
       console.error('[fetchUserProfile]', err.message);
+      // فشل جلب الملف الشخصي (غالباً انقطاع نت عند فتح التطبيق) -- بدون هذا
+      // الاحتياط، الملف الشخصي يفضل فاضياً للأبد، وكل الشاشات تتوقف عنده
+      // (تعتمد على profile.org_id) قبل حتى ما توصل لمنطق التخزين المحلي
+      // الخاص فيها. نرجع لآخر ملف شخصي محفوظ عشان يكمل التطبيق فتحه طبيعياً.
+      const cached = await getCachedData('user_profile', userId);
+      if (cached?.data) setProfile(cached.data);
     }
   }, []);
 

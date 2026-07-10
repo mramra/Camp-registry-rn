@@ -17,7 +17,6 @@ import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabas
 import { checkFamilyIssues, isIncomplete, isAgeInRange, getMembers } from '../../lib/helpers';
 import { cacheData, getCachedData } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
-import { showToast } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -25,7 +24,6 @@ import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import colors from '../../theme/colors';
 
-const __DEBUG_OFFLINE__ = true; // 🔧 مؤقت -- يُحذف بعد تحديد المشكلة
 
 // ── فلاتر ثابتة (نفس النسخة الأصلية) ──────────────────────
 const MISS_OPTIONS = [
@@ -94,9 +92,7 @@ export default function FamiliesListScreen() {
       setAllMembers(members);
       setOfflineInfo(null);
       cacheData('families_list', profile?.id, { families: fams, members, camps: campsData });
-      if (__DEBUG_OFFLINE__) showToast(`✅ [تشخيص] نجح: ${fams.length} أسرة، ${members.length} فرد`, 'success');
     } catch (e) {
-      if (__DEBUG_OFFLINE__) showToast('⚠️ [تشخيص] فشل: ' + e.message, 'error');
       // فشل الاتصال -- نرجع لآخر نسخة محفوظة محلياً بدل شاشة فاضية
       const cached = await getCachedData('families_list', profile?.id);
       if (cached?.data) {
@@ -104,11 +100,6 @@ export default function FamiliesListScreen() {
         setAllMembers(cached.data.members || []);
         setCamps(cached.data.camps || []);
         setOfflineInfo({ savedAt: cached.savedAt });
-        if (__DEBUG_OFFLINE__) {
-          showToast(`📦 [تشخيص] استرجاع: ${cached.data.families?.length || 0} أسرة محفوظة من ${cached.savedAt}`, 'success');
-        }
-      } else if (__DEBUG_OFFLINE__) {
-        showToast('❌ [تشخيص] لا توجد نسخة محفوظة', 'error');
       }
     } finally {
       setLoading(false);

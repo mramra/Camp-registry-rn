@@ -17,11 +17,7 @@ import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchFamilyActivityLog }
 import { calcAge, isIncomplete } from '../../lib/helpers';
 import { cacheData, getCachedData } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
-import { showToast } from '../../utils/toast';
 
-// 🔧 وضع تشخيص مؤقت لمشكلة التخزين المحلي -- يُحذف بعد التأكد من الحل.
-// لما مفعّل (true)، كل خطوة بتحميل بيانات الرئيسية تطلع تنبيه واضح.
-const __DEBUG_OFFLINE__ = true;
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import colors from '../../theme/colors';
 
@@ -130,9 +126,7 @@ export default function DashboardScreen() {
       setStats(finalStats);
       setOfflineInfo(null);
       cacheData('dashboard_stats', profile?.id, { stats: finalStats, families: filteredFams, members, camps: filteredCamps, activityLog });
-      if (__DEBUG_OFFLINE__) showToast('✅ [تشخيص] تحميل ناجح من الإنترنت — تم حفظ نسخة محلية', 'success');
     } catch (e) {
-      if (__DEBUG_OFFLINE__) showToast('⚠️ [تشخيص] فشل التحميل من الإنترنت: ' + e.message, 'error');
       // فشل الاتصال -- نرجع لآخر نسخة محفوظة محلياً (لو موجودة) بدل شاشة فاضية
       const cached = await getCachedData('dashboard_stats', profile?.id);
       if (cached?.data) {
@@ -142,9 +136,6 @@ export default function DashboardScreen() {
         setMembers(cached.data.members || []);
         setCamps(cached.data.camps || []);
         setOfflineInfo({ savedAt: cached.savedAt });
-        if (__DEBUG_OFFLINE__) showToast('📦 [تشخيص] تم استرجاع نسخة محفوظة من: ' + cached.savedAt, 'success');
-      } else if (__DEBUG_OFFLINE__) {
-        showToast('❌ [تشخيص] لا توجد أي نسخة محفوظة محلياً لاسترجاعها', 'error');
       }
     } finally {
       setLoading(false);

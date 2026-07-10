@@ -102,9 +102,25 @@ export default function RegistersScreen() {
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
+
+    // 1) اعرض النسخة المحفوظة فوراً (لو موجودة) — بدون انتظار الشبكة.
+    const cached = await getCachedData('registers', profile?.id);
+    const hadCache = !!cached?.data;
+    if (hadCache) {
+      setFamilies(cached.data.families || []);
+      setMembers(cached.data.members || []);
+      setCamps(cached.data.camps || []);
+      setOfflineInfo({ savedAt: cached.savedAt });
+      setLoading(false);
+    }
+
+    // 2) بعدين حاول تحديث حي بالخلفية.
     try {
       const net = await NetInfo.fetch();
-      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+      if (!net.isConnected) {
+        if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
+        return;
+      }
 
       const campsData = await fetchCamps(orgId);
       const allowedCampIds = getAllowedCampIds(campsData);
@@ -119,15 +135,7 @@ export default function RegistersScreen() {
       setOfflineInfo(null);
       cacheData('registers', profile?.id, { families: fams, members: mems, camps: visibleCamps });
     } catch (e) {
-      const cached = await getCachedData('registers', profile?.id);
-      if (cached?.data) {
-        setFamilies(cached.data.families || []);
-        setMembers(cached.data.members || []);
-        setCamps(cached.data.camps || []);
-        setOfflineInfo({ savedAt: cached.savedAt });
-      } else {
-        showError('تعذّر تحميل السجلات');
-      }
+      if (!hadCache) showError('تعذّر تحميل السجلات ولا توجد نسخة محفوظة');
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -61,52 +61,59 @@ export default function FamilyDetailScreen() {
 
   const load = useCallback(async () => {
     if (!familyId) return;
+
+    // 1) اعرض النسخة المحفوظة فوراً (لو موجودة) — بدون انتظار الشبكة.
+    const directCached = await getCachedData(`family_detail_${familyId}`, profile?.id);
+    let hadCache = !!directCached?.data;
+    if (hadCache) {
+      setFamily(directCached.data.family);
+      setMembers(directCached.data.members || []);
+      setCampName(directCached.data.campName || '');
+      setOfflineInfo({ savedAt: directCached.savedAt });
+      setLoading(false);
+    } else {
+      // احتياط فوري: لو ما فُتحت هذي الأسرة تحديداً قبل، جرّب نسخة قائمة
+      // الأسر المحفوظة (فيها كل الأسر ضمن نطاقك) بدل انتظار الشبكة.
+      const listCached = await getCachedData('families_list', profile?.id);
+      const famFromList = listCached?.data?.families?.find((f) => f.id === familyId);
+      if (famFromList) {
+        hadCache = true;
+        const memsFromList = (listCached.data.members || []).filter((m) => m.family_id === familyId);
+        const campFromList = listCached.data.camps?.find((c) => c.id === famFromList.camp_id)?.name || '';
+        setFamily(famFromList);
+        setMembers(memsFromList);
+        setCampName(campFromList);
+        setOfflineInfo({ savedAt: listCached.savedAt });
+        setLoading(false);
+      }
+    }
+
+    // 2) بعدين حاول تحديث حي بالخلفية.
     try {
       const net = await NetInfo.fetch();
-      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+      if (!net.isConnected) {
+        if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
+        return;
+      }
 
       const data = await fetchFamilyById(familyId);
       if (!data) {
-        showError('لم يتم العثور على الأسرة');
-        setLoading(false);
+        if (!hadCache) showError('لم يتم العثور على الأسرة');
         return;
       }
-      setFamily(data);
 
       const [mems, camps] = await Promise.all([
         fetchFamilyMembers([familyId]),
         data.org_id ? fetchCamps(data.org_id) : Promise.resolve([]),
       ]);
       const resolvedCampName = camps.find((c) => c.id === data.camp_id)?.name || '';
+      setFamily(data);
       setMembers(mems);
       setCampName(resolvedCampName);
       setOfflineInfo(null);
       cacheData(`family_detail_${familyId}`, profile?.id, { family: data, members: mems, campName: resolvedCampName });
     } catch (e) {
-      const cached = await getCachedData(`family_detail_${familyId}`, profile?.id);
-      if (cached?.data) {
-        setFamily(cached.data.family);
-        setMembers(cached.data.members || []);
-        setCampName(cached.data.campName || '');
-        setOfflineInfo({ savedAt: cached.savedAt });
-      } else {
-        // احتياط: لو ما فُتحت هذي الأسرة تحديداً أونلاين قبل، نجرّب نلقاها
-        // بنسخة قائمة الأسر المحفوظة (فيها كل الأسر + كل الأفراد ضمن نطاقك) --
-        // بعض الحقول الإضافية (كالملاحظات) ممكن ما تكون موجودة بهذي النسخة،
-        // لكنها كافية لعرض بيانات الأسرة الأساسية وأفرادها.
-        const listCached = await getCachedData('families_list', profile?.id);
-        const famFromList = listCached?.data?.families?.find((f) => f.id === familyId);
-        if (famFromList) {
-          const memsFromList = (listCached.data.members || []).filter((m) => m.family_id === familyId);
-          const campFromList = listCached.data.camps?.find((c) => c.id === famFromList.camp_id)?.name || '';
-          setFamily(famFromList);
-          setMembers(memsFromList);
-          setCampName(campFromList);
-          setOfflineInfo({ savedAt: listCached.savedAt });
-        } else {
-          showError('تعذّر تحميل بيانات الأسرة ولا توجد نسخة محفوظة');
-        }
-      }
+      if (!hadCache) showError('تعذّر تحميل بيانات الأسرة ولا توجد نسخة محفوظة');
     } finally {
       setLoading(false);
     }

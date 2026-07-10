@@ -117,9 +117,25 @@ export default function ExportScreen() {
 
   const loadMeta = useCallback(async () => {
     if (!orgId) return;
+
+    // 1) اعرض النسخة المحفوظة فوراً (لو موجودة) — بدون انتظار الشبكة.
+    const cached = await getCachedData('export_meta', profile?.id);
+    const hadCache = !!cached?.data;
+    if (hadCache) {
+      setCamps(cached.data.camps || []);
+      setOrgMembers(cached.data.orgMembers || []);
+      setAllFamilies(cached.data.families || []);
+      setAllMembers(cached.data.members || []);
+      setOfflineInfo({ savedAt: cached.savedAt });
+    }
+
+    // 2) بعدين حاول تحديث حي بالخلفية.
     try {
       const net = await NetInfo.fetch();
-      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+      if (!net.isConnected) {
+        if (!hadCache) showToast('لا يوجد اتصال ولا توجد بيانات محفوظة', 'error');
+        return;
+      }
 
       const [c, om] = await Promise.all([fetchCamps(orgId), fetchOrgMembers(orgId)]);
       const allCamps = c || [];
@@ -143,16 +159,7 @@ export default function ExportScreen() {
       setOfflineInfo(null);
       cacheData('export_meta', profile?.id, { camps: visibleCamps, orgMembers: om || [], families: scopedFams, members: mems });
     } catch (e) {
-      const cached = await getCachedData('export_meta', profile?.id);
-      if (cached?.data) {
-        setCamps(cached.data.camps || []);
-        setOrgMembers(cached.data.orgMembers || []);
-        setAllFamilies(cached.data.families || []);
-        setAllMembers(cached.data.members || []);
-        setOfflineInfo({ savedAt: cached.savedAt });
-      } else {
-        showToast('تعذّر تحميل البيانات ولا توجد نسخة محفوظة', 'error');
-      }
+      if (!hadCache) showToast('تعذّر تحميل البيانات ولا توجد نسخة محفوظة', 'error');
     }
   }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps, profile?.id]);
 

@@ -117,9 +117,13 @@ export default function AppDrawer({ visible, onClose, navigation }) {
     setOpenKey((prev) => (prev === key ? null : key));
   };
 
+  // push (مو navigate) عمداً: navigate يرجع لنسخة قديمة من نفس الشاشة لو
+  // موجودة بتاريخ التنقل، وهذا يمسح أي شاشات بينهم بصمت -- فيصير زر الرجوع
+  // يقفز فجأة لصفحة بعيدة (غالباً الرئيسية) بدل الشاشة اللي كنت فيها فعلاً.
+  // push يضمن كل ضغطة بالقائمة تضيف خطوة جديدة بتاريخ حقيقي ومتسلسل.
   const go = (screen) => {
     onClose();
-    navigation.navigate(screen);
+    navigation.push(screen);
   };
 
   return (

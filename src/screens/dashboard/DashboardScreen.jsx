@@ -17,6 +17,7 @@ import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchFamilyActivityLog }
 import { calcAge, isIncomplete } from '../../lib/helpers';
 import { cacheData, getCachedData } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
+import { showError } from '../../utils/toast';
 
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import colors from '../../theme/colors';
@@ -53,19 +54,38 @@ export default function DashboardScreen() {
 
   const loadStats = useCallback(async () => {
     if (!profile?.org_id) return;
+
+    // 1) اعرض النسخة المحفوظة فوراً (لو موجودة) — بدون انتظار الشبكة إطلاقاً.
+    // هذا يخلي فتح التطبيق يبان فوري حتى لو النت بطيء أو مقطوع، بدل مؤشر
+    // تحميل فاضي كل مرة.
+    const cached = await getCachedData('dashboard_stats', profile?.id);
+    const hadCache = !!cached?.data;
+    if (hadCache) {
+      setStats(cached.data.stats);
+      setActivity(cached.data.activityLog || []);
+      setFamilies(cached.data.families || []);
+      setMembers(cached.data.members || []);
+      setCamps(cached.data.camps || []);
+      setOfflineInfo({ savedAt: cached.savedAt }); // مبدئياً "محفوظ" -- يُمسح تلقائياً لو نجحت المزامنة تحت
+      setLoading(false);
+    }
+
+    // 2) بعدين حاول تحديث حي بالخلفية (يزامن البيانات لو فيه نت فعلاً).
     try {
       // فحص الاتصال أولاً -- fetchFamilies/fetchCamps وغيرها تبتلع أخطاءها
       // داخلياً وترجع مصفوفة فاضية بدل رمي استثناء، فالاعتماد على try/catch
       // وحده يفشل يكتشف انقطاع النت (يوصلنا "نجاح" ببيانات فاضية = أصفار).
       const net = await NetInfo.fetch();
-      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+      if (!net.isConnected) {
+        if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
+        return;
+      }
 
       const [famsRaw, camps, activityLog] = await Promise.all([
         fetchFamilies(profile.org_id),
         fetchCamps(profile.org_id),
         fetchFamilyActivityLog(profile.org_id, 15),
       ]);
-      setActivity(activityLog);
       const fams = famsRaw.filter((f) => !f.review_status || f.review_status === 'approved');
       const campIds = getAllowedCampIds(camps);
       const filteredFams = filterLocal(fams, campIds);
@@ -73,9 +93,6 @@ export default function DashboardScreen() {
 
       const famIds = filteredFams.map((f) => f.id);
       const members = await fetchFamilyMembers(famIds);
-      setFamilies(filteredFams);
-      setMembers(members);
-      setCamps(filteredCamps);
 
       // نفس حسابات الأصل بالضبط
       const mByFam = {};
@@ -124,19 +141,16 @@ export default function DashboardScreen() {
         campBars,
       };
       setStats(finalStats);
-      setOfflineInfo(null);
+      setActivity(activityLog);
+      setFamilies(filteredFams);
+      setMembers(members);
+      setCamps(filteredCamps);
+      setOfflineInfo(null); // المزامنة نجحت -- البيانات المعروضة الآن حيّة ومحدَّثة
       cacheData('dashboard_stats', profile?.id, { stats: finalStats, families: filteredFams, members, camps: filteredCamps, activityLog });
     } catch (e) {
-      // فشل الاتصال -- نرجع لآخر نسخة محفوظة محلياً (لو موجودة) بدل شاشة فاضية
-      const cached = await getCachedData('dashboard_stats', profile?.id);
-      if (cached?.data) {
-        setStats(cached.data.stats);
-        setActivity(cached.data.activityLog || []);
-        setFamilies(cached.data.families || []);
-        setMembers(cached.data.members || []);
-        setCamps(cached.data.camps || []);
-        setOfflineInfo({ savedAt: cached.savedAt });
-      }
+      // فشلت المزامنة الحية -- لو ما عندنا نسخة محفوظة من الأساس، هذا فشل حقيقي
+      if (!hadCache) showError('تعذّر تحميل البيانات ولا توجد نسخة محفوظة');
+      // وإلا: النسخة المحفوظة ظاهرة أصلاً من الخطوة 1، نسيبها كما هي
     } finally {
       setLoading(false);
       setRefreshing(false);

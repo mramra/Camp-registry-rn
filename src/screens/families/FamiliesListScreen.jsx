@@ -17,6 +17,7 @@ import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabas
 import { checkFamilyIssues, isIncomplete, isAgeInRange, getMembers } from '../../lib/helpers';
 import { cacheData, getCachedData } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
+import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -70,9 +71,25 @@ export default function FamiliesListScreen() {
   // ── تحميل البيانات (مباشرة من Supabase — بدون طبقة SQLite وسيطة) ──
   const loadData = useCallback(async () => {
     if (!orgId) return;
+
+    // 1) اعرض النسخة المحفوظة فوراً (لو موجودة) — بدون انتظار الشبكة.
+    const cached = await getCachedData('families_list', profile?.id);
+    const hadCache = !!cached?.data;
+    if (hadCache) {
+      setFamilies(cached.data.families || []);
+      setAllMembers(cached.data.members || []);
+      setCamps(cached.data.camps || []);
+      setOfflineInfo({ savedAt: cached.savedAt });
+      setLoading(false);
+    }
+
+    // 2) بعدين حاول تحديث حي بالخلفية.
     try {
       const net = await NetInfo.fetch();
-      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+      if (!net.isConnected) {
+        if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
+        return;
+      }
 
       const allowedCampIds = getAllowedCampIds(camps.length ? camps : await fetchCamps(orgId));
 
@@ -85,22 +102,15 @@ export default function FamiliesListScreen() {
           ? famsRaw
           : famsRaw.filter((f) => allowedCampIds.includes(f.camp_id));
 
+      const members = await fetchFamilyMembers(fams.map((f) => f.id));
+
       setCamps(campsData);
       setFamilies(fams);
-
-      const members = await fetchFamilyMembers(fams.map((f) => f.id));
       setAllMembers(members);
       setOfflineInfo(null);
       cacheData('families_list', profile?.id, { families: fams, members, camps: campsData });
     } catch (e) {
-      // فشل الاتصال -- نرجع لآخر نسخة محفوظة محلياً بدل شاشة فاضية
-      const cached = await getCachedData('families_list', profile?.id);
-      if (cached?.data) {
-        setFamilies(cached.data.families || []);
-        setAllMembers(cached.data.members || []);
-        setCamps(cached.data.camps || []);
-        setOfflineInfo({ savedAt: cached.savedAt });
-      }
+      if (!hadCache) showError('تعذّر تحميل البيانات ولا توجد نسخة محفوظة');
     } finally {
       setLoading(false);
       setRefreshing(false);

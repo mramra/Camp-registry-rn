@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
+import NetInfo from '@react-native-community/netinfo';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -14,12 +15,15 @@ import { showToast } from './src/utils/toast';
 // ملاحظة على showToast: هو تنبيه منبثق (Alert.alert) يحتاج ضغط "حسناً" لإغلاقه،
 // مو toast خفيف يختفي لحاله. لهيك ما نستخدمه للحالة العادية (لا يوجد تحديث)
 // لأنها تصير بكل مرة -- بيصير تنبيه مزعج يتكرر باستمرار. نستخدمه فقط
-// بالحالتين المفيدتين فعلاً: تحديث حقيقي موجود، أو فشل الفحص (عشان تعرف السبب
-// بدل ما يفشل بصمت وتبقى الحيرة "ليش ما تحدّث؟" -- خصوصاً إنه ما فيه وصول
-// لـ console على الموبايل).
+// بالحالتين المفيدتين فعلاً: تحديث حقيقي موجود، أو فشل الفحص لسبب حقيقي
+// (مو مجرد انقطاع نت -- الانقطاع وضع طبيعي متوقَّع، مو خطأ يستاهل تنبيه
+// مخيف بكل فتح تطبيق أوفلاين).
 async function checkAndApplyUpdate() {
   if (__DEV__ || !Updates.isEnabled) return;
   try {
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) return; // أوفلاين -- تجاهل صامت، مو خطأ
+
     const result = await Updates.checkForUpdateAsync();
     if (result.isAvailable) {
       await Updates.fetchUpdateAsync();

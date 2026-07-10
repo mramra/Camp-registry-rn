@@ -12,28 +12,38 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Initialize auth on app start
+  // بدء التشغيل — الآن بنفس مبدأ "اعرض المحفوظ فوراً" المطبَّق بكل الشاشات:
+  // لا ننتظر أي طلب شبكة قبل ما نعرض واجهة المستخدم. getSession() نفسها
+  // سريعة (قراءة محلية من AsyncStorage، بدون شبكة)، فنعتمد عليها لتحديد
+  // isAuthenticated فوراً؛ الملف الشخصي (اللي يحتاج طلب شبكة حقيقي) يُعرض
+  // من آخر نسخة محفوظة فوراً لو موجودة، وتحديثه الحي يصير بالخلفية بدون
+  // ما يمنع فتح التطبيق ولا يطيل دائرة التحميل.
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        setLoading(true);
         setError(null);
-
         const { data, error: sessionError } = await supabase.auth.getSession();
-
         if (sessionError) throw sessionError;
 
         if (data?.session) {
           setSession(data.session);
           setUser(data.session.user);
-          await fetchUserProfile(data.session.user.id);
+
+          // اعرض الملف الشخصي المحفوظ فوراً (لو موجود) -- بدون انتظار الشبكة
+          const cached = await getCachedData('user_profile', data.session.user.id);
+          if (cached?.data) setProfile(cached.data);
+
+          // خلّص شاشة التحميل الآن -- التحديث الحي يصير بالخلفية
+          setLoading(false);
+
+          fetchUserProfile(data.session.user.id);
+          return;
         }
       } catch (err) {
         console.error('[initializeAuth]', err.message);
         setError(err.message);
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     };
 
     initializeAuth();

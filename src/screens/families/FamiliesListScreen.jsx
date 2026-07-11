@@ -15,7 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { checkFamilyIssues, isIncomplete, isAgeInRange, getMembers } from '../../lib/helpers';
-import { cacheData, getCachedData } from '../../lib/offlineCache';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
@@ -85,24 +85,25 @@ export default function FamiliesListScreen() {
 
     // 2) بعدين حاول تحديث حي بالخلفية.
     try {
-      const net = await NetInfo.fetch();
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
       if (!net.isConnected) {
         if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
         return;
       }
 
-      const allowedCampIds = getAllowedCampIds(camps.length ? camps : await fetchCamps(orgId));
+      const allowedCampIds = getAllowedCampIds(camps.length ? camps : await withTimeout(fetchCamps(orgId), 12000, 'انتهت مهلة تحميل البيانات'));
 
-      const [famsRaw, campsData] = await Promise.all([
-        fetchFamilies(orgId),
-        fetchCamps(orgId),
-      ]);
+      const [famsRaw, campsData] = await withTimeout(
+        Promise.all([fetchFamilies(orgId), fetchCamps(orgId)]),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
       const fams =
         allowedCampIds === null
           ? famsRaw
           : famsRaw.filter((f) => allowedCampIds.includes(f.camp_id));
 
-      const members = await fetchFamilyMembers(fams.map((f) => f.id));
+      const members = await withTimeout(fetchFamilyMembers(fams.map((f) => f.id)), 12000, 'انتهت مهلة تحميل البيانات');
 
       setCamps(campsData);
       setFamilies(fams);

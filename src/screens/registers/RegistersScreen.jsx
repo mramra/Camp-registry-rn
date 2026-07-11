@@ -14,7 +14,7 @@ import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
 import colors from '../../theme/colors';
-import { cacheData, getCachedData } from '../../lib/offlineCache';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 
 const TABS = [
@@ -116,17 +116,17 @@ export default function RegistersScreen() {
 
     // 2) بعدين حاول تحديث حي بالخلفية.
     try {
-      const net = await NetInfo.fetch();
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
       if (!net.isConnected) {
         if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
         return;
       }
 
-      const campsData = await fetchCamps(orgId);
+      const campsData = await withTimeout(fetchCamps(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const allowedCampIds = getAllowedCampIds(campsData);
-      const famsRaw = await fetchFamilies(orgId);
+      const famsRaw = await withTimeout(fetchFamilies(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const fams = allowedCampIds === null ? famsRaw : famsRaw.filter((f) => allowedCampIds.includes(f.camp_id));
-      const mems = await fetchFamilyMembers(fams.map((f) => f.id));
+      const mems = await withTimeout(fetchFamilyMembers(fams.map((f) => f.id)), 12000, 'انتهت مهلة تحميل البيانات');
       const visibleCamps = getVisibleCamps(campsData);
 
       setCamps(visibleCamps);

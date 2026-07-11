@@ -15,7 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchFamilyActivityLog } from '../../lib/supabase';
 import { calcAge, isIncomplete } from '../../lib/helpers';
-import { cacheData, getCachedData } from '../../lib/offlineCache';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
 
@@ -75,17 +75,21 @@ export default function DashboardScreen() {
       // فحص الاتصال أولاً -- fetchFamilies/fetchCamps وغيرها تبتلع أخطاءها
       // داخلياً وترجع مصفوفة فاضية بدل رمي استثناء، فالاعتماد على try/catch
       // وحده يفشل يكتشف انقطاع النت (يوصلنا "نجاح" ببيانات فاضية = أصفار).
-      const net = await NetInfo.fetch();
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
       if (!net.isConnected) {
         if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
         return;
       }
 
-      const [famsRaw, camps, activityLog] = await Promise.all([
-        fetchFamilies(profile.org_id),
-        fetchCamps(profile.org_id),
-        fetchFamilyActivityLog(profile.org_id, 15),
-      ]);
+      const [famsRaw, camps, activityLog] = await withTimeout(
+        Promise.all([
+          fetchFamilies(profile.org_id),
+          fetchCamps(profile.org_id),
+          fetchFamilyActivityLog(profile.org_id, 15),
+        ]),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
       const fams = famsRaw.filter((f) => !f.review_status || f.review_status === 'approved');
       const campIds = getAllowedCampIds(camps);
       const filteredFams = filterLocal(fams, campIds);

@@ -19,7 +19,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FormInput from '../../components/ui/FormInput';
 import colors from '../../theme/colors';
-import { cacheData, getCachedData } from '../../lib/offlineCache';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -90,22 +90,26 @@ export default function FamilyDetailScreen() {
 
     // 2) بعدين حاول تحديث حي بالخلفية.
     try {
-      const net = await NetInfo.fetch();
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
       if (!net.isConnected) {
         if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
         return;
       }
 
-      const data = await fetchFamilyById(familyId);
+      const data = await withTimeout(fetchFamilyById(familyId), 12000, 'انتهت مهلة تحميل البيانات');
       if (!data) {
         if (!hadCache) showError('لم يتم العثور على الأسرة');
         return;
       }
 
-      const [mems, camps] = await Promise.all([
-        fetchFamilyMembers([familyId]),
-        data.org_id ? fetchCamps(data.org_id) : Promise.resolve([]),
-      ]);
+      const [mems, camps] = await withTimeout(
+        Promise.all([
+          fetchFamilyMembers([familyId]),
+          data.org_id ? fetchCamps(data.org_id) : Promise.resolve([]),
+        ]),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
       const resolvedCampName = camps.find((c) => c.id === data.camp_id)?.name || '';
       setFamily(data);
       setMembers(mems);

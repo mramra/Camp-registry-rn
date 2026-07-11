@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
-import { fetchDistRounds, fetchCamps, createDistRound } from '../../lib/supabase';
+import { fetchDistRounds, fetchCamps, createDistRound, updateDistRound, deleteDistRound } from '../../lib/supabase';
 import { formatDate } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
@@ -48,6 +48,7 @@ export default function DistributionsScreen() {
   const [roundDate, setRoundDate] = useState(todayStr());
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editingRoundId, setEditingRoundId] = useState(null); // null = إضافة جديدة، وإلا تعديل
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
@@ -77,7 +78,23 @@ export default function DistributionsScreen() {
     return true;
   });
 
-  const handleAddRound = async () => {
+  const openAddForm = () => {
+    setEditingRoundId(null);
+    setName('');
+    setRoundDate(todayStr());
+    setNotes('');
+    setFormVisible(true);
+  };
+
+  const openEditForm = (round) => {
+    setEditingRoundId(round.id);
+    setName(round.name || '');
+    setRoundDate(round.round_date || todayStr());
+    setNotes(round.notes || '');
+    setFormVisible(true);
+  };
+
+  const handleSaveRound = async () => {
     if (!name.trim()) {
       showError('اسم الجولة مطلوب');
       return;
@@ -88,19 +105,22 @@ export default function DistributionsScreen() {
     }
     setSaving(true);
     try {
-      const result = await createDistRound({
-        org_id: orgId,
-        name: name.trim(),
-        round_date: roundDate,
-        notes: notes.trim() || null,
-        status: 'draft',
-      });
+      const result = editingRoundId
+        ? await updateDistRound(editingRoundId, { name: name.trim(), round_date: roundDate, notes: notes.trim() || null })
+        : await createDistRound({
+            org_id: orgId,
+            name: name.trim(),
+            round_date: roundDate,
+            notes: notes.trim() || null,
+            status: 'draft',
+          });
       if (!result.success) {
-        showError(result.error || 'فشل الإنشاء');
+        showError(result.error || 'فشل الحفظ');
         return;
       }
-      showSuccess('تمت إضافة الجولة');
+      showSuccess(editingRoundId ? 'تم تحديث الجولة' : 'تمت إضافة الجولة');
       setFormVisible(false);
+      setEditingRoundId(null);
       setName('');
       setRoundDate(todayStr());
       setNotes('');
@@ -110,6 +130,29 @@ export default function DistributionsScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDeleteRound = (round) => {
+    Alert.alert(
+      'حذف الجولة',
+      `هل تريد حذف جولة "${round.name}" نهائياً؟ سيُحذف معها كل سجلات الاستلام المرتبطة فيها (كأن الاستلام لم يحدث).`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deleteDistRound(round.id);
+            if (result.success) {
+              showSuccess('تم حذف الجولة وكل سجلات الاستلام المرتبطة فيها');
+              loadData();
+            } else {
+              showError(result.error || 'فشل الحذف');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderRound = ({ item: r }) => {
@@ -127,6 +170,16 @@ export default function DistributionsScreen() {
           </View>
           <Text style={[styles.statusBadge, { color: st.color, backgroundColor: `${st.color}22` }]}>{st.label}</Text>
         </View>
+        {canWrite && (
+          <View style={styles.cardActions}>
+            <Pressable style={styles.editIconBtn} onPress={() => openEditForm(r)}>
+              <Text style={styles.editIconBtnText}>✏️ تعديل</Text>
+            </Pressable>
+            <Pressable style={styles.deleteIconBtn} onPress={() => handleDeleteRound(r)}>
+              <Text style={styles.deleteIconBtnText}>🗑️ حذف</Text>
+            </Pressable>
+          </View>
+        )}
       </Pressable>
     );
   };
@@ -157,7 +210,7 @@ export default function DistributionsScreen() {
               subtitle={<Text style={styles.headerSubtitle}>{filtered.length} من {rounds.length} جولة</Text>}
               action={
                 canWrite && (
-                  <Pressable style={styles.addBtn} onPress={() => setFormVisible(true)}>
+                  <Pressable style={styles.addBtn} onPress={openAddForm}>
                     <Text style={styles.addBtnText}>➕ جولة جديدة</Text>
                   </Pressable>
                 )
@@ -192,13 +245,13 @@ export default function DistributionsScreen() {
         ListEmptyComponent={<EmptyState icon="📦" title="لا توجد جولات توزيع مطابقة" />}
       />
 
-      <BottomSheetModal visible={formVisible} onClose={() => setFormVisible(false)} title="➕ جولة توزيع جديدة">
+      <BottomSheetModal visible={formVisible} onClose={() => setFormVisible(false)} title={editingRoundId ? '✏️ تعديل الجولة' : '➕ جولة توزيع جديدة'}>
         <FormInput label="اسم الجولة *" placeholder="توزيع شتوي 2026" value={name} onChangeText={setName} />
         <FormInput label="تاريخ الجولة * (YYYY-MM-DD)" value={roundDate} onChangeText={setRoundDate} />
         <FormInput label="ملاحظات" value={notes} onChangeText={setNotes} multiline numberOfLines={2} />
         <View style={styles.row}>
-          <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={handleAddRound} disabled={saving}>
-            {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>✅ إضافة</Text>}
+          <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={handleSaveRound} disabled={saving}>
+            {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>{editingRoundId ? '💾 حفظ التعديلات' : '✅ إضافة'}</Text>}
           </Pressable>
           <Pressable style={styles.cancelBtn} onPress={() => setFormVisible(false)}>
             <Text style={styles.cancelBtnText}>إلغاء</Text>
@@ -233,6 +286,11 @@ const styles = StyleSheet.create({
   metaLine: { color: colors.muted, fontSize: 11, marginTop: 3, textAlign: 'right' },
   dateLine: { color: colors.muted, fontSize: 10, marginTop: 4, textAlign: 'right' },
   statusBadge: { fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  cardActions: { flexDirection: 'row', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  editIconBtn: { flex: 1, backgroundColor: 'rgba(59,130,246,0.1)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
+  editIconBtnText: { color: colors.blue, fontWeight: 'bold', fontSize: 11 },
+  deleteIconBtn: { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
+  deleteIconBtnText: { color: colors.red, fontWeight: 'bold', fontSize: 11 },
 
   row: { flexDirection: 'row', gap: 8, marginTop: 8 },
   saveBtn: { flex: 1, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },

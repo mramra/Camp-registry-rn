@@ -372,6 +372,36 @@ export const createDistRound = async (roundData) => {
   }
 };
 
+/** تعديل بيانات الجولة (اسم/تاريخ/ملاحظات) -- لا تمس سجلات الاستلام إطلاقاً */
+export const updateDistRound = async (roundId, updates) => {
+  try {
+    const { error } = await supabase.from('dist_rounds').update(updates).eq('id', roundId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * حذف جولة توزيع نهائياً — بما فيها **كل** سجلات الاستلام المرتبطة فيها
+ * (camp_dist_families بـ round_id هذا)، وكأن الجولة لم تكن موجودة إطلاقاً.
+ * الحذف من camp_dist_families أولاً إلزامي قبل حذف الجولة نفسها.
+ */
+export const deleteDistRound = async (roundId) => {
+  try {
+    const { error: delReceivedErr } = await supabase.from('camp_dist_families').delete().eq('round_id', roundId);
+    if (delReceivedErr) throw delReceivedErr;
+
+    const { error: delRoundErr } = await supabase.from('dist_rounds').delete().eq('id', roundId);
+    if (delRoundErr) throw delRoundErr;
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
 export const updateDistRoundStatus = async (roundId, status) => {
   try {
     const { error } = await supabase.from('dist_rounds').update({ status }).eq('id', roundId);

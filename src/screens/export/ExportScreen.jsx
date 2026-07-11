@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, SafeAreaView, ActivityIndicator, Switch } from 'react-native';
 import { supabase, fetchCamps, fetchOrgMembers, createFamily } from '../../lib/supabase';
 import NetInfo from '@react-native-community/netinfo';
-import { cacheData, getCachedData } from '../../lib/offlineCache';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
@@ -131,23 +131,31 @@ export default function ExportScreen() {
 
     // 2) بعدين حاول تحديث حي بالخلفية.
     try {
-      const net = await NetInfo.fetch();
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
       if (!net.isConnected) {
         if (!hadCache) showToast('لا يوجد اتصال ولا توجد بيانات محفوظة', 'error');
         return;
       }
 
-      const [c, om] = await Promise.all([fetchCamps(orgId), fetchOrgMembers(orgId)]);
+      const [c, om] = await withTimeout(
+        Promise.all([fetchCamps(orgId), fetchOrgMembers(orgId)]),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
       const allCamps = c || [];
       const campIds = getAllowedCampIds(allCamps);
       const visibleCamps = getVisibleCamps(allCamps);
 
       // تحميل كل الأسر والأفراد ضمن النطاق المسموح — لكل من التصدير السريع والمخصص
-      const { data: fams } = await supabase
-        .from('families')
-        .select('*, family_members(*)')
-        .eq('org_id', orgId)
-        .eq('_deleted', false);
+      const { data: fams } = await withTimeout(
+        supabase
+          .from('families')
+          .select('*, family_members(*)')
+          .eq('org_id', orgId)
+          .eq('_deleted', false),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
       const scopedFams = filterLocal(fams || [], campIds);
       const mems = [];
       scopedFams.forEach((f) => (f.family_members || []).forEach((m) => mems.push({ ...m, family_id: f.id })));

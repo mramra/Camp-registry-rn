@@ -4,7 +4,7 @@ import {
   Text,
   TextInput,
   Pressable,
-  SectionList,
+  FlatList,
   Alert,
   StyleSheet,
   SafeAreaView,
@@ -63,7 +63,6 @@ export default function UsersListScreen() {
     return map;
   }, [camps, getVisibleCamps]);
 
-  const usersById = useMemo(() => Object.fromEntries(users.map((u) => [u.id, u])), [users]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return users;
@@ -76,13 +75,40 @@ export default function UsersListScreen() {
     );
   }, [users, search]);
 
-  // ── تجميع حسب الدور (بترتيب هرمي مبسّط) ────────────────
-  const sections = useMemo(() => {
-    return ROLE_ORDER.map((role) => ({
-      title: role,
-      data: filtered.filter((u) => u.role === role),
-    })).filter((s) => s.data.length > 0);
-  }, [filtered]);
+  // ── شجرة هرمية حقيقية حسب supervisor_id (مو مجرد تجميع بالدور) ────
+  // كل مستخدم يظهر تحت المشرف عليه مباشرة، بعمق متزايد كل مستوى.
+  // البحث يعطّل الشكل الهرمي مؤقتاً (يرجع لقائمة مسطّحة من النتائج المطابقة).
+  const isSearching = !!search.trim();
+
+  const tree = useMemo(() => {
+    if (isSearching) return null;
+    const byId = Object.fromEntries(users.map((u) => [u.id, u]));
+    const childrenOf = {};
+    users.forEach((u) => {
+      const sup = u.supervisor_id && byId[u.supervisor_id] ? u.supervisor_id : '__root__';
+      if (!childrenOf[sup]) childrenOf[sup] = [];
+      childrenOf[sup].push(u);
+    });
+    const sortGroup = (arr) =>
+      [...arr].sort((a, b) => {
+        const ra = ROLE_ORDER.indexOf(a.role), rb = ROLE_ORDER.indexOf(b.role);
+        if (ra !== rb) return ra - rb;
+        return (a.full_name || '').localeCompare(b.full_name || '', 'ar');
+      });
+
+    const flat = [];
+    const walk = (parentId, depth) => {
+      sortGroup(childrenOf[parentId] || []).forEach((u) => {
+        flat.push({ ...u, __depth: depth });
+        walk(u.id, depth + 1);
+      });
+    };
+    walk('__root__', 0);
+    return flat;
+  }, [users, isSearching]);
+
+  const flatFiltered = useMemo(() => filtered.map((u) => ({ ...u, __depth: 0 })), [filtered]);
+  const displayList = isSearching ? flatFiltered : (tree || []);
 
   const canEditUser = (u) => (isOwner || isSuperAdmin) && u.id !== profile?.id;
   const canDeleteUser = (u) => isOwner && u.role !== 'platform_owner' && u.id !== profile?.id;
@@ -137,42 +163,51 @@ export default function UsersListScreen() {
 
   const renderUser = ({ item: u }) => {
     const cfg = ROLE_CONFIG[u.role] || ROLE_CONFIG.assistant;
-    const supervisor = u.supervisor_id ? usersById[u.supervisor_id] : null;
+    const depth = u.__depth || 0;
 
     return (
-      <View style={[styles.card, { borderRightColor: cfg.color }]}>
-        <View style={styles.cardTop}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.userName}>{cfg.icon} {u.full_name}</Text>
-            {!!u.national_id && <Text style={styles.metaLine}>{u.national_id}</Text>}
-            {!!u.phone && <Text style={styles.metaLine}>{u.phone}</Text>}
-            {!!campMap[u.camp_id] && <Text style={styles.metaLine}>🏕️ {campMap[u.camp_id]}</Text>}
-            {!!supervisor && <Text style={styles.metaLine}>👤 تابع لـ {supervisor.full_name}</Text>}
-          </View>
-          <View style={{ alignItems: 'flex-end', gap: 6 }}>
-            <Badge label={cfg.label} color={cfg.color} />
-            {!u.is_active && <Badge label="⏸️ معطّل" color={colors.muted} />}
-          </View>
-        </View>
-
-        {canEditUser(u) && (
-          <View style={styles.actionsRow}>
-            <Pressable style={styles.editBtn} onPress={() => navigation.push('UserForm', { userId: u.id })}>
-              <Text style={styles.editBtnText}>✏️ تعديل</Text>
-            </Pressable>
-            <Pressable style={styles.resetBtn} onPress={() => handleResetPassword(u)}>
-              <Text style={styles.resetBtnText}>🔑 كلمة مرور</Text>
-            </Pressable>
-            <Pressable style={styles.toggleBtn} onPress={() => handleToggleActive(u)}>
-              <Text style={styles.toggleBtnText}>{u.is_active ? '⏸️ تعطيل' : '▶️ تفعيل'}</Text>
-            </Pressable>
-            {canDeleteUser(u) && (
-              <Pressable style={styles.deleteBtn} onPress={() => handleDelete(u)}>
-                <Text style={styles.deleteBtnText}>🗑️</Text>
-              </Pressable>
-            )}
+      <View style={{ flexDirection: 'row-reverse', marginBottom: 8 }}>
+        {depth > 0 && (
+          <View style={{ width: depth * 22, flexDirection: 'row-reverse' }}>
+            {Array.from({ length: depth }).map((_, i) => (
+              <View key={i} style={styles.treeGuide} />
+            ))}
           </View>
         )}
+        <View style={[styles.card, { borderRightColor: cfg.color, flex: 1 }, depth > 0 && styles.cardNested]}>
+          {depth > 0 && <Text style={styles.treeConnector}>└─</Text>}
+          <View style={styles.cardTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.userName}>{cfg.icon} {u.full_name}</Text>
+              {!!u.national_id && <Text style={styles.metaLine}>{u.national_id}</Text>}
+              {!!u.phone && <Text style={styles.metaLine}>{u.phone}</Text>}
+              {!!campMap[u.camp_id] && <Text style={styles.metaLine}>🏕️ {campMap[u.camp_id]}</Text>}
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 6 }}>
+              <Badge label={cfg.label} color={cfg.color} />
+              {!u.is_active && <Badge label="⏸️ معطّل" color={colors.muted} />}
+            </View>
+          </View>
+
+          {canEditUser(u) && (
+            <View style={styles.actionsRow}>
+              <Pressable style={styles.editBtn} onPress={() => navigation.push('UserForm', { userId: u.id })}>
+                <Text style={styles.editBtnText}>✏️ تعديل</Text>
+              </Pressable>
+              <Pressable style={styles.resetBtn} onPress={() => handleResetPassword(u)}>
+                <Text style={styles.resetBtnText}>🔑 كلمة مرور</Text>
+              </Pressable>
+              <Pressable style={styles.toggleBtn} onPress={() => handleToggleActive(u)}>
+                <Text style={styles.toggleBtnText}>{u.is_active ? '⏸️ تعطيل' : '▶️ تفعيل'}</Text>
+              </Pressable>
+              {canDeleteUser(u) && (
+                <Pressable style={styles.deleteBtn} onPress={() => handleDelete(u)}>
+                  <Text style={styles.deleteBtnText}>🗑️</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -189,15 +224,11 @@ export default function UsersListScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <SectionList
-        sections={sections}
+      <FlatList
+        data={displayList}
         keyExtractor={(item) => item.id}
         renderItem={renderUser}
-        renderSectionHeader={({ section }) => (
-          <Text style={styles.sectionHeader}>
-            {ROLE_CONFIG[section.title].icon} {ROLE_CONFIG[section.title].label} ({section.data.length})
-          </Text>
-        )}
+        extraData={isSearching}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
@@ -205,7 +236,7 @@ export default function UsersListScreen() {
             <PageHeader
               icon="👥"
               title="المستخدمون"
-              subtitle={<Text style={styles.headerSubtitle}>{filtered.length} من أصل {users.length}</Text>}
+              subtitle={<Text style={styles.headerSubtitle}>{filtered.length} من أصل {users.length}{!isSearching ? ' · هيكل هرمي' : ''}</Text>}
               action={
                 (isOwner || isSuperAdmin) && (
                   <Pressable style={styles.addBtn} onPress={() => navigation.push('UserForm')}>
@@ -224,7 +255,6 @@ export default function UsersListScreen() {
           </View>
         }
         ListEmptyComponent={<EmptyState icon="👥" title="لا يوجد مستخدمون مطابقون" />}
-        stickySectionHeadersEnabled={false}
       />
     </SafeAreaView>
   );
@@ -250,6 +280,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionHeader: { color: colors.muted, fontWeight: 'bold', fontSize: 12, marginTop: 12, marginBottom: 8, textAlign: 'right' },
+
+  treeGuide: { width: 22, borderRightWidth: 1, borderRightColor: colors.border },
+  cardNested: { opacity: 0.96 },
+  treeConnector: { color: colors.muted, fontSize: 11, textAlign: 'right', marginBottom: 4 },
 
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRadius: 12, padding: 12, marginBottom: 8 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

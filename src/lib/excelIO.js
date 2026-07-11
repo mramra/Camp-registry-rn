@@ -65,8 +65,8 @@ function buildStyledSheet(rows) {
 // كله، فوق صف العناوين مباشرة. تنسيق مميّز (خلفية داكنة، خط أبيض بارز).
 const BANNER_STYLE = {
   fill: { fgColor: { rgb: '1F2937' } },
-  font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 13 },
-  alignment: { horizontal: 'center', vertical: 'center' },
+  font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
+  alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
   border: {
     top: { style: 'medium', color: { rgb: '111827' } },
     bottom: { style: 'medium', color: { rgb: '111827' } },
@@ -82,6 +82,9 @@ function buildStyledSheetWithBanner(rows, bannerText) {
   XLSX.utils.sheet_add_json(ws, rows, { origin: 'A2' });
   ws['!cols'] = keys.map(() => ({ wch: 20 }));
   ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(keys.length - 1, 0) } }];
+  // ارتفاع صف أكبر يتناسب مع عدد أسطر البانر (كل سطر ~18px + هامش)
+  const lineCount = (bannerText.match(/\n/g) || []).length + 1;
+  ws['!rows'] = [{ hpx: Math.max(24, lineCount * 20) }];
   ws['A1'].s = BANNER_STYLE;
   styleWorksheet(ws, rows.length, keys.length, 1); // صف العناوين الفعلي بالإندكس 1 (بعد البانر)
   return ws;

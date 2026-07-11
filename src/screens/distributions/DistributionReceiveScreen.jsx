@@ -281,13 +281,19 @@ export default function DistributionReceiveScreen() {
       const fileName = `تقرير_استلام_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`;
 
       if (round?.camp_id) {
-        // الجولة عندها مخيم بانر محدّد وقت الإنشاء -- نبني بانر (اسم المخيم +
-        // مندوبه/مديره) بأعلى الملف. البانر معلوماتي فقط -- لا يقيّد عرض
-        // الأسر (تبقى من كل المخيمات)، بس يوضّح الملف باسم مخيم/مندوب معيّن.
+        // الجولة عندها مخيم بانر محدّد وقت الإنشاء -- نبني بانر بأعلى الملف:
+        // السطر الأول اسم المخيم، والثاني مندوب المخيم (role='camp_delegate')
+        // + جواله + إحداثيات المخيم. البانر معلوماتي فقط -- لا يقيّد عرض
+        // الأسر (تبقى من كل المخيمات).
         const bannerCamp = camps.find((c) => c.id === round.camp_id);
         const orgMembers = await fetchOrgMembers(orgId);
-        const managerName = orgMembers.find((m) => m.id === bannerCamp?.manager_id)?.full_name;
-        const bannerText = `مخيم: ${bannerCamp?.name || '—'}   |   المندوب: ${managerName || 'غير محدَّد'}   |   جولة: ${round?.name || ''}`;
+        const delegate = orgMembers.find((m) => m.role === 'camp_delegate' && m.camp_id === bannerCamp?.id);
+        const coords = bannerCamp?.latitude && bannerCamp?.longitude
+          ? `${bannerCamp.latitude}, ${bannerCamp.longitude}`
+          : 'بلا إحداثيات';
+        const line1 = `🏕️ ${bannerCamp?.name || '—'}`;
+        const line2 = `👤 المندوب: ${delegate?.full_name || 'غير معيَّن'}   📱 ${delegate?.phone || '—'}   📍 ${coords}`;
+        const bannerText = `${line1}\n${line2}`;
 
         await exportXLSXMultiSheetWithBanners(
           [{ name: 'استلموا', banner: bannerText, rows }],

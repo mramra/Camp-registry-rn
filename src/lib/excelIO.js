@@ -8,8 +8,12 @@
  * تلقائياً بكل تصدير لاحق بدون إزعاج المستخدم من جديد.
  * على iOS ما فيه مفهوم "تنزيلات" مماثل (قيود نظام التشغيل نفسه)، فيُستخدم
  * فيها قائمة المشاركة/الحفظ القياسية (Sharing) كبديل وحيد متاح.
+ *
+ * يستخدم xlsx-js-style (بديل متطابق الواجهة مع مكتبة xlsx العادية، بس
+ * بدعم تنسيق مجاني كامل: تلوين، تسطير، محاذاة) بدل xlsx العادية اللي
+ * تتجاهل أي تنسيق صامتاً بالنسخة المجانية.
  */
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -19,10 +23,55 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const SAF_DIR_KEY = 'excelio_downloads_directory_uri';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
+// ── تنسيق الجدول: بانر رأسي ملوّن + تناوب أبيض/رمادي + توسيط كل الخلايا ──
+const HEADER_STYLE = {
+  fill: { fgColor: { rgb: 'F59E0B' } }, // برتقالي (نفس لون التطبيق المميز)
+  font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
+  alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+  border: {
+    top: { style: 'thin', color: { rgb: 'D1D5DB' } },
+    bottom: { style: 'thin', color: { rgb: 'D1D5DB' } },
+    left: { style: 'thin', color: { rgb: 'D1D5DB' } },
+    right: { style: 'thin', color: { rgb: 'D1D5DB' } },
+  },
+};
+const rowStyle = (isEven) => ({
+  fill: { fgColor: { rgb: isEven ? 'F3F4F6' : 'FFFFFF' } }, // تناوب رمادي فاتح/أبيض
+  alignment: { horizontal: 'center', vertical: 'center' },
+  border: {
+    top: { style: 'thin', color: { rgb: 'E5E7EB' } },
+    bottom: { style: 'thin', color: { rgb: 'E5E7EB' } },
+    left: { style: 'thin', color: { rgb: 'E5E7EB' } },
+    right: { style: 'thin', color: { rgb: 'E5E7EB' } },
+  },
+});
+
+/** يطبّق التنسيق (بانر رأسي + تناوب صفوف + توسيط) على ورقة مبنية من json_to_sheet */
+function styleWorksheet(ws, rowCount, colCount) {
+  for (let r = 0; r <= rowCount; r++) {
+    for (let c = 0; c < colCount; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) continue;
+      ws[addr].s = r === 0 ? HEADER_STYLE : rowStyle((r - 1) % 2 === 0);
+    }
+  }
+}
+
+function buildStyledSheet(rows) {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const keys = Object.keys(rows[0] || {});
+  ws['!cols'] = keys.map(() => ({ wch: 20 }));
+  styleWorksheet(ws, rows.length, keys.length);
+  return ws;
+}
+
 /**
  * يحفظ محتوى base64 كملف Excel بمجلد التنزيلات مباشرة (أندرويد) عبر SAF،
  * مع إعادة استخدام إذن المجلد المحفوظ من مرة سابقة لو موجود. يرجع true لو
  * نجح الحفظ المباشر، أو false لو تعذّر (فيرجع الاستدعاء للمشاركة كبديل).
+ * ملاحظة مهمة: لا يطلب إذن المجلد أكثر من مرة واحدة بكل محاولة تصدير --
+ * لو createFileAsync فشلت لأي سبب (مثلاً اسم ملف مكرر)، نفشل مباشرة
+ * ونرجع للمشاركة، بدل ما نطلب الإذن من جديد ونربك المستخدم بصندوقين.
  */
 async function saveBase64ToDownloadsAndroid(base64, finalName) {
   try {
@@ -35,22 +84,14 @@ async function saveBase64ToDownloadsAndroid(base64, finalName) {
       await AsyncStorage.setItem(SAF_DIR_KEY, dirUri);
     }
 
-    let fileUri;
-    try {
-      fileUri = await FileSystem.StorageAccessFramework.createFileAsync(dirUri, finalName, XLSX_MIME);
-    } catch (createErr) {
-      // الإذن المحفوظ صار غير صالح (المستخدم غيّر المجلد أو ألغى الإذن من
-      // إعدادات النظام) -- اطلب الإذن من جديد مرة وحدة وأعد المحاولة.
-      await AsyncStorage.removeItem(SAF_DIR_KEY);
-      const perm = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-      if (!perm.granted) return false;
-      await AsyncStorage.setItem(SAF_DIR_KEY, perm.directoryUri);
-      fileUri = await FileSystem.StorageAccessFramework.createFileAsync(perm.directoryUri, finalName, XLSX_MIME);
-    }
-
+    const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(dirUri, finalName, XLSX_MIME);
     await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
     return true;
   } catch {
+    // الإذن المحفوظ غير صالح أو فشل الإنشاء لأي سبب -- نمسحه عشان يُطلب
+    // إذن صحيح بالمحاولة الجاية، ونرجع للمشاركة الآن بدون إزعاج المستخدم
+    // بصندوق ثاني بنفس هذي المحاولة.
+    await AsyncStorage.removeItem(SAF_DIR_KEY);
     return false;
   }
 }
@@ -77,14 +118,18 @@ async function saveOrShare(base64, finalName) {
   return { uri: cacheUri, savedToDownloads: false };
 }
 
+/** اسم ملف فريد دايماً (تاريخ + وقت لدقة الثانية) -- يمنع تصادم الاسم لو
+ * صُدِّر نفس التقرير أكثر من مرة بنفس اليوم (كان سبب فشل الحفظ المباشر
+ * سابقاً وطلب إذن المجلد مرتين). */
 function buildFinalName(fileName) {
   const now = new Date();
-  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  return `${fileName}_${dateStr}.xlsx`;
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return `${fileName}_${stamp}.xlsx`;
 }
 
 /**
- * يصدّر مصفوفة صفوف (objects) إلى ملف Excel، ثم يحفظه بالتنزيلات مباشرة.
+ * يصدّر مصفوفة صفوف (objects) إلى ملف Excel منسَّق، ثم يحفظه بالتنزيلات مباشرة.
  * @param {Array<Object>} rows - صفوف البيانات (كل عنصر = صف بمفاتيح = أسماء الأعمدة)
  * @param {string} sheetName - اسم الورقة داخل الملف
  * @param {string} fileName - اسم الملف (بدون امتداد)
@@ -94,10 +139,7 @@ export async function exportXLSX(rows, sheetName, fileName) {
     throw new Error('لا توجد بيانات للتصدير');
   }
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const keys = Object.keys(rows[0] || {});
-  ws['!cols'] = keys.map(() => ({ wch: 20 }));
-
+  const ws = buildStyledSheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
@@ -108,7 +150,7 @@ export async function exportXLSX(rows, sheetName, fileName) {
 }
 
 /**
- * يصدّر عدة أوراق بملف Excel واحد، ثم يحفظه بالتنزيلات مباشرة.
+ * يصدّر عدة أوراق منسَّقة بملف Excel واحد، ثم يحفظه بالتنزيلات مباشرة.
  * @param {Array<{name: string, rows: Array<Object>}>} sheets - كل عنصر ورقة مستقلة
  * @param {string} fileName - اسم الملف (بدون امتداد)
  */
@@ -120,9 +162,7 @@ export async function exportXLSXMultiSheet(sheets, fileName) {
 
   const wb = XLSX.utils.book_new();
   validSheets.forEach((s) => {
-    const ws = XLSX.utils.json_to_sheet(s.rows);
-    const keys = Object.keys(s.rows[0] || {});
-    ws['!cols'] = keys.map(() => ({ wch: 20 }));
+    const ws = buildStyledSheet(s.rows);
     XLSX.utils.book_append_sheet(wb, ws, s.name.slice(0, 31)); // حد Excel: 31 حرف لاسم الورقة
   });
 

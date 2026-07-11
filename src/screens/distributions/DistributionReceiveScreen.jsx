@@ -13,7 +13,7 @@ import {
   unmarkFamilyReceivedByRound,
 } from '../../lib/supabase';
 import { showError, showSuccess } from '../../utils/toast';
-import { exportXLSXMultiSheet } from '../../lib/excelIO';
+import { exportXLSX } from '../../lib/excelIO';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -244,14 +244,11 @@ export default function DistributionReceiveScreen() {
     setExporting(true);
     try {
       const received = sortByCamp(families.filter((f) => receivedIds.has(f.id)));
-      const notReceived = sortByCamp(families.filter((f) => !receivedIds.has(f.id)));
 
-      await exportXLSXMultiSheet(
-        [
-          { name: 'استلموا', rows: received.map(buildExportRow) },
-          { name: 'لم يستلموا', rows: notReceived.map(buildExportRow) },
-        ],
-        `تقرير_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`
+      await exportXLSX(
+        received.map(buildExportRow),
+        'استلموا',
+        `تقرير_استلام_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`
       );
       showSuccess('تم تصدير التقرير');
     } catch (e) {

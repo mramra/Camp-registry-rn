@@ -1,13 +1,12 @@
 /**
  * excelIO.js — تصدير واستيراد ملفات Excel على React Native
  *
- * التصدير يحفظ الملف مباشرة بمجلد "التنزيلات" (Downloads) على الجهاز --
- * بدون فتح قائمة اختيار تطبيقات (واتساب/مسنجر...). على أندرويد هذا يتطلب
- * إذن وصول لمجلد عبر Storage Access Framework (SAF) — يُطلب مرة واحدة
- * بس (أول تصدير)، ويُحفظ الإذن محلياً (AsyncStorage) لإعادة استخدامه
- * تلقائياً بكل تصدير لاحق بدون إزعاج المستخدم من جديد.
- * على iOS ما فيه مفهوم "تنزيلات" مماثل (قيود نظام التشغيل نفسه)، فيُستخدم
- * فيها قائمة المشاركة/الحفظ القياسية (Sharing) كبديل وحيد متاح.
+ * التصدير يبني الملف بالذاكرة، يحفظه مؤقتاً بكاش التطبيق، ثم يفتح قائمة
+ * "إرسال إلى" القياسية بالجهاز (نفس الطريقة الأصلية) — فيها خيار "نسخ"
+ * يقدر المستخدم يستخدمه يدوياً لحفظ الملف بأي مكان يحبه. جُرِّب سابقاً
+ * حفظ مباشر بمجلد التنزيلات عبر Storage Access Framework، لكن تبيّن غير
+ * موثوق (يطلب إذن المجلد من جديد كل مرة على بعض الأجهزة) فتم التراجع
+ * عنه بالكامل بناءً على طلب صريح.
  *
  * يستخدم xlsx-js-style (بديل متطابق الواجهة مع مكتبة xlsx العادية، بس
  * بدعم تنسيق مجاني كامل: تلوين، تسطير، محاذاة) بدل xlsx العادية اللي
@@ -17,10 +16,7 @@ import XLSX from 'xlsx-js-style';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const SAF_DIR_KEY = 'excelio_downloads_directory_uri';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 // ── تنسيق الجدول: بانر رأسي ملوّن + تناوب أبيض/رمادي + توسيط كل الخلايا ──
@@ -65,47 +61,10 @@ function buildStyledSheet(rows) {
   return ws;
 }
 
-/**
- * يحفظ محتوى base64 كملف Excel بمجلد التنزيلات مباشرة (أندرويد) عبر SAF،
- * مع إعادة استخدام إذن المجلد المحفوظ من مرة سابقة لو موجود. يرجع true لو
- * نجح الحفظ المباشر، أو false لو تعذّر (فيرجع الاستدعاء للمشاركة كبديل).
- * ملاحظة مهمة: لا يطلب إذن المجلد أكثر من مرة واحدة بكل محاولة تصدير --
- * لو createFileAsync فشلت لأي سبب (مثلاً اسم ملف مكرر)، نفشل مباشرة
- * ونرجع للمشاركة، بدل ما نطلب الإذن من جديد ونربك المستخدم بصندوقين.
- */
-async function saveBase64ToDownloadsAndroid(base64, finalName) {
-  try {
-    let dirUri = await AsyncStorage.getItem(SAF_DIR_KEY);
-
-    if (!dirUri) {
-      const perm = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-      if (!perm.granted) return false;
-      dirUri = perm.directoryUri;
-      await AsyncStorage.setItem(SAF_DIR_KEY, dirUri);
-    }
-
-    const fileUri = await FileSystem.StorageAccessFramework.createFileAsync(dirUri, finalName, XLSX_MIME);
-    await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-    return true;
-  } catch {
-    // الإذن المحفوظ غير صالح أو فشل الإنشاء لأي سبب -- نمسحه عشان يُطلب
-    // إذن صحيح بالمحاولة الجاية، ونرجع للمشاركة الآن بدون إزعاج المستخدم
-    // بصندوق ثاني بنفس هذي المحاولة.
-    await AsyncStorage.removeItem(SAF_DIR_KEY);
-    return false;
-  }
-}
-
-/** يحفظ ملف Excel جاهز (base64) بأفضل طريقة متاحة للمنصة -- تنزيل مباشر
- * بأندرويد، أو قائمة مشاركة/حفظ بـiOS (ما فيه بديل تنزيل مباشر بـiOS). */
-async function saveOrShare(base64, finalName) {
+/** يحفظ الملف مؤقتاً بالكاش، ثم يفتح قائمة "إرسال إلى" (فيها خيار نسخ). */
+async function saveAndShare(base64, finalName) {
   const cacheUri = FileSystem.cacheDirectory + finalName;
   await FileSystem.writeAsStringAsync(cacheUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-
-  if (Platform.OS === 'android') {
-    const saved = await saveBase64ToDownloadsAndroid(base64, finalName);
-    if (saved) return { uri: cacheUri, savedToDownloads: true };
-  }
 
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
@@ -115,12 +74,9 @@ async function saveOrShare(base64, finalName) {
       UTI: 'org.openxmlformats.spreadsheetml.sheet',
     });
   }
-  return { uri: cacheUri, savedToDownloads: false };
+  return cacheUri;
 }
 
-/** اسم ملف فريد دايماً (تاريخ + وقت لدقة الثانية) -- يمنع تصادم الاسم لو
- * صُدِّر نفس التقرير أكثر من مرة بنفس اليوم (كان سبب فشل الحفظ المباشر
- * سابقاً وطلب إذن المجلد مرتين). */
 function buildFinalName(fileName) {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
@@ -129,7 +85,7 @@ function buildFinalName(fileName) {
 }
 
 /**
- * يصدّر مصفوفة صفوف (objects) إلى ملف Excel منسَّق، ثم يحفظه بالتنزيلات مباشرة.
+ * يصدّر مصفوفة صفوف (objects) إلى ملف Excel منسَّق، ثم يفتح قائمة الإرسال.
  * @param {Array<Object>} rows - صفوف البيانات (كل عنصر = صف بمفاتيح = أسماء الأعمدة)
  * @param {string} sheetName - اسم الورقة داخل الملف
  * @param {string} fileName - اسم الملف (بدون امتداد)
@@ -145,12 +101,11 @@ export async function exportXLSX(rows, sheetName, fileName) {
   const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
 
   const finalName = buildFinalName(fileName);
-  const result = await saveOrShare(base64, finalName);
-  return result.uri;
+  return saveAndShare(base64, finalName);
 }
 
 /**
- * يصدّر عدة أوراق منسَّقة بملف Excel واحد، ثم يحفظه بالتنزيلات مباشرة.
+ * يصدّر عدة أوراق منسَّقة بملف Excel واحد، ثم يفتح قائمة الإرسال.
  * @param {Array<{name: string, rows: Array<Object>}>} sheets - كل عنصر ورقة مستقلة
  * @param {string} fileName - اسم الملف (بدون امتداد)
  */
@@ -168,8 +123,7 @@ export async function exportXLSXMultiSheet(sheets, fileName) {
 
   const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
   const finalName = buildFinalName(fileName);
-  const result = await saveOrShare(base64, finalName);
-  return result.uri;
+  return saveAndShare(base64, finalName);
 }
 
 /**

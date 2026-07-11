@@ -126,19 +126,18 @@ export default function PermissionsAdminScreen() {
           </Text>
         </View>
 
-        {/* رأس الأعمدة (الأدوار) */}
-        <View style={styles.headerRow}>
-          <Text style={styles.pageColHeader}>الصفحة</Text>
+        {/* رأس توضيحي للأدوار (فوق كل البطاقات، مرة وحدة) */}
+        <View style={styles.rolesLegendRow}>
           {ROLES.map((r) => (
             <Text key={r.key} style={styles.roleColHeader}>{r.label}</Text>
           ))}
         </View>
 
-        {pageKeys.map((pageKey, idx) => (
-          <View key={pageKey} style={[styles.pageRow, idx % 2 === 0 && styles.pageRowAlt]}>
-            <View style={styles.pageNameCol}>
-              <Text style={styles.pageName}>{PAGE_REGISTRY[pageKey]?.label || pageKey}</Text>
-            </View>
+        {pageKeys.map((pageKey) => (
+          <View key={pageKey} style={styles.pageCard}>
+            <Text style={styles.pageName} numberOfLines={2}>
+              {PAGE_REGISTRY[pageKey]?.label || pageKey}
+            </Text>
             <View style={styles.rolesCells}>
               {ROLES.map((role) => (
                 <PermissionCell
@@ -169,17 +168,17 @@ const styles = StyleSheet.create({
   legend: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, marginBottom: 12 },
   legendText: { color: colors.muted, fontSize: 11, textAlign: 'right' },
 
-  headerRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 4 },
-  pageColHeader: { flex: 1, color: colors.muted, fontSize: 10, fontWeight: 'bold', textAlign: 'right' },
-  roleColHeader: { width: 96, color: colors.muted, fontSize: 9, fontWeight: 'bold', textAlign: 'center' },
+  rolesLegendRow: { flexDirection: 'row-reverse', justifyContent: 'flex-end', gap: 3, paddingVertical: 6, marginBottom: 4 },
+  roleColHeader: { width: 88, color: colors.muted, fontSize: 9, fontWeight: 'bold', textAlign: 'center' },
 
-  pageRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 8, borderRadius: 8 },
-  pageRowAlt: { backgroundColor: colors.surface },
-  pageNameCol: { flex: 1, minWidth: 0, paddingEnd: 6 },
-  pageName: { color: colors.white, fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
-  rolesCells: { flexDirection: 'row-reverse' },
+  pageCard: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+    padding: 12, marginBottom: 8,
+  },
+  pageName: { color: colors.white, fontSize: 13, fontWeight: 'bold', textAlign: 'right', marginBottom: 8 },
+  rolesCells: { flexDirection: 'row-reverse', justifyContent: 'flex-end' },
 
-  cellRow: { width: 96, flexDirection: 'row', justifyContent: 'center', gap: 3 },
+  cellRow: { width: 88, flexDirection: 'row', justifyContent: 'center', gap: 3 },
   cellBtn: { width: 26, height: 26, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   cellIcon: { fontSize: 12, fontWeight: 'bold' },
 });

@@ -13,6 +13,7 @@
  * تتجاهل أي تنسيق صامتاً بالنسخة المجانية.
  */
 import XLSX from 'xlsx-js-style';
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -92,6 +93,25 @@ function buildStyledSheetWithBanner(rows, bannerText) {
 
 /** يحفظ الملف مؤقتاً بالكاش، ثم يفتح قائمة "إرسال إلى" (فيها خيار نسخ). */
 async function saveAndShare(base64, finalName) {
+  // الويب: لا وجود لـ FileSystem.cacheDirectory ولا Sharing على المتصفح --
+  // نبني الملف كـ Blob وننزّله مباشرة عبر رابط تنزيل تلقائي (نفس سلوك أي
+  // موقع ويب عادي)، بدل الاعتماد على واجهات native غير المدعومة بالويب.
+  if (Platform.OS === 'web') {
+    const byteChars = atob(base64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: XLSX_MIME });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = finalName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return url;
+  }
+
   const cacheUri = FileSystem.cacheDirectory + finalName;
   await FileSystem.writeAsStringAsync(cacheUri, base64, { encoding: FileSystem.EncodingType.Base64 });
 
@@ -194,10 +214,23 @@ export async function pickAndParseXLSX() {
 
   if (result.canceled || !result.assets?.[0]) return null;
 
-  const fileUri = result.assets[0].uri;
-  const base64 = await FileSystem.readAsStringAsync(fileUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
+  let base64;
+  if (Platform.OS === 'web') {
+    // الويب: لا وجود لمسار ملف حقيقي -- الملف يوصل كـ File object مباشرة
+    // من متصفح المستخدم (result.assets[0].file)، نقرأه عبر FileReader.
+    const file = result.assets[0].file;
+    base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = () => reject(new Error('تعذّر قراءة الملف'));
+      reader.readAsDataURL(file);
+    });
+  } else {
+    const fileUri = result.assets[0].uri;
+    base64 = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  }
 
   const wb = XLSX.read(base64, { type: 'base64' });
   const firstSheetName = wb.SheetNames[0];

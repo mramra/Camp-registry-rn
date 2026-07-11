@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { StackActions } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useDataScope } from '../lib/useDataScope';
 import { fetchPendingRequestsCount, fetchFamilies, fetchFamilyMembers, fetchCamps } from '../lib/supabase';
@@ -156,14 +155,18 @@ export default function AppDrawer({ visible, onClose, navigation }) {
     setOpenKey((prev) => (prev === key ? null : key));
   };
 
-  // dispatch(StackActions.push) -- مرجع NavigationContainer (اللي وصل هنا
-  // كـ navigation) ما يدعم navigation.push() مباشرة، هذي متاحة بس بـ navigation
-  // prop لشاشة داخل الـ Stack. push بدل navigate عمداً: navigate يرجع لنسخة
-  // قديمة من نفس الشاشة لو موجودة بتاريخ التنقل، وهذا يمسح أي شاشات بينهم
-  // بصمت -- فيصير زر الرجوع يقفز فجأة لصفحة بعيدة بدل الشاشة اللي كنت فيها فعلاً.
+  // كل تنقل من القائمة الجانبية = "وجهة رئيسية جديدة"، فنعيد ضبط الـ stack
+  // بالكامل لـ [الرئيسية, الشاشة المطلوبة] بدل تكديسها فوق كل الشاشات
+  // السابقة. هذا يحل مشكلة: فتح عدة شاشات من القائمة بالتتابع يخلي زر
+  // الرجوع يحتاج ضغطات كثيرة عشان يوصل للرئيسية بدل ضغطة وحدة متوقَّعة.
+  // التنقل الداخلي بكل شاشة (تفاصيل/تعديل عبر push) يبقى فوق هذا الأساس
+  // الجديد بشكل طبيعي، فما يتأثر إطلاقاً.
   const go = (screen) => {
     onClose();
-    navigation.dispatch(StackActions.push(screen));
+    navigation.reset({
+      index: screen === 'Dashboard' ? 0 : 1,
+      routes: screen === 'Dashboard' ? [{ name: 'Dashboard' }] : [{ name: 'Dashboard' }, { name: screen }],
+    });
   };
 
   return (

@@ -217,8 +217,12 @@ export default function CampsListScreen() {
         <View style={[styles.card, styles.mainCard]}>{renderCampInfo(camp, false, subs.length)}</View>
         {!isCollapsed &&
           subs.map((s) => (
-            <View key={s.id} style={[styles.card, styles.subCard]}>
-              {renderCampInfo(s, true, 0)}
+            <View key={s.id} style={styles.treeRow}>
+              <View style={styles.treeGuide} />
+              <View style={[styles.card, styles.subCard, { flex: 1 }]}>
+                <Text style={styles.treeConnector}>└─ فرع تابع</Text>
+                {renderCampInfo(s, true, 0)}
+              </View>
             </View>
           ))}
       </View>
@@ -294,7 +298,10 @@ const styles = StyleSheet.create({
 
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14, marginBottom: 8 },
   mainCard: { backgroundColor: colors.surface, borderRightWidth: 3, borderRightColor: colors.accent },
-  subCard: { backgroundColor: colors.surface, borderRightWidth: 3, borderRightColor: colors.blue, marginStart: 20 },
+  subCard: { backgroundColor: colors.surface, borderRightWidth: 3, borderRightColor: colors.blue, marginBottom: 0 },
+  treeRow: { flexDirection: 'row-reverse', marginBottom: 8 },
+  treeGuide: { width: 22, borderRightWidth: 1, borderRightColor: colors.border },
+  treeConnector: { color: colors.muted, fontSize: 10, textAlign: 'right', marginBottom: 4 },
 
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   mainName: { color: colors.white, fontWeight: '900', fontSize: 14, textAlign: 'right' },

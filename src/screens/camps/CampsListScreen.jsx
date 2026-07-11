@@ -185,14 +185,14 @@ export default function CampsListScreen() {
         {(editable || deletable) && (
           <View style={styles.actionsRow}>
             {editable && (
-              <Pressable style={styles.editBtn} onPress={() => navigation.navigate('CampForm', { campId: camp.id })}>
+              <Pressable style={styles.editBtn} onPress={() => navigation.push('CampForm', { campId: camp.id })}>
                 <Text style={styles.editBtnText}>✏️ تعديل</Text>
               </Pressable>
             )}
             {!isSub && (isOwner || isSuperAdmin) && (
               <Pressable
                 style={styles.addSubBtn}
-                onPress={() => navigation.navigate('CampForm', { parentCampId: camp.id })}
+                onPress={() => navigation.push('CampForm', { parentCampId: camp.id })}
               >
                 <Text style={styles.addSubBtnText}>➕ فرع</Text>
               </Pressable>
@@ -251,7 +251,7 @@ export default function CampsListScreen() {
               subtitle={<Text style={styles.headerSubtitle}>{parents.length} من أصل {camps.length} مخيم</Text>}
               action={
                 (isOwner || isSuperAdmin) && (
-                  <Pressable style={styles.addBtn} onPress={() => navigation.navigate('CampForm')}>
+                  <Pressable style={styles.addBtn} onPress={() => navigation.push('CampForm')}>
                     <Text style={styles.addBtnText}>➕ إضافة</Text>
                   </Pressable>
                 )

@@ -276,7 +276,7 @@ export default function FamiliesListScreen() {
 
     return (
       <Pressable
-        onPress={() => navigation.navigate('FamilyDetail', { familyId: f.id })}
+        onPress={() => navigation.push('FamilyDetail', { familyId: f.id })}
         style={({ pressed }) => [
           styles.card,
           { borderRightColor: borderColor },
@@ -336,7 +336,7 @@ export default function FamiliesListScreen() {
                   {canWrite && (
                     <Pressable
                       style={styles.addBtn}
-                      onPress={() => navigation.navigate('FamilyForm')}
+                      onPress={() => navigation.push('FamilyForm')}
                     >
                       <Text style={styles.addBtnText}>➕ إضافة</Text>
                     </Pressable>

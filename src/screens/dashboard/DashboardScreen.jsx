@@ -235,7 +235,7 @@ export default function DashboardScreen() {
 
   const handleQuickAction = (a) => {
     if (a.action === 'logout') logout();
-    else if (a.screen) navigation.navigate(a.screen);
+    else if (a.screen) navigation.push(a.screen);
   };
 
   return (
@@ -276,7 +276,7 @@ export default function DashboardScreen() {
                 <Pressable
                   key={r.key}
                   style={styles.searchRow}
-                  onPress={() => navigation.navigate('FamilyDetail', { familyId: r.familyId })}
+                  onPress={() => navigation.push('FamilyDetail', { familyId: r.familyId })}
                 >
                   <Text style={styles.searchRowIcon}>{r.isHead ? '👨‍👩‍👧' : '👤'}</Text>
                   <View style={{ flex: 1 }}>
@@ -299,7 +299,7 @@ export default function DashboardScreen() {
             <Pressable
               key={s.label}
               style={({ pressed }) => [styles.statCard, pressed && styles.pressed]}
-              onPress={() => s.screen && navigation.navigate(s.screen)}
+              onPress={() => s.screen && navigation.push(s.screen)}
             >
               <Text style={styles.statIcon}>{s.icon}</Text>
               <Text style={[styles.statValue, { color: s.color }]}>

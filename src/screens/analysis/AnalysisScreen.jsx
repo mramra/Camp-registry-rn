@@ -406,7 +406,7 @@ export default function AnalysisScreen() {
                 style={styles.drillRow}
                 onPress={() => {
                   setDrillDown(null);
-                  navigation.navigate('FamilyDetail', { familyId: famId });
+                  navigation.push('FamilyDetail', { familyId: famId });
                 }}
               >
                 <Text style={styles.drillName}>{index + 1}. {name}</Text>

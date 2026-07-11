@@ -316,7 +316,7 @@ export default function RegistersScreen() {
   );
 
   const renderHealth = ({ item: r }) => (
-    <Pressable style={styles.card} onPress={() => r.famId && navigation.navigate('FamilyDetail', { familyId: r.famId })}>
+    <Pressable style={styles.card} onPress={() => r.famId && navigation.push('FamilyDetail', { familyId: r.famId })}>
       <View style={styles.cardTop}>
         <Text style={styles.cardName}>{r.name} <Text style={styles.cardMeta}>({r.role})</Text></Text>
         <Badge label={r.healthType} color={HEALTH_COLOR[r.key] || colors.muted} />

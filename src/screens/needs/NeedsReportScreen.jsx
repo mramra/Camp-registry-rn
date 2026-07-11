@@ -129,7 +129,7 @@ export default function NeedsReportScreen() {
     const unhealthy = mems.flatMap((m) => memberHealthKeys(m).map((k) => ({ m, k })));
 
     return (
-      <Pressable style={styles.card} onPress={() => navigation.navigate('FamilyDetail', { familyId: f.id })}>
+      <Pressable style={styles.card} onPress={() => navigation.push('FamilyDetail', { familyId: f.id })}>
         <View style={styles.cardTop}>
           <View style={{ flex: 1 }}>
             <Text style={styles.headName}>{f.head_name}</Text>

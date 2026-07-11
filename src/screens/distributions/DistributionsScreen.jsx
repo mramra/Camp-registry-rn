@@ -166,7 +166,7 @@ export default function DistributionsScreen() {
     return (
       <Pressable
         style={[styles.card, { borderRightColor: st.color }]}
-        onPress={() => navigation.navigate('DistributionReceive', { round: r })}
+        onPress={() => navigation.push('DistributionReceive', { round: r })}
       >
         <View style={styles.cardTop}>
           <View style={{ flex: 1 }}>

@@ -232,7 +232,7 @@ export default function AlertsScreen() {
                 {!!a.screen && (
                   <Pressable
                     style={[styles.actionBtn, { backgroundColor: `${s.text}22`, borderColor: s.border }]}
-                    onPress={() => navigation.navigate(a.screen)}
+                    onPress={() => navigation.push(a.screen)}
                   >
                     <Text style={[styles.actionText, { color: s.text }]}>عرض</Text>
                   </Pressable>

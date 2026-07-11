@@ -157,7 +157,7 @@ export default function UsersListScreen() {
 
         {canEditUser(u) && (
           <View style={styles.actionsRow}>
-            <Pressable style={styles.editBtn} onPress={() => navigation.navigate('UserForm', { userId: u.id })}>
+            <Pressable style={styles.editBtn} onPress={() => navigation.push('UserForm', { userId: u.id })}>
               <Text style={styles.editBtnText}>✏️ تعديل</Text>
             </Pressable>
             <Pressable style={styles.resetBtn} onPress={() => handleResetPassword(u)}>
@@ -208,7 +208,7 @@ export default function UsersListScreen() {
               subtitle={<Text style={styles.headerSubtitle}>{filtered.length} من أصل {users.length}</Text>}
               action={
                 (isOwner || isSuperAdmin) && (
-                  <Pressable style={styles.addBtn} onPress={() => navigation.navigate('UserForm')}>
+                  <Pressable style={styles.addBtn} onPress={() => navigation.push('UserForm')}>
                     <Text style={styles.addBtnText}>➕ إضافة</Text>
                   </Pressable>
                 )

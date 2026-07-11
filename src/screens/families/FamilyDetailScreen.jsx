@@ -299,7 +299,7 @@ export default function FamilyDetailScreen() {
           {canEdit && (
             <Pressable
               style={[styles.editBtn, !!offlineInfo && styles.btnDisabled]}
-              onPress={() => !offlineInfo && navigation.navigate('FamilyForm', { familyId })}
+              onPress={() => !offlineInfo && navigation.push('FamilyForm', { familyId })}
               disabled={!!offlineInfo}
             >
               <Text style={styles.editBtnText}>✏️ تعديل</Text>

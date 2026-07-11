@@ -10,27 +10,15 @@ import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FormInput from '../../components/ui/FormInput';
-import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
-
-const STATUS_MAP = {
-  draft: { label: 'مسودة', color: colors.muted },
-  active: { label: 'نشط', color: colors.green },
-  completed: { label: 'مكتمل', color: colors.blue },
-  cancelled: { label: 'ملغي', color: colors.red },
-};
-
-const STATUS_FILTER_OPTIONS = [
-  { value: '', label: 'كل الحالات' },
-  ...Object.entries({ draft: 'مسودة', active: 'نشط', completed: 'مكتمل', cancelled: 'ملغي' }).map(([value, label]) => ({ value, label })),
-];
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 /**
  * قائمة جولات التوزيع — جولة = كيان واحد فقط (اسم + تاريخ يحدده المستخدم +
- * ملاحظات)، بدون أي مفهوم "دفعة" وسيط. فتح الجولة يوديك مباشرة لشاشة تسجيل
- * الاستلام (مستلمين/غير مستلمين) — لا شاشة وسيطة بينهم.
+ * ملاحظات)، بدون أي مفهوم "دفعة" وسيط، وبدون نظام حالة (مسودة/نشط/مكتمل/
+ * ملغي) -- حُذف بالكامل بناءً على الطلب. فتح الجولة يوديك مباشرة لشاشة
+ * تسجيل الاستلام (مستلمين/غير مستلمين) — لا شاشة وسيطة بينهم.
  */
 export default function DistributionsScreen() {
   const navigation = useNavigation();
@@ -42,7 +30,6 @@ export default function DistributionsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
   const [formVisible, setFormVisible] = useState(false);
   const [name, setName] = useState('');
   const [roundDate, setRoundDate] = useState(todayStr());
@@ -60,8 +47,6 @@ export default function DistributionsScreen() {
         fetchDistReceivedCountsByRound(orgId),
       ]);
       const campIds = getAllowedCampIds(campsData);
-      // الجولة نفسها غير مرتبطة بمخيم -- تظهر لكل المستخدمين المصرَّح لهم
-      // بأي مخيم ضمن المنظمة (فلترة المخيم تصير داخل شاشة الاستلام نفسها).
       setRounds(roundsData);
       setCamps(getVisibleCamps(campsData));
       setReceivedCounts(counts);
@@ -79,7 +64,6 @@ export default function DistributionsScreen() {
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
   const filtered = rounds.filter((r) => {
-    if (filterStatus && r.status !== filterStatus) return false;
     if (search.trim() && !(r.name || '').toLowerCase().includes(search.trim().toLowerCase())) return false;
     return true;
   });
@@ -118,7 +102,6 @@ export default function DistributionsScreen() {
             name: name.trim(),
             round_date: roundDate,
             notes: notes.trim() || null,
-            status: 'draft',
           });
       if (!result.success) {
         showError(result.error || 'فشل الحفظ');
@@ -162,20 +145,16 @@ export default function DistributionsScreen() {
   };
 
   const renderRound = ({ item: r }) => {
-    const st = STATUS_MAP[r.status] || { label: r.status, color: colors.muted };
     return (
       <Pressable
-        style={[styles.card, { borderRightColor: st.color }]}
+        style={styles.card}
         onPress={() => navigation.push('DistributionReceive', { round: r })}
       >
-        <View style={styles.cardTop}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.roundName}>📦 {r.name}</Text>
-            {!!r.notes && <Text style={styles.metaLine}>{r.notes}</Text>}
-            <Text style={styles.dateLine}>📅 {formatDate(r.round_date || r.created_at)}</Text>
-            <Text style={styles.receivedLine}>✅ {receivedCounts[r.id] || 0} أسرة استلمت</Text>
-          </View>
-          <Text style={[styles.statusBadge, { color: st.color, backgroundColor: `${st.color}22` }]}>{st.label}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.roundName}>📦 {r.name}</Text>
+          {!!r.notes && <Text style={styles.metaLine}>{r.notes}</Text>}
+          <Text style={styles.dateLine}>📅 {formatDate(r.round_date || r.created_at)}</Text>
+          <Text style={styles.receivedLine}>✅ {receivedCounts[r.id] || 0} أسرة استلمت</Text>
         </View>
         {canWrite && (
           <View style={styles.cardActions}>
@@ -224,28 +203,12 @@ export default function DistributionsScreen() {
               }
             />
 
-            <View style={styles.statsGrid}>
-              {Object.entries(STATUS_MAP).map(([key, meta]) => (
-                <View key={key} style={styles.statBox}>
-                  <Text style={[styles.statValue, { color: meta.color }]}>{rounds.filter((r) => r.status === key).length}</Text>
-                  <Text style={styles.statLabel}>{meta.label}</Text>
-                </View>
-              ))}
-            </View>
-
             <TextInput
               value={search}
               onChangeText={setSearch}
               placeholder="🔍 بحث في الجولات..."
               placeholderTextColor={colors.muted}
               style={styles.searchInput}
-            />
-
-            <SelectField
-              value={STATUS_FILTER_OPTIONS.find((o) => o.value === filterStatus)?.label}
-              placeholder="كل الحالات"
-              options={STATUS_FILTER_OPTIONS}
-              onSelect={setFilterStatus}
             />
           </View>
         }
@@ -277,23 +240,16 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
   addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
 
-  statsGrid: { flexDirection: 'row', gap: 6, marginBottom: 12 },
-  statBox: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingVertical: 8, alignItems: 'center' },
-  statValue: { fontSize: 16, fontWeight: '900' },
-  statLabel: { color: colors.muted, fontSize: 9, marginTop: 2 },
-
   searchInput: {
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 10,
   },
 
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRadius: 12, padding: 14, marginBottom: 8 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRightColor: colors.accent, borderRadius: 12, padding: 14, marginBottom: 8 },
   roundName: { color: colors.white, fontWeight: 'bold', fontSize: 14, textAlign: 'right' },
   metaLine: { color: colors.muted, fontSize: 11, marginTop: 3, textAlign: 'right' },
   dateLine: { color: colors.muted, fontSize: 10, marginTop: 4, textAlign: 'right' },
   receivedLine: { color: colors.green, fontSize: 11, fontWeight: 'bold', marginTop: 4, textAlign: 'right' },
-  statusBadge: { fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   cardActions: { flexDirection: 'row', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
   editIconBtn: { flex: 1, backgroundColor: 'rgba(59,130,246,0.1)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
   editIconBtnText: { color: colors.blue, fontWeight: 'bold', fontSize: 11 },

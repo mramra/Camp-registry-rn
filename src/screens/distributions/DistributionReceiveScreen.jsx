@@ -13,6 +13,7 @@ import {
   unmarkFamilyReceivedByRound,
 } from '../../lib/supabase';
 import { showError, showSuccess } from '../../utils/toast';
+import { exportXLSXMultiSheet } from '../../lib/excelIO';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -210,6 +211,48 @@ export default function DistributionReceiveScreen() {
     }
   };
 
+  const [exporting, setExporting] = useState(false);
+
+  /** يبني صفوف أسرة واحدة لملف التصدير (اسم، هوية، مخيم، خيمة، عدد أفراد، جوال) */
+  const buildExportRow = (f, i) => ({
+    '#': i + 1,
+    'المخيم': campMap[f.camp_id] || '—',
+    'اسم رب الأسرة': f.head_name || '',
+    'رقم الهوية': f.head_id || '',
+    'رقم الخيمة': f.tent || '',
+    'عدد الأفراد': 1 + (membersByFamily[f.id]?.length || 0),
+    'الجوال': f.phone1 || '',
+  });
+
+  /** ترتيب الأسر حسب المخيم (تجميعي) ثم الاسم -- لكل من ورقتي الاستلام */
+  const sortByCamp = (list) =>
+    [...list].sort((a, b) => {
+      const ca = campMap[a.camp_id] || '';
+      const cb = campMap[b.camp_id] || '';
+      return ca === cb ? (a.head_name || '').localeCompare(b.head_name || '', 'ar') : ca.localeCompare(cb, 'ar');
+    });
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const received = sortByCamp(families.filter((f) => receivedIds.has(f.id)));
+      const notReceived = sortByCamp(families.filter((f) => !receivedIds.has(f.id)));
+
+      await exportXLSXMultiSheet(
+        [
+          { name: 'استلموا', rows: received.map(buildExportRow) },
+          { name: 'لم يستلموا', rows: notReceived.map(buildExportRow) },
+        ],
+        `تقرير_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`
+      );
+      showSuccess('تم تصدير التقرير');
+    } catch (e) {
+      showError('فشل التصدير: ' + e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const renderFamily = ({ item: f }) => {
     const memberCount = 1 + (membersByFamily[f.id]?.length || 0);
     const selected = selectedIds.has(f.id);
@@ -261,6 +304,11 @@ export default function DistributionReceiveScreen() {
               icon="✅"
               title={round?.name || 'جولة توزيع'}
               subtitle={<Text style={styles.headerSubtitle}>{receivedIds.size} استلم من أصل {families.length}</Text>}
+              action={
+                <Pressable style={[styles.exportBtn, exporting && styles.disabled]} onPress={handleExport} disabled={exporting}>
+                  {exporting ? <ActivityIndicator color={colors.green} size="small" /> : <Text style={styles.exportBtnText}>📤 تصدير</Text>}
+                </Pressable>
+              }
             />
 
             <View style={styles.chipsRow}>
@@ -345,6 +393,8 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 90 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
+  exportBtn: { backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  exportBtnText: { color: colors.green, fontWeight: 'bold', fontSize: 12 },
   searchInput: {
     backgroundColor: colors.surface2,
     borderWidth: 1,

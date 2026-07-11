@@ -52,6 +52,48 @@ export async function exportXLSX(rows, sheetName, fileName) {
 }
 
 /**
+ * يصدّر عدة أوراق بملف Excel واحد، ثم يفتح قائمة مشاركة/حفظ.
+ * @param {Array<{name: string, rows: Array<Object>}>} sheets - كل عنصر ورقة مستقلة
+ * @param {string} fileName - اسم الملف (بدون امتداد)
+ */
+export async function exportXLSXMultiSheet(sheets, fileName) {
+  const validSheets = (sheets || []).filter((s) => s.rows && s.rows.length > 0);
+  if (validSheets.length === 0) {
+    throw new Error('لا توجد بيانات للتصدير');
+  }
+
+  const wb = XLSX.utils.book_new();
+  validSheets.forEach((s) => {
+    const ws = XLSX.utils.json_to_sheet(s.rows);
+    const keys = Object.keys(s.rows[0] || {});
+    ws['!cols'] = keys.map(() => ({ wch: 20 }));
+    XLSX.utils.book_append_sheet(wb, ws, s.name.slice(0, 31)); // حد Excel: 31 حرف لاسم الورقة
+  });
+
+  const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const finalName = `${fileName}_${dateStr}.xlsx`;
+  const fileUri = FileSystem.cacheDirectory + finalName;
+
+  await FileSystem.writeAsStringAsync(fileUri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  const canShare = await Sharing.isAvailableAsync();
+  if (canShare) {
+    await Sharing.shareAsync(fileUri, {
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      dialogTitle: finalName,
+      UTI: 'org.openxmlformats.spreadsheetml.sheet',
+    });
+  }
+
+  return fileUri;
+}
+
+/**
  * يفتح منتقي الملفات، يقرأ أول ورقة من ملف Excel مختار، ويرجع
  * الصفوف كمصفوفة objects (رأس الجدول = مفاتيح كل صف).
  * يرجع null لو ألغى المستخدم الاختيار.

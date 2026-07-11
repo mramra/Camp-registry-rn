@@ -402,6 +402,24 @@ export const deleteDistRound = async (roundId) => {
   }
 };
 
+/** عدد الأسر المستلمة لكل جولة توزيع بالمنظمة -- خريطة round_id → عدد،
+ * لعرضها مباشرة على بطاقة كل جولة بقائمة التوزيعات. */
+export const fetchDistReceivedCountsByRound = async (orgId) => {
+  try {
+    const { data, error } = await supabase.from('camp_dist_families').select('round_id').eq('org_id', orgId);
+    if (error) throw error;
+    const counts = {};
+    (data || []).forEach((r) => {
+      if (!r.round_id) return;
+      counts[r.round_id] = (counts[r.round_id] || 0) + 1;
+    });
+    return counts;
+  } catch (err) {
+    console.error('[fetchDistReceivedCountsByRound]', err.message);
+    return {};
+  }
+};
+
 export const updateDistRoundStatus = async (roundId, status) => {
   try {
     const { error } = await supabase.from('dist_rounds').update({ status }).eq('id', roundId);

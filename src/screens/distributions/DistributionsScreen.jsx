@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, FlatList, StyleSheet, SafeAreaView, R
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
-import { fetchDistRounds, fetchCamps, createDistRound, updateDistRound, deleteDistRound } from '../../lib/supabase';
+import { fetchDistRounds, fetchCamps, createDistRound, updateDistRound, deleteDistRound, fetchDistReceivedCountsByRound } from '../../lib/supabase';
 import { formatDate } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
@@ -49,16 +49,22 @@ export default function DistributionsScreen() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [editingRoundId, setEditingRoundId] = useState(null); // null = إضافة جديدة، وإلا تعديل
+  const [receivedCounts, setReceivedCounts] = useState({});
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
     try {
-      const [roundsData, campsData] = await Promise.all([fetchDistRounds(orgId), fetchCamps(orgId)]);
+      const [roundsData, campsData, counts] = await Promise.all([
+        fetchDistRounds(orgId),
+        fetchCamps(orgId),
+        fetchDistReceivedCountsByRound(orgId),
+      ]);
       const campIds = getAllowedCampIds(campsData);
       // الجولة نفسها غير مرتبطة بمخيم -- تظهر لكل المستخدمين المصرَّح لهم
       // بأي مخيم ضمن المنظمة (فلترة المخيم تصير داخل شاشة الاستلام نفسها).
       setRounds(roundsData);
       setCamps(getVisibleCamps(campsData));
+      setReceivedCounts(counts);
     } catch (e) {
       showError('تعذّر تحميل جولات التوزيع');
     } finally {
@@ -167,6 +173,7 @@ export default function DistributionsScreen() {
             <Text style={styles.roundName}>📦 {r.name}</Text>
             {!!r.notes && <Text style={styles.metaLine}>{r.notes}</Text>}
             <Text style={styles.dateLine}>📅 {formatDate(r.round_date || r.created_at)}</Text>
+            <Text style={styles.receivedLine}>✅ {receivedCounts[r.id] || 0} أسرة استلمت</Text>
           </View>
           <Text style={[styles.statusBadge, { color: st.color, backgroundColor: `${st.color}22` }]}>{st.label}</Text>
         </View>
@@ -285,6 +292,7 @@ const styles = StyleSheet.create({
   roundName: { color: colors.white, fontWeight: 'bold', fontSize: 14, textAlign: 'right' },
   metaLine: { color: colors.muted, fontSize: 11, marginTop: 3, textAlign: 'right' },
   dateLine: { color: colors.muted, fontSize: 10, marginTop: 4, textAlign: 'right' },
+  receivedLine: { color: colors.green, fontSize: 11, fontWeight: 'bold', marginTop: 4, textAlign: 'right' },
   statusBadge: { fontSize: 10, fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   cardActions: { flexDirection: 'row', gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
   editIconBtn: { flex: 1, backgroundColor: 'rgba(59,130,246,0.1)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' },

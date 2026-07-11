@@ -55,11 +55,14 @@ export default function DashboardScreen() {
   const loadStats = useCallback(async () => {
     if (!profile?.org_id) return;
 
-    // 1) اعرض النسخة المحفوظة فوراً (لو موجودة) — بدون انتظار الشبكة إطلاقاً.
-    // هذا يخلي فتح التطبيق يبان فوري حتى لو النت بطيء أو مقطوع، بدل مؤشر
-    // تحميل فاضي كل مرة.
+    // 1) اعرض النسخة المحفوظة فوراً (لو موجودة وسليمة) — بدون انتظار الشبكة
+    // إطلاقاً. هذا يخلي فتح التطبيق يبان فوري حتى لو النت بطيء أو مقطوع.
+    // ملاحظة أمان: لو النسخة المحفوظة نفسها "صفر أسر" (بقايا نسخة قديمة
+    // فاسدة من قبل إصلاحات سابقة)، نتجاهلها تماماً بدل ما نعرضها كأنها
+    // بيانات صحيحة مع شريط "محفوظ" مربك.
     const cached = await getCachedData('dashboard_stats', profile?.id);
-    const hadCache = !!cached?.data;
+    const cacheLooksValid = cached?.data?.stats && cached.data.stats.families > 0;
+    const hadCache = cacheLooksValid;
     if (hadCache) {
       setStats(cached.data.stats);
       setActivity(cached.data.activityLog || []);

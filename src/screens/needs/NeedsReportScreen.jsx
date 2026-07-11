@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { getFamilyCategories, getOrphanCount, hasHealthData } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -38,7 +41,7 @@ function memberHealthKeys(m) {
 
 export default function NeedsReportScreen() {
   const navigation = useNavigation();
-  const { orgId } = useAuth();
+  const { orgId, profile } = useAuth();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
 
   const [families, setFamilies] = useState([]);
@@ -50,24 +53,41 @@ export default function NeedsReportScreen() {
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
     try {
-      const campsData = await fetchCamps(orgId);
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+
+      const campsData = await withTimeout(fetchCamps(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const allowedCampIds = getAllowedCampIds(campsData);
-      const famsRaw = await fetchFamilies(orgId);
+      const famsRaw = await withTimeout(fetchFamilies(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const fams = filterLocal(famsRaw, allowedCampIds);
+      const mems = await withTimeout(fetchFamilyMembers(fams.map((f) => f.id)), 12000, 'انتهت مهلة تحميل البيانات');
+      const visibleCamps = getVisibleCamps(campsData);
+
       setFamilies(fams);
-      setCamps(getVisibleCamps(campsData));
-      setMembers(await fetchFamilyMembers(fams.map((f) => f.id)));
+      setCamps(visibleCamps);
+      setMembers(mems);
+      setOfflineInfo(null);
+      cacheData('needs_report', profile?.id, { families: fams, camps: visibleCamps, members: mems });
     } catch (e) {
-      showError('تعذّر تحميل تقرير الاحتياجات');
+      const cached = await getCachedData('needs_report', profile?.id);
+      if (cached?.data) {
+        setFamilies(cached.data.families || []);
+        setCamps(cached.data.camps || []);
+        setMembers(cached.data.members || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      } else {
+        showError('تعذّر تحميل تقرير الاحتياجات');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps]);
+  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps, profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -180,6 +200,14 @@ export default function NeedsReportScreen() {
               action={<ExportButton getRows={getExportRows} sheetName="تقرير الاحتياجات" fileName="تقرير_الاحتياجات" />}
             />
 
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
+                </Text>
+              </View>
+            )}
+
             <View style={styles.statsGrid}>
               {Object.entries(CAT_LABELS).map(([k, v]) => (
                 <Pressable
@@ -251,6 +279,11 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
 
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   statBox: { width: '31%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 8, alignItems: 'center' },

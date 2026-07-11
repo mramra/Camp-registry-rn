@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { naturalCompare } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -14,7 +17,7 @@ import colors from '../../theme/colors';
 const REQUIRED_FIELDS = ['head_name', 'head_id', 'phone1', 'camp_id'];
 
 export default function CampCompareScreen() {
-  const { orgId } = useAuth();
+  const { orgId, profile } = useAuth();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
 
   const [data, setData] = useState([]);
@@ -22,16 +25,20 @@ export default function CampCompareScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState('families');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
     try {
-      const camps = await fetchCamps(orgId);
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+
+      const camps = await withTimeout(fetchCamps(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const campIds = getAllowedCampIds(camps);
-      const famsRaw = await fetchFamilies(orgId);
+      const famsRaw = await withTimeout(fetchFamilies(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const families = filterLocal(famsRaw, campIds);
       const famIdSet = new Set(families.map((f) => f.id));
-      const membersRaw = await fetchFamilyMembers(families.map((f) => f.id));
+      const membersRaw = await withTimeout(fetchFamilyMembers(families.map((f) => f.id)), 12000, 'انتهت مهلة تحميل البيانات');
       const members = campIds === null ? membersRaw : membersRaw.filter((m) => famIdSet.has(m.family_id));
 
       const campFams = {};
@@ -71,13 +78,21 @@ export default function CampCompareScreen() {
         };
       });
       setData(rows);
+      setOfflineInfo(null);
+      cacheData('camp_compare', profile?.id, { rows });
     } catch (e) {
-      showError('تعذّر تحميل مقارنة المخيمات');
+      const cached = await getCachedData('camp_compare', profile?.id);
+      if (cached?.data) {
+        setData(cached.data.rows || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      } else {
+        showError('تعذّر تحميل مقارنة المخيمات');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps]);
+  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps, profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -195,6 +210,22 @@ export default function CampCompareScreen() {
               }
             />
 
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
+                </Text>
+              </View>
+            )}
+
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
+                </Text>
+              </View>
+            )}
+
             <View style={styles.totalsGrid}>
               {[
                 ['👨‍👩‍👧‍👦', 'الأسر', totals.families, colors.accent],
@@ -231,6 +262,16 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   refreshBtn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   refreshIcon: { fontSize: 15 },
 

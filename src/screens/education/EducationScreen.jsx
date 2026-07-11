@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { exportXLSX } from '../../lib/excelIO';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import {
   calcAge, getStageGroup, getGradeDelay, getExpectedGrade, STAGE_ICONS,
 } from '../../lib/helpers';
@@ -28,21 +31,29 @@ export default function EducationScreen() {
   const [campFilter, setCampFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
     setLoading(true);
     try {
-      const [famRes, campRes, memRes, orgRes] = await Promise.all([
-        supabase
-          .from('families')
-          .select('id, camp_id, head_name, head_id, head_dob, head_qualification')
-          .eq('org_id', orgId)
-          .eq('_deleted', false),
-        supabase.from('camps').select('*').eq('org_id', orgId),
-        null, // يُعبَّأ لاحقاً بعد معرفة معرّفات الأسر
-        supabase.from('org_members').select('*').eq('org_id', orgId),
-      ]);
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+
+      const [famRes, campRes, , orgRes] = await withTimeout(
+        Promise.all([
+          supabase
+            .from('families')
+            .select('id, camp_id, head_name, head_id, head_dob, head_qualification')
+            .eq('org_id', orgId)
+            .eq('_deleted', false),
+          supabase.from('camps').select('*').eq('org_id', orgId),
+          null, // يُعبَّأ لاحقاً بعد معرفة معرّفات الأسر
+          supabase.from('org_members').select('*').eq('org_id', orgId),
+        ]),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
 
       const allCamps = campRes.data || [];
       const campIds = getAllowedCampIds(allCamps);
@@ -50,23 +61,44 @@ export default function EducationScreen() {
       const familyIds = scopedFamilies.map((f) => f.id);
 
       const memResFinal = familyIds.length
-        ? await supabase
-            .from('family_members')
-            .select('id, family_id, name, national_id, dob, relation, qualification, actual_grade')
-            .in('family_id', familyIds)
-            .eq('_deleted', false)
+        ? await withTimeout(
+            supabase
+              .from('family_members')
+              .select('id, family_id, name, national_id, dob, relation, qualification, actual_grade')
+              .in('family_id', familyIds)
+              .eq('_deleted', false),
+            12000,
+            'انتهت مهلة تحميل البيانات'
+          )
         : { data: [] };
 
+      const visibleCamps = getVisibleCamps(allCamps);
+      const finalMembers = memResFinal.data || [];
+      const finalOrgMembers = orgRes.data || [];
+
       setFamilies(scopedFamilies);
-      setCamps(getVisibleCamps(allCamps));
-      setMembers(memResFinal.data || []);
-      setOrgMembers(orgRes.data || []);
+      setCamps(visibleCamps);
+      setMembers(finalMembers);
+      setOrgMembers(finalOrgMembers);
+      setOfflineInfo(null);
+      cacheData('education_report', profile?.id, {
+        families: scopedFamilies, camps: visibleCamps, members: finalMembers, orgMembers: finalOrgMembers,
+      });
     } catch (err) {
-      console.error('[EducationScreen loadData]', err.message);
+      const cached = await getCachedData('education_report', profile?.id);
+      if (cached?.data) {
+        setFamilies(cached.data.families || []);
+        setCamps(cached.data.camps || []);
+        setMembers(cached.data.members || []);
+        setOrgMembers(cached.data.orgMembers || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      } else {
+        console.error('[EducationScreen loadData]', err.message);
+      }
     } finally {
       setLoading(false);
     }
-  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps]);
+  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps, profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -150,6 +182,14 @@ export default function EducationScreen() {
           subtitle={`${filtered.length} نتيجة${delayedCount ? ` — ⚠️ ${delayedCount} متأخر دراسياً` : ''}`}
         />
 
+        {!!offlineInfo && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>
+              📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
+            </Text>
+          </View>
+        )}
+
         <SelectField
           value={campOptions.find((o) => o.value === campFilter)?.label}
           placeholder="⛺ كل المخيمات"
@@ -228,6 +268,11 @@ export default function EducationScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 32 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
 
   stageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   stageCell: {

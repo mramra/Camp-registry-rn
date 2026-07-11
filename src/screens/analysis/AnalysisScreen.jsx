@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { calcAge, hasHealthData, getOrphanCount } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
@@ -48,7 +51,7 @@ function StatBar({ label, count, total, color, onPress }) {
 
 export default function AnalysisScreen() {
   const navigation = useNavigation();
-  const { orgId } = useAuth();
+  const { orgId, profile } = useAuth();
   const { getAllowedCampIds, filterLocal } = useDataScope();
 
   const [families, setFamilies] = useState([]);
@@ -61,24 +64,40 @@ export default function AnalysisScreen() {
   const [drillSearch, setDrillSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
     try {
-      const campsData = await fetchCamps(orgId);
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+
+      const campsData = await withTimeout(fetchCamps(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const allowedCampIds = getAllowedCampIds(campsData);
-      const famsRaw = await fetchFamilies(orgId);
+      const famsRaw = await withTimeout(fetchFamilies(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const fams = filterLocal(famsRaw, allowedCampIds);
+      const mems = await withTimeout(fetchFamilyMembers(fams.map((f) => f.id)), 12000, 'انتهت مهلة تحميل البيانات');
+
       setCamps(campsData);
       setFamilies(fams);
-      setMembers(await fetchFamilyMembers(fams.map((f) => f.id)));
+      setMembers(mems);
+      setOfflineInfo(null);
+      cacheData('analysis_report', profile?.id, { families: fams, camps: campsData, members: mems });
     } catch (e) {
-      showError('تعذّر تحميل التحليلات');
+      const cached = await getCachedData('analysis_report', profile?.id);
+      if (cached?.data) {
+        setFamilies(cached.data.families || []);
+        setCamps(cached.data.camps || []);
+        setMembers(cached.data.members || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      } else {
+        showError('تعذّر تحميل التحليلات');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [orgId, getAllowedCampIds, filterLocal]);
+  }, [orgId, getAllowedCampIds, filterLocal, profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -243,6 +262,14 @@ export default function AnalysisScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
       >
         <PageHeader icon="📈" title="التقارير والتحليلات" />
+
+        {!!offlineInfo && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>
+              📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
+            </Text>
+          </View>
+        )}
 
         <View style={styles.chipsRow}>
           <FilterChip
@@ -426,6 +453,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 32 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   tabsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
 

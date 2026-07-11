@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { exportXLSX } from '../../lib/excelIO';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import {
   parseArr, hasHealthData, arrLabel, calcAge,
   buildFamHasNamedWife, buildFamWithInfant, isAutoNursing,
@@ -33,26 +36,42 @@ export default function HealthReportScreen() {
   const [loading, setLoading] = useState(true);
   const [campFilter, setCampFilter] = useState('');
   const [catFilter, setCatFilter] = useState('');
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
     setLoading(true);
     try {
-      const allCamps = await fetchCamps(orgId);
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+
+      const allCamps = await withTimeout(fetchCamps(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const campIds = getAllowedCampIds(allCamps);
-      const allFamilies = await fetchFamilies(orgId);
+      const allFamilies = await withTimeout(fetchFamilies(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const scopedFamilies = filterLocal(allFamilies, campIds);
       const familyIds = scopedFamilies.map((f) => f.id);
-      const mems = await fetchFamilyMembers(familyIds);
+      const mems = await withTimeout(fetchFamilyMembers(familyIds), 12000, 'انتهت مهلة تحميل البيانات');
+      const visibleCamps = getVisibleCamps(allCamps);
+
       setFamilies(scopedFamilies);
-      setCamps(getVisibleCamps(allCamps));
+      setCamps(visibleCamps);
       setMembers(mems);
+      setOfflineInfo(null);
+      cacheData('health_report', profile?.id, { families: scopedFamilies, camps: visibleCamps, members: mems });
     } catch (err) {
-      console.error('[HealthReportScreen loadData]', err.message);
+      const cached = await getCachedData('health_report', profile?.id);
+      if (cached?.data) {
+        setFamilies(cached.data.families || []);
+        setCamps(cached.data.camps || []);
+        setMembers(cached.data.members || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      } else {
+        console.error('[HealthReportScreen loadData]', err.message);
+      }
     } finally {
       setLoading(false);
     }
-  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps]);
+  }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps, profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -161,6 +180,14 @@ export default function HealthReportScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <PageHeader icon="⚕️" title="كشف الحالات الصحية" subtitle={`${filtered.length} حالة${catFilter ? ' — ' + catFilter : ''}`} />
 
+        {!!offlineInfo && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>
+              📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
+            </Text>
+          </View>
+        )}
+
         {canExport && (
           <View style={styles.exportRow}>
             <Pressable style={styles.expAccent} onPress={() => exportReport('all')}>
@@ -251,6 +278,11 @@ export default function HealthReportScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 32 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
 
   exportRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   expAccent: { flexGrow: 1, backgroundColor: colors.accent, paddingVertical: 10, borderRadius: 12, alignItems: 'center', minWidth: 70 },

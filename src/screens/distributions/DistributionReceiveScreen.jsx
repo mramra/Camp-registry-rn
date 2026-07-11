@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useRoute, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import {
@@ -14,6 +15,8 @@ import {
 } from '../../lib/supabase';
 import { showError, showSuccess } from '../../utils/toast';
 import { exportXLSX } from '../../lib/excelIO';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -36,7 +39,7 @@ const SORT_OPTIONS = [
 export default function DistributionReceiveScreen() {
   const route = useRoute();
   const { round } = route.params || {};
-  const { orgId, canWrite } = useAuth();
+  const { orgId, canWrite, profile } = useAuth();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
 
   const [families, setFamilies] = useState([]);
@@ -53,20 +56,25 @@ export default function DistributionReceiveScreen() {
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
+  const [offlineInfo, setOfflineInfo] = useState(null);
   const [bulkSaving, setBulkSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!round?.id || !orgId) return;
     try {
-      const campsData = await fetchCamps(orgId);
-      const allowedCampIds = getAllowedCampIds(campsData);
-      setCamps(getVisibleCamps(campsData));
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
+      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
 
-      const famsRaw = await fetchFamilies(orgId);
+      const campsData = await withTimeout(fetchCamps(orgId), 12000, 'انتهت مهلة تحميل البيانات');
+      const allowedCampIds = getAllowedCampIds(campsData);
+      const visibleCamps = getVisibleCamps(campsData);
+      setCamps(visibleCamps);
+
+      const famsRaw = await withTimeout(fetchFamilies(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const fams = filterLocal(famsRaw, allowedCampIds);
       setFamilies(fams);
 
-      const members = await fetchFamilyMembers(fams.map((f) => f.id));
+      const members = await withTimeout(fetchFamilyMembers(fams.map((f) => f.id)), 12000, 'انتهت مهلة تحميل البيانات');
       const grouped = {};
       members.forEach((m) => {
         if (!grouped[m.family_id]) grouped[m.family_id] = [];
@@ -74,18 +82,38 @@ export default function DistributionReceiveScreen() {
       });
       setMembersByFamily(grouped);
 
-      const [received, roundsData] = await Promise.all([
-        fetchDistReceivedFamilyIdsByRound(round.id),
-        fetchDistRounds(orgId),
-      ]);
+      const [received, roundsData] = await withTimeout(
+        Promise.all([
+          fetchDistReceivedFamilyIdsByRound(round.id),
+          fetchDistRounds(orgId),
+        ]),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
+      const otherRoundsList = roundsData.filter((r) => r.id !== round.id);
       setReceivedIds(received);
-      setOtherRounds(roundsData.filter((r) => r.id !== round.id));
+      setOtherRounds(otherRoundsList);
+      setOfflineInfo(null);
+      cacheData(`dist_receive_${round.id}`, profile?.id, {
+        camps: visibleCamps, families: fams, membersByFamily: grouped,
+        receivedIds: [...received], otherRounds: otherRoundsList,
+      });
     } catch (e) {
-      showError('تعذّر تحميل قائمة الأسر');
+      const cached = await getCachedData(`dist_receive_${round.id}`, profile?.id);
+      if (cached?.data) {
+        setCamps(cached.data.camps || []);
+        setFamilies(cached.data.families || []);
+        setMembersByFamily(cached.data.membersByFamily || {});
+        setReceivedIds(new Set(cached.data.receivedIds || []));
+        setOtherRounds(cached.data.otherRounds || []);
+        setOfflineInfo({ savedAt: cached.savedAt });
+      } else {
+        showError('تعذّر تحميل قائمة الأسر');
+      }
     } finally {
       setLoading(false);
     }
-  }, [round?.id, orgId]);
+  }, [round?.id, orgId, profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -160,6 +188,10 @@ export default function DistributionReceiveScreen() {
   const toggleReceive = async (family) => {
     if (!canWrite) {
       showError('لا تملك صلاحية تسجيل الاستلام');
+      return;
+    }
+    if (offlineInfo) {
+      showError('تسجيل الاستلام يتطلب اتصالاً بالإنترنت');
       return;
     }
     const already = receivedIds.has(family.id);
@@ -316,6 +348,14 @@ export default function DistributionReceiveScreen() {
               }
             />
 
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة (تسجيل الاستلام غير متاح الآن)
+                </Text>
+              </View>
+            )}
+
             <View style={styles.chipsRow}>
               <FilterChip
                 label={`⏳ لم يستلم (${pendingCount})`}
@@ -381,7 +421,7 @@ export default function DistributionReceiveScreen() {
         ListEmptyComponent={<EmptyState icon="✅" title={tab === 'pending' ? 'كل الأسر استلمت أو لا نتائج مطابقة' : 'لا توجد أسر مستلمة بعد'} />}
       />
 
-      {tab === 'pending' && selectedIds.size > 0 && canWrite && (
+      {tab === 'pending' && selectedIds.size > 0 && canWrite && !offlineInfo && (
         <View style={styles.bulkBar}>
           <Text style={styles.bulkText}>{selectedIds.size} محددة</Text>
           <Pressable style={[styles.bulkBtn, bulkSaving && styles.disabled]} onPress={bulkMarkReceived} disabled={bulkSaving}>
@@ -398,6 +438,11 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 90 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   exportBtn: { backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   exportBtnText: { color: colors.green, fontWeight: 'bold', fontSize: 12 },
   searchInput: {

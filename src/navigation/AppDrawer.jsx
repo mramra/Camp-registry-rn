@@ -15,7 +15,7 @@ import colors from '../theme/colors';
  * بـ React Native نفسه، فتعمل فوراً عبر تحديث OTA بدون أي بناء إضافي.
  */
 export default function AppDrawer({ visible, onClose, navigation }) {
-  const { profile, logout, isOwner, isSuperAdmin, orgId } = useAuth();
+  const { profile, logout, isOwner, isSuperAdmin, orgId, canAccessPageNow } = useAuth();
   const { getAllowedCampIds, filterLocal } = useDataScope();
 
   // شارات عدد بسيطة على "الطلبات المعلّقة" و"التنبيهات" -- تُحسب فقط
@@ -57,17 +57,17 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       key: 'home',
       title: '🏠 الرئيسية',
       items: [
-        { icon: '🏠', label: 'الرئيسية', screen: 'Dashboard' },
-        { icon: '🔔', label: 'التنبيهات', screen: 'Alerts', count: alertsCount },
+        { icon: '🏠', label: 'الرئيسية', screen: 'Dashboard', pageKey: 'dashboard' },
+        { icon: '🔔', label: 'التنبيهات', screen: 'Alerts', count: alertsCount, pageKey: 'alerts' },
       ],
     },
     {
       key: 'families',
       title: '👨‍👩‍👧 الأسر',
       items: [
-        { icon: '👨‍👩‍👧‍👦', label: 'قائمة الأسر', screen: 'FamiliesList' },
-        { icon: '🚶', label: 'حركات الأسر', screen: 'Movements' },
-        { icon: '📦', label: 'التوزيعات', screen: 'Distributions' },
+        { icon: '👨‍👩‍👧‍👦', label: 'قائمة الأسر', screen: 'FamiliesList', pageKey: 'families' },
+        { icon: '🚶', label: 'حركات الأسر', screen: 'Movements', pageKey: 'movements' },
+        { icon: '📦', label: 'التوزيعات', screen: 'Distributions', pageKey: 'distributions' },
         ...(isOwner ? [{ icon: '🚪', label: 'الأسر الخارجة', screen: 'ExitedFamilies' }] : []),
       ],
     },
@@ -75,9 +75,9 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       key: 'camps',
       title: '🏕️ المخيمات والمستخدمون',
       items: [
-        { icon: '🏕️', label: 'المخيمات', screen: 'CampsList' },
-        { icon: '👥', label: 'المستخدمون', screen: 'UsersList' },
-        { icon: '📱', label: 'الأجهزة', screen: 'Devices' },
+        { icon: '🏕️', label: 'المخيمات', screen: 'CampsList', pageKey: 'camps' },
+        { icon: '👥', label: 'المستخدمون', screen: 'UsersList', pageKey: 'users' },
+        { icon: '📱', label: 'الأجهزة', screen: 'Devices', pageKey: 'devices' },
         ...(isOwner ? [{ icon: '🔐', label: 'إدارة الصلاحيات', screen: 'PermissionsAdmin' }] : []),
       ],
     },
@@ -85,29 +85,29 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       key: 'registers',
       title: '⚕️ السجلات الاجتماعية والصحية',
       items: [
-        { icon: '📋', label: 'السجلات', screen: 'Registers' },
-        { icon: '🎓', label: 'الحالة الدراسية', screen: 'Education' },
+        { icon: '📋', label: 'السجلات', screen: 'Registers', pageKey: 'registers' },
+        { icon: '🎓', label: 'الحالة الدراسية', screen: 'Education', pageKey: 'education_status' },
       ],
     },
     {
       key: 'analysis',
       title: '📊 التحليل والتقارير',
       items: [
-        { icon: '📈', label: 'التقارير والتحليلات', screen: 'Analysis' },
-        { icon: '📋', label: 'تقارير الاحتياجات', screen: 'NeedsReport' },
-        { icon: '🏕️', label: 'مقارنة المخيمات', screen: 'CampCompare' },
-        { icon: '⚕️', label: 'كشف الحالات الصحية', screen: 'HealthReport' },
-        { icon: '💾', label: 'استيراد وتصدير', screen: 'Export' },
+        { icon: '📈', label: 'التقارير والتحليلات', screen: 'Analysis', pageKey: 'analysis' },
+        { icon: '📋', label: 'تقارير الاحتياجات', screen: 'NeedsReport', pageKey: 'needs_report' },
+        { icon: '🏕️', label: 'مقارنة المخيمات', screen: 'CampCompare', pageKey: 'camp_compare' },
+        { icon: '⚕️', label: 'كشف الحالات الصحية', screen: 'HealthReport', pageKey: 'health_report' },
+        { icon: '💾', label: 'استيراد وتصدير', screen: 'Export', pageKey: 'export' },
       ],
     },
     {
       key: 'comms',
       title: '💬 التواصل والحساب',
       items: [
-        { icon: '💬', label: 'الرسائل', screen: 'SMS' },
-        { icon: '⚙️', label: 'الإعدادات', screen: 'Settings' },
-        { icon: '💎', label: 'الاشتراك والباقات', screen: 'Subscription' },
-        { icon: '❓', label: 'المساعدة والدعم', screen: 'Help' },
+        { icon: '💬', label: 'الرسائل', screen: 'SMS', pageKey: 'sms' },
+        { icon: '⚙️', label: 'الإعدادات', screen: 'Settings', pageKey: 'settings' },
+        { icon: '💎', label: 'الاشتراك والباقات', screen: 'Subscription', pageKey: 'subscription' },
+        { icon: '❓', label: 'المساعدة والدعم', screen: 'Help', pageKey: 'help' },
       ],
     },
     ...(isOwner || profile?.can_review_approvals
@@ -116,16 +116,24 @@ export default function AppDrawer({ visible, onClose, navigation }) {
             key: 'admin',
             title: '⚙️ الإدارة والنظام',
             items: [
-              { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests', count: pendingCount },
-              { icon: '📝', label: 'سجل التغييرات', screen: 'Audit' },
-              { icon: '🩺', label: 'تشخيص النظام', screen: 'Diagnostics' },
-              { icon: '🗄️', label: 'إدارة البيانات', screen: 'Data' },
+              { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests', count: pendingCount, pageKey: 'pending_requests' },
+              { icon: '📝', label: 'سجل التغييرات', screen: 'Audit', pageKey: 'audit' },
+              { icon: '🩺', label: 'تشخيص النظام', screen: 'Diagnostics', pageKey: 'diagnostics' },
+              { icon: '🗄️', label: 'إدارة البيانات', screen: 'Data', pageKey: 'data' },
               ...(isOwner ? [{ icon: '🛡️', label: 'الفحص الأمني', screen: 'SecurityAudit' }] : []),
             ],
           },
         ]
       : []),
-  ];
+  ]
+    // فلترة كل عنصر حسب صلاحيات الصفحات الفعلية (canAccessPageNow) --
+    // عناصر بدون pageKey (محصورة أصلاً بشرط isOwner بالتعريف فوق) تبقى
+    // زي ما هي. القسم اللي تفضى بالكامل بعد الفلترة ما يظهر إطلاقاً.
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.pageKey || canAccessPageNow(item.pageKey)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   // القسم اللي فيه الشاشة الحالية يفتح لحاله، والباقي مطوي (نفس السابق) —
   // بس الآن بمنطق أكورديون: قسم واحد بس مفتوح بأي وقت. فتح قسم جديد يطوي

@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../lib/supabase';
-import { hasPermission } from '../lib/permissions';
+import { supabase, fetchAllPagePermissions } from '../lib/supabase';
+import { hasPermission, canAccessPageSync } from '../lib/permissions';
 import { cacheData, getCachedData, withTimeout } from '../lib/offlineCache';
 
 export const AuthContext = createContext({});
@@ -36,6 +36,8 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [previewAs, setPreviewAs] = useState(null);
+  const [pagePermRows, setPagePermRows] = useState([]);
+  const [pagePermLoaded, setPagePermLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -110,6 +112,8 @@ export const AuthProvider = ({ children }) => {
         setSession(null);
         setUser(null);
         setProfile(null);
+        setPagePermRows([]);
+        setPagePermLoaded(false);
       }
     });
 
@@ -128,6 +132,7 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error;
       setProfile(data);
       cacheData('user_profile', userId, data);
+      loadPagePermissions(data.org_id);
     } catch (err) {
       console.error('[fetchUserProfile]', err.message);
       // فشل جلب الملف الشخصي (غالباً انقطاع نت أو شبكة متعلّقة عند فتح
@@ -136,7 +141,27 @@ export const AuthProvider = ({ children }) => {
       // لمنطق التخزين المحلي الخاص فيها. نرجع لآخر ملف شخصي محفوظ عشان
       // يكمل التطبيق فتحه طبيعياً.
       const cached = await getCachedData('user_profile', userId);
-      if (cached?.data) setProfile(cached.data);
+      if (cached?.data) {
+        setProfile(cached.data);
+        loadPagePermissions(cached.data.org_id);
+      }
+    }
+  }, []);
+
+  // جلب صفوف صلاحيات الصفحات (page_permissions) -- مرة عند تسجيل الدخول،
+  // تُستخدم بعدها محلياً (canAccessPageNow) بدون طلب شبكة إضافي بكل شاشة.
+  const loadPagePermissions = useCallback(async (orgId) => {
+    if (!orgId) return;
+    try {
+      const rows = await fetchAllPagePermissions(orgId);
+      setPagePermRows(rows);
+      cacheData('page_permissions', orgId, rows);
+    } catch (err) {
+      console.error('[loadPagePermissions]', err.message);
+      const cached = await getCachedData('page_permissions', orgId);
+      if (cached?.data) setPagePermRows(cached.data);
+    } finally {
+      setPagePermLoaded(true);
     }
   }, []);
 
@@ -179,6 +204,8 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setProfile(null);
       setPreviewAs(null);
+      setPagePermRows([]);
+      setPagePermLoaded(false);
       setError(null);
 
       return { success: true };
@@ -203,6 +230,11 @@ export const AuthProvider = ({ children }) => {
   const isCampDelegate = role === 'camp_delegate' || isSuperAdmin;
   const isAssistant = role === 'assistant';
 
+  const canAccessPageNow = useCallback(
+    (pageKey) => canAccessPageSync(effectiveProfile, pageKey, pagePermRows),
+    [effectiveProfile, pagePermRows]
+  );
+
   const value = {
     user,
     session,
@@ -211,6 +243,8 @@ export const AuthProvider = ({ children }) => {
     previewAs,
     setPreviewAs,
     isPreviewMode: !!previewAs,
+    pagePermLoaded,
+    canAccessPageNow,
     loading,
     error,
     login,

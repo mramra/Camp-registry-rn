@@ -136,7 +136,9 @@ export default function PermissionsAdminScreen() {
 
         {pageKeys.map((pageKey, idx) => (
           <View key={pageKey} style={[styles.pageRow, idx % 2 === 0 && styles.pageRowAlt]}>
-            <Text style={styles.pageName} numberOfLines={1}>{PAGE_REGISTRY[pageKey].label}</Text>
+            <View style={styles.pageNameCol}>
+              <Text style={styles.pageName}>{PAGE_REGISTRY[pageKey]?.label || pageKey}</Text>
+            </View>
             <View style={styles.rolesCells}>
               {ROLES.map((role) => (
                 <PermissionCell
@@ -173,7 +175,8 @@ const styles = StyleSheet.create({
 
   pageRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 8, borderRadius: 8 },
   pageRowAlt: { backgroundColor: colors.surface },
-  pageName: { flex: 1, color: colors.white, fontSize: 11, fontWeight: 'bold', textAlign: 'right', paddingEnd: 6 },
+  pageNameCol: { flex: 1, minWidth: 0, paddingEnd: 6 },
+  pageName: { color: colors.white, fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
   rolesCells: { flexDirection: 'row-reverse' },
 
   cellRow: { width: 96, flexDirection: 'row', justifyContent: 'center', gap: 3 },

@@ -55,7 +55,7 @@ const navTheme = {
 };
 
 const RootNavigator = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, isPreviewMode, previewAs, setPreviewAs, realProfile } = useAuth();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [navRef, setNavRef] = useState(null);
 
@@ -150,6 +150,26 @@ const RootNavigator = () => {
 
       {isAuthenticated && navRef && (
         <AppDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} navigation={navRef} />
+      )}
+
+      {isPreviewMode && (
+        <View style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          backgroundColor: '#7c2d12', flexDirection: 'row-reverse',
+          alignItems: 'center', justifyContent: 'space-between',
+          paddingHorizontal: 16, paddingVertical: 10, paddingBottom: 18,
+          borderTopWidth: 2, borderTopColor: colors.accent,
+        }}>
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold', flex: 1, textAlign: 'right' }}>
+            👁️ تعاين الآن كـ: {previewAs?.full_name} — أنت فعلياً {realProfile?.full_name}
+          </Text>
+          <Pressable
+            onPress={() => { setPreviewAs(null); navRef?.reset({ index: 0, routes: [{ name: 'Dashboard' }] }); }}
+            style={{ backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginRight: 10 }}
+          >
+            <Text style={{ color: '#000', fontWeight: '900', fontSize: 11 }}>إنهاء المعاينة</Text>
+          </Pressable>
+        </View>
       )}
     </NavigationContainer>
   );

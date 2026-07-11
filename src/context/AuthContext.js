@@ -35,6 +35,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [previewAs, setPreviewAs] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -177,6 +178,7 @@ export const AuthProvider = ({ children }) => {
       setSession(null);
       setUser(null);
       setProfile(null);
+      setPreviewAs(null);
       setError(null);
 
       return { success: true };
@@ -189,7 +191,13 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const role = profile?.role;
+  // ملف "المعاينة" (لو مفعّل) يحل محل الملف الحقيقي بكل مكان بالتطبيق --
+  // كل الصلاحيات (isOwner/isSuperAdmin/canWrite...) وحدود الرؤية بـ
+  // useDataScope تُشتق منه تلقائياً بدون أي تغيير إضافي بباقي الشاشات،
+  // فمالك المنصة يقدر يشوف التطبيق بالضبط متل ما يشوفه أي مستخدم تاني.
+  const effectiveProfile = previewAs || profile;
+
+  const role = effectiveProfile?.role;
   const isOwner = role === 'platform_owner';
   const isSuperAdmin = role === 'super_admin' || isOwner;
   const isCampDelegate = role === 'camp_delegate' || isSuperAdmin;
@@ -198,21 +206,25 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     session,
-    profile,
+    profile: effectiveProfile,
+    realProfile: profile,
+    previewAs,
+    setPreviewAs,
+    isPreviewMode: !!previewAs,
     loading,
     error,
     login,
     logout,
     isAuthenticated: !!session,
     userRole: role,
-    orgId: profile?.org_id,
+    orgId: effectiveProfile?.org_id,
     isOwner,
     isSuperAdmin,
     isCampDelegate,
     isAssistant,
-    canWrite: hasPermission(profile, 'write'),
-    canEdit: hasPermission(profile, 'edit'),
-    canDelete: hasPermission(profile, 'delete'),
+    canWrite: hasPermission(effectiveProfile, 'write'),
+    canEdit: hasPermission(effectiveProfile, 'edit'),
+    canDelete: hasPermission(effectiveProfile, 'delete'),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

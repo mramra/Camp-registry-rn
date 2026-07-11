@@ -33,7 +33,7 @@ const ROLE_ORDER = ['platform_owner', 'super_admin', 'camp_delegate', 'assistant
 
 export default function UsersListScreen() {
   const navigation = useNavigation();
-  const { profile, orgId, isOwner, isSuperAdmin } = useAuth();
+  const { profile, orgId, isOwner, isSuperAdmin, setPreviewAs } = useAuth();
   const { getVisibleCamps } = useDataScope();
 
   const [users, setUsers] = useState([]);
@@ -112,6 +112,13 @@ export default function UsersListScreen() {
 
   const canEditUser = (u) => (isOwner || isSuperAdmin) && u.id !== profile?.id;
   const canDeleteUser = (u) => isOwner && u.role !== 'platform_owner' && u.id !== profile?.id;
+
+  // معاينة التطبيق بالضبط متل ما يشوفه هذا المستخدم -- ما ينفع لمالك
+  // المنصة (ما فيه أعلى منه أصلاً)، وممنوعة على نفسك (بلا معنى).
+  const handlePreview = (u) => {
+    setPreviewAs(u);
+    navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
+  };
 
   const handleToggleActive = async (u) => {
     // تفعيل/تعطيل سريع من القائمة (نفس منطق الأصل: تحديث مباشر بدون Edge Function)
@@ -197,6 +204,11 @@ export default function UsersListScreen() {
               <Pressable style={styles.resetBtn} onPress={() => handleResetPassword(u)}>
                 <Text style={styles.resetBtnText}>🔑 كلمة مرور</Text>
               </Pressable>
+              {u.role !== 'platform_owner' && (
+                <Pressable style={styles.previewBtn} onPress={() => handlePreview(u)}>
+                  <Text style={styles.previewBtnText}>👁️ معاينة</Text>
+                </Pressable>
+              )}
               <Pressable style={styles.toggleBtn} onPress={() => handleToggleActive(u)}>
                 <Text style={styles.toggleBtnText}>{u.is_active ? '⏸️ تعطيل' : '▶️ تفعيل'}</Text>
               </Pressable>
@@ -295,6 +307,8 @@ const styles = StyleSheet.create({
   editBtnText: { color: colors.blue, fontWeight: 'bold', fontSize: 10 },
   resetBtn: { backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   resetBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 10 },
+  previewBtn: { backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.4)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  previewBtnText: { color: colors.green, fontWeight: 'bold', fontSize: 10 },
   toggleBtn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   toggleBtnText: { color: colors.white, fontWeight: 'bold', fontSize: 10 },
   deleteBtn: { backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },

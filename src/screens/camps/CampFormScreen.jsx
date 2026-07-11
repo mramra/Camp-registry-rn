@@ -141,7 +141,7 @@ export default function CampFormScreen() {
         address: address.trim() || null,
         capacity: capacity ? parseInt(capacity, 10) : null,
         status,
-        manager_id: managerId || null,
+        manager_id: campType === 'sub' ? null : (managerId || null),
         latitude,
         longitude,
         portal_open: portalOpen,
@@ -218,20 +218,28 @@ export default function CampFormScreen() {
             )
           )}
 
-          {isOwner && (
-            <SelectField
-              label="🔴 مدير الإيواء"
-              value={orgMembers.find((m) => m.id === managerId)?.full_name}
-              options={[
-                {
-                  value: '',
-                  label: campType === 'sub' && parentCampId ? '— تلقائي من المخيم الرئيسي —' : '— بدون مدير إيواء —',
-                },
-                ...orgMembers.map((m) => ({ value: m.id, label: m.full_name })),
-              ]}
-              onSelect={(v) => setManagerId(v || null)}
-              placeholder="— بدون مدير إيواء —"
-            />
+          {isOwner && campType === 'sub' && parentCampId ? (
+            <View style={styles.inheritBox}>
+              <Text style={styles.inheritLabel}>🔴 مدير الإيواء</Text>
+              <Text style={styles.inheritText}>
+                يُورَث تلقائياً من المخيم الرئيسي (
+                {orgMembers.find((m) => m.id === allCamps.find((c) => c.id === parentCampId)?.manager_id)?.full_name || 'غير محدَّد'}
+                ) — الفروع ما تقدر يكون إلها مدير إيواء مستقل، عشان تفادي تضارب البيانات.
+              </Text>
+            </View>
+          ) : (
+            isOwner && (
+              <SelectField
+                label="🔴 مدير الإيواء"
+                value={orgMembers.find((m) => m.id === managerId)?.full_name}
+                options={[
+                  { value: '', label: '— بدون مدير إيواء —' },
+                  ...orgMembers.map((m) => ({ value: m.id, label: m.full_name })),
+                ]}
+                onSelect={(v) => setManagerId(v || null)}
+                placeholder="— بدون مدير إيواء —"
+              />
+            )
           )}
 
           <FormInput label="العنوان" placeholder="موقع المخيم" value={address} onChangeText={setAddress} />
@@ -324,6 +332,9 @@ const styles = StyleSheet.create({
 
   row: { flexDirection: 'row', gap: 8, marginTop: 4 },
   portalBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 12 },
+  inheritBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 12 },
+  inheritLabel: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right', marginBottom: 4 },
+  inheritText: { color: colors.muted, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   portalRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   portalTitle: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right' },
   portalSub: { color: colors.muted, fontSize: 10, marginTop: 3, textAlign: 'right', lineHeight: 15 },

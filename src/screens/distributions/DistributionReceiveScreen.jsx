@@ -153,6 +153,9 @@ export default function DistributionReceiveScreen() {
     });
   };
 
+  const selectAllVisible = () => setSelectedIds(new Set(filtered.map((f) => f.id)));
+  const deselectAll = () => setSelectedIds(new Set());
+
   const toggleReceive = async (family) => {
     if (!canWrite) {
       showError('لا تملك صلاحية تسجيل الاستلام');
@@ -217,11 +220,9 @@ export default function DistributionReceiveScreen() {
         onPress={() => (tab === 'pending' ? toggleSelect(f.id) : toggleReceive(f))}
       >
         <View style={styles.cardRow}>
-          {tab === 'pending' && (
-            <Text style={styles.checkbox}>{selected ? '☑️' : '⬜'}</Text>
-          )}
+          {tab === 'pending' && selected && <Text style={styles.selectedIcon}>✓</Text>}
           <View style={{ flex: 1 }}>
-            <Text style={styles.familyName}>{f.head_name || '—'}</Text>
+            <Text style={[styles.familyName, selected && styles.familyNameSelected]}>{f.head_name || '—'}</Text>
             <Text style={styles.metaLine}>
               {memberCount} أفراد{f.tent ? ` · ⛺ ${f.tent}` : ''}{f.camp_id ? ` · 🏕️ ${campMap[f.camp_id] || '—'}` : ''}
             </Text>
@@ -310,7 +311,17 @@ export default function DistributionReceiveScreen() {
             <Text style={styles.resultCount}>📋 {filtered.length} نتيجة مطابقة</Text>
 
             {tab === 'pending' && (
-              <Text style={styles.hint}>اضغط على اسم الأسرة لتحديدها، ثم اضغط "استلام" بالأسفل</Text>
+              <>
+                <View style={styles.selectAllRow}>
+                  <Pressable style={styles.selectAllBtn} onPress={selectAllVisible}>
+                    <Text style={styles.selectAllBtnText}>☑️ تحديد الكل ({filtered.length})</Text>
+                  </Pressable>
+                  <Pressable style={styles.deselectAllBtn} onPress={deselectAll}>
+                    <Text style={styles.deselectAllBtnText}>✕ إلغاء التحديد</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.hint}>اضغط على اسم الأسرة لتحديدها، ثم اضغط "استلام" بالأسفل</Text>
+              </>
             )}
           </View>
         }
@@ -348,13 +359,19 @@ const styles = StyleSheet.create({
   },
   chipsRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   resultCount: { color: colors.accent, fontSize: 11, fontWeight: 'bold', marginBottom: 8, textAlign: 'right' },
+  selectAllRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  selectAllBtn: { flex: 1, backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  selectAllBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 11 },
+  deselectAllBtn: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  deselectAllBtnText: { color: colors.muted, fontWeight: 'bold', fontSize: 11 },
   hint: { color: colors.muted, fontSize: 10, marginBottom: 10, textAlign: 'right' },
 
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRightColor: colors.accent, borderRadius: 12, padding: 12, marginBottom: 8 },
-  cardSelected: { backgroundColor: 'rgba(245,158,11,0.1)' },
+  cardSelected: { backgroundColor: 'rgba(245,158,11,0.18)', borderColor: colors.accent, borderWidth: 1.5 },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  checkbox: { fontSize: 16 },
+  selectedIcon: { fontSize: 16, fontWeight: '900', color: colors.accent },
   familyName: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right' },
+  familyNameSelected: { color: colors.accent },
   metaLine: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
   undoBtn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   undoBtnText: { color: colors.muted, fontSize: 10, fontWeight: 'bold' },

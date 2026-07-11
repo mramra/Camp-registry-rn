@@ -224,12 +224,20 @@ export default function DistributionReceiveScreen() {
     'الجوال': f.phone1 || '',
   });
 
-  /** ترتيب الأسر حسب المخيم (تجميعي) ثم الاسم -- لكل من ورقتي الاستلام */
+  /** ترتيب الأسر حسب المخيم (تجميعي)، ثم رقم الخيمة (عددياً، والي بدون
+   * رقم خيمة يروح بآخر القائمة دايماً)، ثم الاسم -- لكل من ورقتي الاستلام */
   const sortByCamp = (list) =>
     [...list].sort((a, b) => {
       const ca = campMap[a.camp_id] || '';
       const cb = campMap[b.camp_id] || '';
-      return ca === cb ? (a.head_name || '').localeCompare(b.head_name || '', 'ar') : ca.localeCompare(cb, 'ar');
+      if (ca !== cb) return ca.localeCompare(cb, 'ar');
+
+      const ta = a.tent ? String(a.tent).trim() : '';
+      const tb = b.tent ? String(b.tent).trim() : '';
+      if (!ta && !tb) return (a.head_name || '').localeCompare(b.head_name || '', 'ar');
+      if (!ta) return 1; // بدون رقم خيمة → بالآخر
+      if (!tb) return -1;
+      return ta.localeCompare(tb, 'ar', { numeric: true });
     });
 
   const handleExport = async () => {

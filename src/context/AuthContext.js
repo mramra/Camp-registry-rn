@@ -1,9 +1,35 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { hasPermission } from '../lib/permissions';
 import { cacheData, getCachedData, withTimeout } from '../lib/offlineCache';
 
 export const AuthContext = createContext({});
+
+/**
+ * قراءة الجلسة المحفوظة مباشرة من AsyncStorage، متجاوزين supabase.auth
+ * .getSession() تماماً. سبب الحاجة لهذا: getSession() ليست قراءة محلية
+ * بحتة كما يبدو -- لو رمز الوصول (access_token) منتهي الصلاحية (شائع
+ * جداً لو التطبيق ما اتفتح لفترة)، تحاول تجدده تلقائياً عبر الشبكة قبل
+ * ما ترجع أي نتيجة. لو النت مقطوع، هذي المحاولة "تعلّق" لفترة طويلة، وبعد
+ * فشلها ترجع "لا جلسة" -- فيوصل المستخدم لشاشة تسجيل الدخول رغم إن
+ * جلسته محفوظة أصلاً على الجهاز. هذي الدالة تقرأ المفتاح الخام مباشرة
+ * (بدون أي محاولة تجديد شبكة) كخط دفاع أخير عند فشل/تعليق getSession().
+ */
+async function getRawStoredSession() {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const authKey = keys.find((k) => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    if (!authKey) return null;
+    const raw = await AsyncStorage.getItem(authKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const sessionLike = parsed?.user ? parsed : parsed?.currentSession;
+    return sessionLike?.user ? sessionLike : null;
+  } catch {
+    return null;
+  }
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -22,21 +48,41 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       try {
         setError(null);
-        const { data, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
 
-        if (data?.session) {
-          setSession(data.session);
-          setUser(data.session.user);
+        let activeSession = null;
+        try {
+          const { data, error: sessionError } = await withTimeout(
+            supabase.auth.getSession(),
+            5000,
+            'انتهت مهلة قراءة الجلسة'
+          );
+          if (sessionError) throw sessionError;
+          activeSession = data?.session || null;
+        } catch (sessionErr) {
+          // getSession() تعلّقت أو فشلت (غالباً محاولة تجديد رمز عبر شبكة
+          // مقطوعة) -- نرجع للجلسة الخام المحفوظة مباشرة بدل ما نعتبر
+          // المستخدم غير مسجَّل دخول أصلاً.
+          activeSession = await getRawStoredSession();
+        }
+
+        // احتياط إضافي: حتى لو getSession() رجعت بنجاح لكن بدون جلسة
+        // (بعض الحالات النادرة أوفلاين)، جرّب القراءة الخام قبل الاستسلام.
+        if (!activeSession) {
+          activeSession = await getRawStoredSession();
+        }
+
+        if (activeSession?.user) {
+          setSession(activeSession);
+          setUser(activeSession.user);
 
           // اعرض الملف الشخصي المحفوظ فوراً (لو موجود) -- بدون انتظار الشبكة
-          const cached = await getCachedData('user_profile', data.session.user.id);
+          const cached = await getCachedData('user_profile', activeSession.user.id);
           if (cached?.data) setProfile(cached.data);
 
           // خلّص شاشة التحميل الآن -- التحديث الحي يصير بالخلفية
           setLoading(false);
 
-          fetchUserProfile(data.session.user.id);
+          fetchUserProfile(activeSession.user.id);
           return;
         }
       } catch (err) {
@@ -52,11 +98,15 @@ export const AuthProvider = ({ children }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      setSession(currentSession);
       if (currentSession?.user) {
+        setSession(currentSession);
         setUser(currentSession.user);
         await fetchUserProfile(currentSession.user.id);
-      } else {
+      } else if (event === 'SIGNED_OUT') {
+        // مسح الجلسة فقط عند تسجيل خروج صريح -- تجاهل أي حدث تلقائي
+        // بجلسة فارغة (غالباً محاولة تحقق/تجديد فشلت بسبب انقطاع نت،
+        // مو تسجيل خروج حقيقي) عشان ما نطيح المستخدم لشاشة الدخول بالغلط.
+        setSession(null);
         setUser(null);
         setProfile(null);
       }

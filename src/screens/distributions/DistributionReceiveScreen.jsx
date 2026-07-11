@@ -20,7 +20,7 @@ import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
 
 const SORT_OPTIONS = [
-  { value: 'size_asc', label: '👤 عدد أفراد الأسرة (تصاعدي)' },
+  { value: 'size_desc', label: '👤 حجم الأسرة (الأكبر أولاً)' },
   { value: 'tent_asc', label: '⛺ رقم الخيمة' },
   { value: 'alpha', label: '🔤 أبجدي' },
 ];
@@ -48,7 +48,7 @@ export default function DistributionReceiveScreen() {
   const [tab, setTab] = useState('pending'); // pending | received
   const [filterCamp, setFilterCamp] = useState('');
   const [filterOtherRound, setFilterOtherRound] = useState('');
-  const [sortMode, setSortMode] = useState('size_asc');
+  const [sortMode, setSortMode] = useState('size_desc');
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -124,7 +124,7 @@ export default function DistributionReceiveScreen() {
         default: {
           const am = (membersByFamily[a.id]?.length || 0) + 1;
           const bm = (membersByFamily[b.id]?.length || 0) + 1;
-          return am - bm;
+          return bm - am; // الأكبر أولاً
         }
       }
     });
@@ -239,6 +239,7 @@ export default function DistributionReceiveScreen() {
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderFamily}
+        extraData={{ filterCamp, filterOtherRound, sortMode, search, tab, selectedIds, receivedIds }}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View>
@@ -293,6 +294,8 @@ export default function DistributionReceiveScreen() {
               style={styles.searchInput}
             />
 
+            <Text style={styles.resultCount}>📋 {filtered.length} نتيجة مطابقة</Text>
+
             {tab === 'pending' && (
               <Text style={styles.hint}>اضغط على اسم الأسرة لتحديدها، ثم اضغط "استلام" بالأسفل</Text>
             )}
@@ -331,6 +334,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   chipsRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  resultCount: { color: colors.accent, fontSize: 11, fontWeight: 'bold', marginBottom: 8, textAlign: 'right' },
   hint: { color: colors.muted, fontSize: 10, marginBottom: 10, textAlign: 'right' },
 
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRightColor: colors.accent, borderRadius: 12, padding: 12, marginBottom: 8 },

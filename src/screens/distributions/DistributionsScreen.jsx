@@ -10,6 +10,7 @@ import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FormInput from '../../components/ui/FormInput';
+import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -34,6 +35,7 @@ export default function DistributionsScreen() {
   const [name, setName] = useState('');
   const [roundDate, setRoundDate] = useState(todayStr());
   const [notes, setNotes] = useState('');
+  const [bannerCampId, setBannerCampId] = useState(null); // اختياري -- للبانر بالتصدير فقط، لا يقيّد عرض الأسر
   const [saving, setSaving] = useState(false);
   const [editingRoundId, setEditingRoundId] = useState(null); // null = إضافة جديدة، وإلا تعديل
   const [receivedCounts, setReceivedCounts] = useState({});
@@ -73,6 +75,7 @@ export default function DistributionsScreen() {
     setName('');
     setRoundDate(todayStr());
     setNotes('');
+    setBannerCampId(null);
     setFormVisible(true);
   };
 
@@ -81,6 +84,7 @@ export default function DistributionsScreen() {
     setName(round.name || '');
     setRoundDate(round.round_date || todayStr());
     setNotes(round.notes || '');
+    setBannerCampId(round.camp_id || null);
     setFormVisible(true);
   };
 
@@ -96,12 +100,13 @@ export default function DistributionsScreen() {
     setSaving(true);
     try {
       const result = editingRoundId
-        ? await updateDistRound(editingRoundId, { name: name.trim(), round_date: roundDate, notes: notes.trim() || null })
+        ? await updateDistRound(editingRoundId, { name: name.trim(), round_date: roundDate, notes: notes.trim() || null, camp_id: bannerCampId })
         : await createDistRound({
             org_id: orgId,
             name: name.trim(),
             round_date: roundDate,
             notes: notes.trim() || null,
+            camp_id: bannerCampId,
           });
       if (!result.success) {
         showError(result.error || 'فشل الحفظ');
@@ -113,6 +118,7 @@ export default function DistributionsScreen() {
       setName('');
       setRoundDate(todayStr());
       setNotes('');
+      setBannerCampId(null);
       loadData();
     } catch (e) {
       showError('خطأ: ' + e.message);
@@ -154,6 +160,9 @@ export default function DistributionsScreen() {
           <Text style={styles.roundName}>📦 {r.name}</Text>
           {!!r.notes && <Text style={styles.metaLine}>{r.notes}</Text>}
           <Text style={styles.dateLine}>📅 {formatDate(r.round_date || r.created_at)}</Text>
+          {!!r.camp_id && (
+            <Text style={styles.metaLine}>🏷️ بانر: {camps.find((c) => c.id === r.camp_id)?.name || '—'}</Text>
+          )}
           <Text style={styles.receivedLine}>✅ {receivedCounts[r.id] || 0} أسرة استلمت</Text>
         </View>
         {canWrite && (
@@ -219,6 +228,13 @@ export default function DistributionsScreen() {
         <FormInput label="اسم الجولة *" placeholder="توزيع شتوي 2026" value={name} onChangeText={setName} />
         <FormInput label="تاريخ الجولة * (YYYY-MM-DD)" value={roundDate} onChangeText={setRoundDate} />
         <FormInput label="ملاحظات" value={notes} onChangeText={setNotes} multiline numberOfLines={2} />
+        <SelectField
+          label="مخيم البانر (اختياري -- يظهر بأعلى ملف Excel عند التصدير بس)"
+          value={camps.find((c) => c.id === bannerCampId)?.name}
+          options={[{ value: '', label: '— بدون بانر —' }, ...camps.map((c) => ({ value: c.id, label: c.name }))]}
+          onSelect={(v) => setBannerCampId(v || null)}
+          placeholder="— بدون بانر —"
+        />
         <View style={styles.row}>
           <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={handleSaveRound} disabled={saving}>
             {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>{editingRoundId ? '💾 حفظ التعديلات' : '✅ إضافة'}</Text>}

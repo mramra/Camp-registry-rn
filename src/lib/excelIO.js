@@ -42,13 +42,13 @@ const rowStyle = (isEven) => ({
   },
 });
 
-/** يطبّق التنسيق (بانر رأسي + تناوب صفوف + توسيط) على ورقة مبنية من json_to_sheet */
-function styleWorksheet(ws, rowCount, colCount) {
-  for (let r = 0; r <= rowCount; r++) {
+/** يطبّق التنسيق (رأس بالصف headerRow + تناوب صفوف + توسيط) على ورقة */
+function styleWorksheet(ws, rowCount, colCount, headerRow = 0) {
+  for (let r = headerRow; r <= headerRow + rowCount; r++) {
     for (let c = 0; c < colCount; c++) {
       const addr = XLSX.utils.encode_cell({ r, c });
       if (!ws[addr]) continue;
-      ws[addr].s = r === 0 ? HEADER_STYLE : rowStyle((r - 1) % 2 === 0);
+      ws[addr].s = r === headerRow ? HEADER_STYLE : rowStyle((r - headerRow - 1) % 2 === 0);
     }
   }
 }
@@ -58,6 +58,32 @@ function buildStyledSheet(rows) {
   const keys = Object.keys(rows[0] || {});
   ws['!cols'] = keys.map(() => ({ wch: 20 }));
   styleWorksheet(ws, rows.length, keys.length);
+  return ws;
+}
+
+// بانر معلوماتي (مثلاً: اسم المخيم + المندوب) — صف واحد مدمج بعرض الجدول
+// كله، فوق صف العناوين مباشرة. تنسيق مميّز (خلفية داكنة، خط أبيض بارز).
+const BANNER_STYLE = {
+  fill: { fgColor: { rgb: '1F2937' } },
+  font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 13 },
+  alignment: { horizontal: 'center', vertical: 'center' },
+  border: {
+    top: { style: 'medium', color: { rgb: '111827' } },
+    bottom: { style: 'medium', color: { rgb: '111827' } },
+    left: { style: 'medium', color: { rgb: '111827' } },
+    right: { style: 'medium', color: { rgb: '111827' } },
+  },
+};
+
+/** نفس buildStyledSheet لكن مع صف بانر مدمج بالأعلى (فوق صف العناوين) */
+function buildStyledSheetWithBanner(rows, bannerText) {
+  const keys = Object.keys(rows[0] || {});
+  const ws = XLSX.utils.aoa_to_sheet([[bannerText]]);
+  XLSX.utils.sheet_add_json(ws, rows, { origin: 'A2' });
+  ws['!cols'] = keys.map(() => ({ wch: 20 }));
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(keys.length - 1, 0) } }];
+  ws['A1'].s = BANNER_STYLE;
+  styleWorksheet(ws, rows.length, keys.length, 1); // صف العناوين الفعلي بالإندكس 1 (بعد البانر)
   return ws;
 }
 
@@ -118,6 +144,29 @@ export async function exportXLSXMultiSheet(sheets, fileName) {
   const wb = XLSX.utils.book_new();
   validSheets.forEach((s) => {
     const ws = buildStyledSheet(s.rows);
+    XLSX.utils.book_append_sheet(wb, ws, s.name.slice(0, 31)); // حد Excel: 31 حرف لاسم الورقة
+  });
+
+  const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+  const finalName = buildFinalName(fileName);
+  return saveAndShare(base64, finalName);
+}
+
+/**
+ * يصدّر عدة أوراق منسَّقة، كل وحدة معها بانر معلوماتي بأعلاها (مثلاً اسم
+ * مخيم + مندوبه)، بملف Excel واحد.
+ * @param {Array<{name: string, banner: string, rows: Array<Object>}>} sheets
+ * @param {string} fileName - اسم الملف (بدون امتداد)
+ */
+export async function exportXLSXMultiSheetWithBanners(sheets, fileName) {
+  const validSheets = (sheets || []).filter((s) => s.rows && s.rows.length > 0);
+  if (validSheets.length === 0) {
+    throw new Error('لا توجد بيانات للتصدير');
+  }
+
+  const wb = XLSX.utils.book_new();
+  validSheets.forEach((s) => {
+    const ws = buildStyledSheetWithBanner(s.rows, s.banner || s.name);
     XLSX.utils.book_append_sheet(wb, ws, s.name.slice(0, 31)); // حد Excel: 31 حرف لاسم الورقة
   });
 

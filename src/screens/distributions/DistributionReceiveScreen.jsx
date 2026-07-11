@@ -8,13 +8,14 @@ import {
   fetchFamilies,
   fetchFamilyMembers,
   fetchCamps,
+  fetchOrgMembers,
   fetchDistRounds,
   fetchDistReceivedFamilyIdsByRound,
   markFamilyReceivedByRound,
   unmarkFamilyReceivedByRound,
 } from '../../lib/supabase';
 import { showError, showSuccess } from '../../utils/toast';
-import { exportXLSX } from '../../lib/excelIO';
+import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
@@ -276,12 +277,25 @@ export default function DistributionReceiveScreen() {
     setExporting(true);
     try {
       const received = sortByCamp(families.filter((f) => receivedIds.has(f.id)));
+      const rows = received.map(buildExportRow);
+      const fileName = `تقرير_استلام_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`;
 
-      await exportXLSX(
-        received.map(buildExportRow),
-        'استلموا',
-        `تقرير_استلام_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`
-      );
+      if (round?.camp_id) {
+        // الجولة عندها مخيم بانر محدّد وقت الإنشاء -- نبني بانر (اسم المخيم +
+        // مندوبه/مديره) بأعلى الملف. البانر معلوماتي فقط -- لا يقيّد عرض
+        // الأسر (تبقى من كل المخيمات)، بس يوضّح الملف باسم مخيم/مندوب معيّن.
+        const bannerCamp = camps.find((c) => c.id === round.camp_id);
+        const orgMembers = await fetchOrgMembers(orgId);
+        const managerName = orgMembers.find((m) => m.id === bannerCamp?.manager_id)?.full_name;
+        const bannerText = `مخيم: ${bannerCamp?.name || '—'}   |   المندوب: ${managerName || 'غير محدَّد'}   |   جولة: ${round?.name || ''}`;
+
+        await exportXLSXMultiSheetWithBanners(
+          [{ name: 'استلموا', banner: bannerText, rows }],
+          fileName
+        );
+      } else {
+        await exportXLSX(rows, 'استلموا', fileName);
+      }
       showSuccess('تم تصدير التقرير');
     } catch (e) {
       showError('فشل التصدير: ' + e.message);

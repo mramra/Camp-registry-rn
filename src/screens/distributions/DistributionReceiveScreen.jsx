@@ -291,12 +291,17 @@ export default function DistributionReceiveScreen() {
         const coords = bannerCamp?.latitude && bannerCamp?.longitude
           ? `${bannerCamp.latitude}, ${bannerCamp.longitude}`
           : 'بلا إحداثيات';
-        const line1 = `🏕️ ${bannerCamp?.name || '—'}`;
-        const line2 = `👤 المندوب: ${delegate?.full_name || 'غير معيَّن'}   📱 ${delegate?.phone || '—'}   📍 ${coords}`;
-        const bannerText = `${line1}\n${line2}`;
+        const rawName = bannerCamp?.name || '—';
+        // نضيف كلمة "مخيم" قبل الاسم لو مو موجودة أصلاً بالاسم (بعض المخيمات
+        // مسمّاة "مخيم هند" أصلاً، فما نكرّرها "مخيم مخيم هند").
+        const campDisplayName = rawName.trim().startsWith('مخيم') ? rawName : `مخيم ${rawName}`;
+        const bannerLines = [
+          { text: `🏕️ ${campDisplayName}`, size: 18 },
+          { text: `👤 المندوب: ${delegate?.full_name || 'غير معيَّن'}   📱 ${delegate?.phone || '—'}   📍 ${coords}`, size: 11 },
+        ];
 
         await exportXLSXMultiSheetWithBanners(
-          [{ name: 'استلموا', banner: bannerText, rows }],
+          [{ name: 'استلموا', banner: bannerLines, rows }],
           fileName
         );
       } else {

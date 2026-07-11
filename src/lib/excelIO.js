@@ -62,32 +62,47 @@ function buildStyledSheet(rows) {
   return ws;
 }
 
-// بانر معلوماتي (مثلاً: اسم المخيم + المندوب) — صف واحد مدمج بعرض الجدول
-// كله، فوق صف العناوين مباشرة. تنسيق مميّز (خلفية داكنة، خط أبيض بارز).
-const BANNER_STYLE = {
-  fill: { fgColor: { rgb: '1F2937' } },
-  font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
-  alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-  border: {
-    top: { style: 'medium', color: { rgb: '111827' } },
-    bottom: { style: 'medium', color: { rgb: '111827' } },
-    left: { style: 'medium', color: { rgb: '111827' } },
-    right: { style: 'medium', color: { rgb: '111827' } },
-  },
-};
+// بانر معلوماتي (مثلاً: اسم المخيم + المندوب) — قد يكون صفاً واحداً أو
+// عدة صفوف مدمجة بعرض الجدول كله، فوق صف العناوين مباشرة. تنسيق مميّز
+// (خلفية داكنة، خط أبيض بارز). كل صف يقدر ياخذ حجم خط مستقل (مثلاً اسم
+// المخيم بخط أكبر من سطر بيانات المندوب تحته).
+function bannerStyle(sz) {
+  return {
+    fill: { fgColor: { rgb: '1F2937' } },
+    font: { bold: true, color: { rgb: 'FFFFFF' }, sz },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: {
+      top: { style: 'medium', color: { rgb: '111827' } },
+      bottom: { style: 'medium', color: { rgb: '111827' } },
+      left: { style: 'medium', color: { rgb: '111827' } },
+      right: { style: 'medium', color: { rgb: '111827' } },
+    },
+  };
+}
 
-/** نفس buildStyledSheet لكن مع صف بانر مدمج بالأعلى (فوق صف العناوين) */
-function buildStyledSheetWithBanner(rows, bannerText) {
+/**
+ * نفس buildStyledSheet لكن مع صف/صفوف بانر مدمجة بالأعلى (فوق صف العناوين).
+ * @param {Array<Object>} rows
+ * @param {string|Array<{text:string, size?:number}>} banner - نص واحد (سطر
+ *   وحيد بحجم افتراضي)، أو مصفوفة أسطر كل وحد بحجم خط مستقل.
+ */
+function buildStyledSheetWithBanner(rows, banner) {
   const keys = Object.keys(rows[0] || {});
-  const ws = XLSX.utils.aoa_to_sheet([[bannerText]]);
-  XLSX.utils.sheet_add_json(ws, rows, { origin: 'A2' });
+  const lines = Array.isArray(banner) ? banner : [{ text: banner, size: 12 }];
+  const bannerRowCount = lines.length;
+
+  const ws = XLSX.utils.aoa_to_sheet(lines.map((l) => [l.text]));
+  XLSX.utils.sheet_add_json(ws, rows, { origin: `A${bannerRowCount + 1}` });
   ws['!cols'] = keys.map(() => ({ wch: 20 }));
-  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(keys.length - 1, 0) } }];
-  // ارتفاع صف أكبر يتناسب مع عدد أسطر البانر (كل سطر ~18px + هامش)
-  const lineCount = (bannerText.match(/\n/g) || []).length + 1;
-  ws['!rows'] = [{ hpx: Math.max(24, lineCount * 20) }];
-  ws['A1'].s = BANNER_STYLE;
-  styleWorksheet(ws, rows.length, keys.length, 1); // صف العناوين الفعلي بالإندكس 1 (بعد البانر)
+
+  ws['!merges'] = lines.map((_, i) => ({ s: { r: i, c: 0 }, e: { r: i, c: Math.max(keys.length - 1, 0) } }));
+  ws['!rows'] = lines.map((l) => ({ hpx: Math.max(22, (l.size || 12) * 1.8) }));
+  lines.forEach((l, i) => {
+    const cellRef = XLSX.utils.encode_cell({ r: i, c: 0 });
+    ws[cellRef].s = bannerStyle(l.size || 12);
+  });
+
+  styleWorksheet(ws, rows.length, keys.length, bannerRowCount); // صف العناوين الفعلي بعد البانر
   return ws;
 }
 

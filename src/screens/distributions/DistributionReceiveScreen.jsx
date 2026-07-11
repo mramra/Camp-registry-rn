@@ -101,8 +101,12 @@ export default function DistributionReceiveScreen() {
 
   const campMap = Object.fromEntries(camps.map((c) => [c.id, c.name]));
 
-  const filtered = useMemo(() => {
-    let list = families.filter((f) => (tab === 'received' ? receivedIds.has(f.id) : !receivedIds.has(f.id)));
+  // القاعدة المشتركة: الأسر بعد تطبيق فلاتر المخيم/الجولة السابقة/البحث،
+  // قبل تقسيمها لتبويبي مستلم/غير مستلم -- نستخدمها لحساب أعداد التبويبين
+  // نفسها (بدل عدد إجمالي ثابت لا يعكس الفلاتر المطبَّقة، وهذا كان يبين
+  // "متجمّد" ومربك لما تفلتر بمخيم مثلاً).
+  const baseFiltered = useMemo(() => {
+    let list = families;
 
     if (filterCamp) list = list.filter((f) => f.camp_id === filterCamp);
 
@@ -114,6 +118,15 @@ export default function DistributionReceiveScreen() {
       const q = search.trim().toLowerCase();
       list = list.filter((f) => (f.head_name || '').toLowerCase().includes(q) || (f.head_id || '').includes(q));
     }
+
+    return list;
+  }, [families, filterCamp, filterOtherRound, otherRoundReceivedIds, search]);
+
+  const pendingCount = baseFiltered.filter((f) => !receivedIds.has(f.id)).length;
+  const receivedCount = baseFiltered.filter((f) => receivedIds.has(f.id)).length;
+
+  const filtered = useMemo(() => {
+    let list = baseFiltered.filter((f) => (tab === 'received' ? receivedIds.has(f.id) : !receivedIds.has(f.id)));
 
     list = [...list].sort((a, b) => {
       switch (sortMode) {
@@ -130,7 +143,7 @@ export default function DistributionReceiveScreen() {
     });
 
     return list;
-  }, [families, receivedIds, tab, filterCamp, filterOtherRound, otherRoundReceivedIds, search, membersByFamily, sortMode]);
+  }, [baseFiltered, receivedIds, tab, membersByFamily, sortMode]);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) => {
@@ -251,12 +264,12 @@ export default function DistributionReceiveScreen() {
 
             <View style={styles.chipsRow}>
               <FilterChip
-                label={`⏳ لم يستلم (${families.length - receivedIds.size})`}
+                label={`⏳ لم يستلم (${pendingCount})`}
                 selected={tab === 'pending'}
                 onPress={() => { setTab('pending'); setSelectedIds(new Set()); }}
               />
               <FilterChip
-                label={`✅ استلم (${receivedIds.size})`}
+                label={`✅ استلم (${receivedCount})`}
                 selected={tab === 'received'}
                 onPress={() => setTab('received')}
               />

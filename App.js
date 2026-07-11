@@ -31,7 +31,17 @@ async function checkAndApplyUpdate() {
       await Updates.reloadAsync();
     }
   } catch (e) {
-    showToast('⚠️ فشل التحقق من التحديث: ' + e.message, 'error');
+    // رسالة الخطأ الخام من مكتبة expo-updates تقنية جداً ومخيفة للمستخدم
+    // العادي (Call to function 'ExpoUpdates.fetchUpdateAsync' has been
+    // rejected...) -- وأغلب أسبابها فعلياً اتصال ضعيف انقطع أثناء التحميل،
+    // مو خطأ حقيقي بالتطبيق. نعرض رسالة مبسّطة وهادئة بدل النص التقني.
+    const raw = e?.message || '';
+    const isDownloadIssue = /download|network|fetch|timeout|connection/i.test(raw);
+    if (isDownloadIssue) {
+      showToast('⚠️ تعذّر تحميل التحديث بسبب ضعف الاتصال — التطبيق يعمل طبيعياً بآخر نسخة موجودة، وراح تتم المحاولة تلقائياً مرة ثانية لاحقاً', 'warning');
+    } else {
+      showToast('⚠️ تعذّر التحقق من وجود تحديث جديد', 'warning');
+    }
   }
 }
 

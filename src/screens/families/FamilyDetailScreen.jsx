@@ -36,8 +36,8 @@ function buildHealthBadges({ disabilities, injuries, chronic_diseases, female_st
   const nds = arrLabel(needs);
   if (dis) badges.push({ icon: '🦽', label: dis, color: colors.purple });
   if (inj) badges.push({ icon: '🩹', label: inj, color: colors.accent });
-  if (chr) badges.push({ icon: '💊', label: chr, color: '#fb923c' });
-  if (fem) badges.push({ icon: '♀️', label: fem, color: '#f472b6' });
+  if (chr) badges.push({ icon: '💊', label: chr, color: colors.orange });
+  if (fem) badges.push({ icon: '♀️', label: fem, color: colors.pink });
   if (nds) badges.push({ icon: '🦯', label: nds, color: colors.blue });
   if (orphan_status) badges.push({ icon: '👶', label: ORPHAN_LABELS[orphan_status] || orphan_status, color: colors.red });
   return badges;

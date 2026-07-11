@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import * as Updates from 'expo-updates';
 import NetInfo from '@react-native-community/netinfo';
 import { AuthProvider } from './src/context/AuthContext';
-import { ThemeProvider } from './src/context/ThemeContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { showToast } from './src/utils/toast';
 
@@ -66,11 +65,9 @@ export default function App() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <StatusBar style="light" backgroundColor="#0d1117" />
-        <RootNavigator />
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <StatusBar style="light" backgroundColor="#0d1117" />
+      <RootNavigator />
+    </AuthProvider>
   );
 }

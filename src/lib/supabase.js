@@ -777,3 +777,21 @@ export const transferFamily = async (family, { toCampId, date, reason, notes, ac
     return { success: false, error: err.message };
   }
 };
+
+// ── عدادات خفيفة للشارات بالقائمة الجانبية (بدون جلب كل البيانات) ──
+
+/** عدد الطلبات المعلّقة فقط (COUNT خفيف، بدون جلب أي صفوف فعلياً) */
+export const fetchPendingRequestsCount = async (orgId) => {
+  try {
+    const { count, error } = await supabase
+      .from('family_history')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .eq('status', 'pending');
+    if (error) throw error;
+    return count || 0;
+  } catch (err) {
+    console.error('[fetchPendingRequestsCount]', err.message);
+    return 0;
+  }
+};

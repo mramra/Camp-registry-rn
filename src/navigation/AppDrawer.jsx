@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { StackActions } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useDataScope } from '../lib/useDataScope';
+import { fetchPendingRequestsCount, fetchFamilies, fetchFamilyMembers, fetchCamps } from '../lib/supabase';
+import { isIncomplete } from '../lib/helpers';
 import colors from '../theme/colors';
 
 /**
@@ -13,7 +16,42 @@ import colors from '../theme/colors';
  * بـ React Native نفسه، فتعمل فوراً عبر تحديث OTA بدون أي بناء إضافي.
  */
 export default function AppDrawer({ visible, onClose, navigation }) {
-  const { profile, logout, isOwner, isSuperAdmin } = useAuth();
+  const { profile, logout, isOwner, isSuperAdmin, orgId } = useAuth();
+  const { getAllowedCampIds, filterLocal } = useDataScope();
+
+  // شارات عدد بسيطة على "الطلبات المعلّقة" و"التنبيهات" -- تُحسب فقط
+  // عند فتح القائمة (مو بكل تنقّل)، وتُحفظ لحد الفتحة الجاية عشان ما نكرر
+  // طلبات شبكة زيادة. الطلبات المعلّقة: عدّاد خفيف مباشر. التنبيهات: بروكسي
+  // خفيف (عدد الأسر ببيانات ناقصة فقط -- أشيع نوع تنبيه) بدل حساب كل أنواع
+  // التنبيهات الكامل (أثقل بكثير ومطابق لما تحسبه شاشة التنبيهات نفسها).
+  const [pendingCount, setPendingCount] = useState(0);
+  const [alertsCount, setAlertsCount] = useState(0);
+
+  useEffect(() => {
+    if (!visible || !orgId) return;
+
+    if (isOwner || profile?.can_review_approvals) {
+      fetchPendingRequestsCount(orgId).then(setPendingCount);
+    }
+
+    (async () => {
+      try {
+        const [famsRaw, camps] = await Promise.all([fetchFamilies(orgId), fetchCamps(orgId)]);
+        const campIds = getAllowedCampIds(camps);
+        const myFams = filterLocal(famsRaw, campIds);
+        const members = await fetchFamilyMembers(myFams.map((f) => f.id));
+        const mByFam = {};
+        members.forEach((m) => {
+          if (!mByFam[m.family_id]) mByFam[m.family_id] = [];
+          mByFam[m.family_id].push(m);
+        });
+        setAlertsCount(myFams.filter((f) => isIncomplete(f, mByFam[f.id])).length);
+      } catch {
+        // فشل حساب الشارة لا يجب أن يعطّل القائمة أبداً
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, orgId]);
 
   const SECTIONS = [
     {
@@ -21,7 +59,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       title: '🏠 الرئيسية',
       items: [
         { icon: '🏠', label: 'الرئيسية', screen: 'Dashboard' },
-        { icon: '🔔', label: 'التنبيهات', screen: 'Alerts' },
+        { icon: '🔔', label: 'التنبيهات', screen: 'Alerts', count: alertsCount },
       ],
     },
     {
@@ -79,7 +117,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
             key: 'admin',
             title: '⚙️ الإدارة والنظام',
             items: [
-              { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests' },
+              { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests', count: pendingCount },
               { icon: '📝', label: 'سجل التغييرات', screen: 'Audit' },
               { icon: '🩺', label: 'تشخيص النظام', screen: 'Diagnostics' },
               { icon: '🗄️', label: 'إدارة البيانات', screen: 'Data' },
@@ -161,6 +199,11 @@ export default function AppDrawer({ visible, onClose, navigation }) {
                         >
                           <Text style={styles.itemIcon}>{item.icon}</Text>
                           <Text style={[styles.itemLabel, isActive && styles.itemLabelActive]}>{item.label}</Text>
+                          {!!item.count && (
+                            <View style={styles.countBadge}>
+                              <Text style={styles.countBadgeText}>{item.count > 99 ? '99+' : item.count}</Text>
+                            </View>
+                          )}
                           {isActive && <Text style={styles.activeDot}>●</Text>}
                         </Pressable>
                       );
@@ -216,6 +259,8 @@ const styles = StyleSheet.create({
   itemLabel: { flex: 1, color: colors.white, fontSize: 14, fontWeight: 'bold', textAlign: 'right' },
   itemLabelActive: { color: colors.accent },
   activeDot: { color: colors.accent, fontSize: 10 },
+  countBadge: { backgroundColor: colors.red, borderRadius: 999, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  countBadgeText: { color: colors.white, fontSize: 10, fontWeight: '900' },
   logoutBtn: { padding: 16, borderTopWidth: 1, borderTopColor: colors.border },
   logoutText: { color: colors.red, fontWeight: 'bold', fontSize: 14, textAlign: 'center' },
 });

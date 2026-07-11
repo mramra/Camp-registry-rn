@@ -6,6 +6,7 @@ import { PAGE_REGISTRY } from '../../lib/permissions';
 import { fetchAllPagePermissions, setPagePermission, clearPagePermission } from '../../lib/supabase';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
+import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import colors from '../../theme/colors';
 
 const ROLES = [
@@ -14,35 +15,49 @@ const ROLES = [
   { key: 'assistant', label: 'المساعد' },
 ];
 
-const STATE_STYLE = {
-  true: { icon: '✓', color: colors.green, bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.4)' },
-  false: { icon: '✕', color: colors.red, bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)' },
-  default: { icon: '↺', color: colors.muted, bg: 'rgba(107,114,128,0.12)', border: 'rgba(107,114,128,0.3)' },
-};
+const STATES = [
+  { key: 'true', allowed: true, icon: '✓', label: 'مسموح', color: colors.green },
+  { key: 'false', allowed: false, icon: '✕', label: 'ممنوع', color: colors.red },
+  { key: 'default', allowed: null, icon: '↺', label: 'افتراضي النظام', color: colors.muted },
+];
 
-// نفس فكرة القائمة المنبثقة بالأصل — هنا 3 أزرار مباشرة (أنسب للمس على الموبايل)
-const PermissionCell = ({ value, busy, onSet }) => {
-  const current = value === true ? 'true' : value === false ? 'false' : 'default';
+// زر اختيار واحد مضغوط (بدل 3 أزرار مكدّسة) — يعرض الحالة الحالية،
+// وبالضغط يفتح ورقة سفلية بخيارات واضحة (نفس نمط SelectField بالتطبيق).
+const PermissionCell = ({ value, busy, onSet, roleLabel }) => {
+  const [visible, setVisible] = useState(false);
+  const current = STATES.find((s) => s.allowed === value) || STATES[2];
+
   return (
-    <View style={styles.cellRow}>
-      {['true', 'false', 'default'].map((key) => {
-        const s = STATE_STYLE[key];
-        const selected = current === key;
-        return (
+    <>
+      <Pressable
+        disabled={busy}
+        onPress={() => setVisible(true)}
+        style={[styles.cellBtn, { backgroundColor: `${current.color}22`, borderColor: `${current.color}66` }]}
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={current.color} />
+        ) : (
+          <Text style={[styles.cellIcon, { color: current.color }]}>{current.icon}</Text>
+        )}
+      </Pressable>
+
+      <BottomSheetModal visible={visible} onClose={() => setVisible(false)} title={roleLabel || 'حالة الصلاحية'}>
+        {STATES.map((s) => (
           <Pressable
-            key={key}
-            disabled={busy}
-            onPress={() => onSet(key === 'true' ? true : key === 'false' ? false : null)}
-            style={[
-              styles.cellBtn,
-              { backgroundColor: selected ? s.bg : 'transparent', borderColor: selected ? s.border : colors.border },
-            ]}
+            key={s.key}
+            style={styles.sheetOption}
+            onPress={() => {
+              onSet(s.allowed);
+              setVisible(false);
+            }}
           >
-            <Text style={[styles.cellIcon, { color: selected ? s.color : colors.muted }]}>{s.icon}</Text>
+            <Text style={[styles.sheetOptionIcon, { color: s.color }]}>{s.icon}</Text>
+            <Text style={styles.sheetOptionText}>{s.label}</Text>
+            {current.key === s.key && <Text style={styles.sheetOptionCheck}>●</Text>}
           </Pressable>
-        );
-      })}
-    </View>
+        ))}
+      </BottomSheetModal>
+    </>
   );
 };
 
@@ -142,6 +157,7 @@ export default function PermissionsAdminScreen() {
               {ROLES.map((role) => (
                 <PermissionCell
                   key={role.key}
+                  roleLabel={`${role.label} — ${PAGE_REGISTRY[pageKey]?.label || pageKey}`}
                   value={getValue(role.key, pageKey)}
                   busy={saving === `${role.key}:${pageKey}`}
                   onSet={(v) => setValue(role.key, pageKey, v)}
@@ -168,7 +184,7 @@ const styles = StyleSheet.create({
   legend: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, marginBottom: 12 },
   legendText: { color: colors.muted, fontSize: 11, textAlign: 'right' },
 
-  rolesLegendRow: { flexDirection: 'row-reverse', justifyContent: 'flex-end', gap: 3, paddingVertical: 6, marginBottom: 4 },
+  rolesLegendRow: { flexDirection: 'row-reverse', justifyContent: 'flex-end', gap: 6, paddingVertical: 6, marginBottom: 4 },
   roleColHeader: { width: 88, color: colors.muted, fontSize: 9, fontWeight: 'bold', textAlign: 'center' },
 
   pageCard: {
@@ -176,9 +192,16 @@ const styles = StyleSheet.create({
     padding: 12, marginBottom: 8,
   },
   pageName: { color: colors.white, fontSize: 13, fontWeight: 'bold', textAlign: 'right', marginBottom: 8 },
-  rolesCells: { flexDirection: 'row-reverse', justifyContent: 'flex-end' },
+  rolesCells: { flexDirection: 'row-reverse', justifyContent: 'flex-end', gap: 6 },
 
-  cellRow: { width: 88, flexDirection: 'row', justifyContent: 'center', gap: 3 },
-  cellBtn: { width: 26, height: 26, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  cellIcon: { fontSize: 12, fontWeight: 'bold' },
+  cellBtn: { width: 88, height: 38, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  cellIcon: { fontSize: 16, fontWeight: '900' },
+
+  sheetOption: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
+    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  sheetOptionIcon: { fontSize: 16, fontWeight: '900', width: 20, textAlign: 'center' },
+  sheetOptionText: { color: colors.white, fontSize: 14, fontWeight: 'bold', flex: 1, textAlign: 'right' },
+  sheetOptionCheck: { color: colors.accent, fontSize: 10 },
 });

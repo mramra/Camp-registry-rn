@@ -10,10 +10,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchMovements, fetchCamps } from '../../lib/supabase';
-import { formatDate } from '../../lib/utils';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { formatDate, formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -29,7 +31,7 @@ const TYPE_MAP = {
 };
 
 export default function MovementsScreen() {
-  const { orgId, canWrite } = useAuth();
+  const { profile, orgId, canWrite } = useAuth();
   const { getAllowedCampIds, getVisibleCamps } = useDataScope();
 
   const [movements, setMovements] = useState([]);
@@ -40,32 +42,67 @@ export default function MovementsScreen() {
   const [formVisible, setFormVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [offlineInfo, setOfflineInfo] = useState(null);
+  const [rawMovements, setRawMovements] = useState([]); // غير مفلترة -- نفلتر محلياً بالذاكرة أو بالكاش
+
+  const applyFilters = useCallback((movs, campsData) => {
+    let result = movs;
+    if (filterType) result = result.filter((m) => m.type === filterType);
+    if (filterCamp) result = result.filter((m) => m.from_camp === filterCamp || m.to_camp === filterCamp);
+    if (!filterCamp) {
+      const allowedCampIds = getAllowedCampIds(campsData);
+      if (allowedCampIds !== null) {
+        const set = new Set(allowedCampIds);
+        result = result.filter((m) => set.has(m.from_camp) || set.has(m.to_camp));
+      }
+    }
+    return result;
+  }, [filterType, filterCamp, getAllowedCampIds]);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
-    try {
-      const campsData = await fetchCamps(orgId);
-      const visible = getVisibleCamps(campsData);
+
+    const cached = await getCachedData('movements_list', profile?.id);
+    const hadCache = !!cached?.data;
+    if (hadCache) {
+      const visible = getVisibleCamps(cached.data.camps || []);
       setCamps(visible);
+      setRawMovements(cached.data.movements || []);
+      setMovements(applyFilters(cached.data.movements || [], cached.data.camps || []));
+      setOfflineInfo({ savedAt: cached.savedAt });
+      setLoading(false);
+    }
 
-      let movs = await fetchMovements(orgId, { type: filterType, campId: filterCamp });
-
-      if (!filterCamp) {
-        const allowedCampIds = getAllowedCampIds(campsData);
-        if (allowedCampIds !== null) {
-          const set = new Set(allowedCampIds);
-          movs = movs.filter((m) => set.has(m.from_camp) || set.has(m.to_camp));
-        }
+    try {
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
+      if (!net.isConnected) {
+        if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
+        return;
       }
 
-      setMovements(movs);
+      const [campsData, movs] = await withTimeout(
+        Promise.all([fetchCamps(orgId), fetchMovements(orgId, {})]),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
+      const visible = getVisibleCamps(campsData);
+      setCamps(visible);
+      setRawMovements(movs);
+      setMovements(applyFilters(movs, campsData));
+      setOfflineInfo(null);
+      cacheData('movements_list', profile?.id, { movements: movs, camps: campsData });
     } catch (e) {
-      showError('تعذّر تحميل حركات الأسر');
+      if (!hadCache) showError('تعذّر تحميل حركات الأسر');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [orgId, filterType, filterCamp, getAllowedCampIds, getVisibleCamps]);
+  }, [orgId, getVisibleCamps, applyFilters]);
+
+  // إعادة تطبيق الفلاتر محلياً فوراً (بدون طلب شبكة) كل ما تتغيّر
+  useEffect(() => {
+    if (rawMovements.length) setMovements(applyFilters(rawMovements, camps));
+  }, [filterType, filterCamp]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -133,13 +170,20 @@ export default function MovementsScreen() {
               title="حركات الأسر"
               subtitle={<Text style={styles.headerSubtitle}>{movements.length} حركة</Text>}
               action={
-                canWrite && (
+                canWrite && !offlineInfo && (
                   <Pressable style={styles.addBtn} onPress={() => setFormVisible(true)}>
                     <Text style={styles.addBtnText}>➕ نقل أسرة</Text>
                   </Pressable>
                 )
               }
             />
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة (لا يمكن تسجيل نقل الآن)
+                </Text>
+              </View>
+            )}
 
             <View style={styles.statsRow}>
               {Object.entries(TYPE_MAP).map(([k, v]) => (

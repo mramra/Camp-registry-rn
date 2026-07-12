@@ -12,10 +12,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchOrgMembers, fetchCamps, callAdminAPI, updateOrgMember } from '../../lib/supabase';
-import { randomPassword } from '../../lib/utils';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { formatDateTime, randomPassword } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -41,14 +43,42 @@ export default function UsersListScreen() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
-    const [usersData, campsData] = await Promise.all([fetchOrgMembers(orgId), fetchCamps(orgId)]);
-    setUsers(usersData);
-    setCamps(campsData);
-    setLoading(false);
-    setRefreshing(false);
+
+    const cached = await getCachedData('users_list', profile?.id);
+    const hadCache = !!cached?.data;
+    if (hadCache) {
+      setUsers(cached.data.users || []);
+      setCamps(cached.data.camps || []);
+      setOfflineInfo({ savedAt: cached.savedAt });
+      setLoading(false);
+    }
+
+    try {
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
+      if (!net.isConnected) {
+        if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
+        return;
+      }
+
+      const [usersData, campsData] = await withTimeout(
+        Promise.all([fetchOrgMembers(orgId), fetchCamps(orgId)]),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
+      setUsers(usersData);
+      setCamps(campsData);
+      setOfflineInfo(null);
+      cacheData('users_list', profile?.id, { users: usersData, camps: campsData });
+    } catch (e) {
+      if (!hadCache) showError('تعذّر تحميل البيانات ولا توجد نسخة محفوظة');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [orgId]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -110,7 +140,7 @@ export default function UsersListScreen() {
   const flatFiltered = useMemo(() => filtered.map((u) => ({ ...u, __depth: 0 })), [filtered]);
   const displayList = isSearching ? flatFiltered : (tree || []);
 
-  const canEditUser = (u) => (isOwner || isSuperAdmin) && u.id !== profile?.id;
+  const canEditUser = (u) => (isOwner || isSuperAdmin) && u.id !== profile?.id && !offlineInfo;
   const canDeleteUser = (u) => isOwner && u.role !== 'platform_owner' && u.id !== profile?.id;
 
   // معاينة التطبيق بالضبط متل ما يشوفه هذا المستخدم -- ما ينفع لمالك
@@ -250,13 +280,20 @@ export default function UsersListScreen() {
               title="المستخدمون"
               subtitle={<Text style={styles.headerSubtitle}>{filtered.length} من أصل {users.length}{!isSearching ? ' · هيكل هرمي' : ''}</Text>}
               action={
-                (isOwner || isSuperAdmin) && (
+                (isOwner || isSuperAdmin) && !offlineInfo && (
                   <Pressable style={styles.addBtn} onPress={() => navigation.push('UserForm')}>
                     <Text style={styles.addBtnText}>➕ إضافة</Text>
                   </Pressable>
                 )
               }
             />
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة (لا يمكن الإضافة/التعديل/الحذف الآن)
+                </Text>
+              </View>
+            )}
             <TextInput
               value={search}
               onChangeText={setSearch}
@@ -277,6 +314,11 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
   addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
   searchInput: {

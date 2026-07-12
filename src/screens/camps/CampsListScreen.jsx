@@ -13,9 +13,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchCamps, fetchCampFamilyCounts, fetchOrgMembers, deleteCamp } from '../../lib/supabase';
+import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -39,19 +42,46 @@ export default function CampsListScreen() {
   const [collapsed, setCollapsed] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [offlineInfo, setOfflineInfo] = useState(null);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
-    const [campsData, counts, members] = await Promise.all([
-      fetchCamps(orgId),
-      fetchCampFamilyCounts(orgId),
-      fetchOrgMembers(orgId),
-    ]);
-    setCamps(campsData);
-    setFamCount(counts);
-    setOrgMembers(members);
-    setLoading(false);
-    setRefreshing(false);
+
+    // 1) اعرض النسخة المحفوظة فوراً (لو موجودة) — بدون انتظار الشبكة.
+    const cached = await getCachedData('camps_list', profile?.id);
+    const hadCache = !!cached?.data;
+    if (hadCache) {
+      setCamps(cached.data.camps || []);
+      setFamCount(cached.data.famCount || {});
+      setOrgMembers(cached.data.orgMembers || []);
+      setOfflineInfo({ savedAt: cached.savedAt });
+      setLoading(false);
+    }
+
+    // 2) بعدين حاول تحديث حي بالخلفية.
+    try {
+      const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
+      if (!net.isConnected) {
+        if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
+        return;
+      }
+
+      const [campsData, counts, members] = await withTimeout(
+        Promise.all([fetchCamps(orgId), fetchCampFamilyCounts(orgId), fetchOrgMembers(orgId)]),
+        12000,
+        'انتهت مهلة تحميل البيانات'
+      );
+      setCamps(campsData);
+      setFamCount(counts);
+      setOrgMembers(members);
+      setOfflineInfo(null);
+      cacheData('camps_list', profile?.id, { camps: campsData, famCount: counts, orgMembers: members });
+    } catch (e) {
+      if (!hadCache) showError('تعذّر تحميل البيانات ولا توجد نسخة محفوظة');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [orgId]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -182,7 +212,7 @@ export default function CampsListScreen() {
           <Text style={[styles.statusLabel, { color: st.color }]}>{st.label}</Text>
         </View>
 
-        {(editable || deletable) && (
+        {(editable || deletable) && !offlineInfo && (
           <View style={styles.actionsRow}>
             {editable && (
               <Pressable style={styles.editBtn} onPress={() => navigation.push('CampForm', { campId: camp.id })}>
@@ -254,13 +284,20 @@ export default function CampsListScreen() {
               title="المخيمات"
               subtitle={<Text style={styles.headerSubtitle}>{parents.length} من أصل {camps.length} مخيم</Text>}
               action={
-                (isOwner || isSuperAdmin) && (
+                (isOwner || isSuperAdmin) && !offlineInfo && (
                   <Pressable style={styles.addBtn} onPress={() => navigation.push('CampForm')}>
                     <Text style={styles.addBtnText}>➕ إضافة</Text>
                   </Pressable>
                 )
               }
             />
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة (لا يمكن الإضافة/التعديل/الحذف الآن)
+                </Text>
+              </View>
+            )}
             <TextInput
               value={search}
               onChangeText={setSearch}
@@ -281,6 +318,11 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
+  offlineBanner: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+    borderRadius: 12, padding: 10, marginBottom: 12,
+  },
+  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
   addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
   searchInput: {

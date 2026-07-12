@@ -32,12 +32,11 @@
  * قائمة المشاركة/الحفظ القياسية دائماً.
  */
 import XLSX from 'xlsx-js-style';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { showInfo, showError } from '../utils/toast';
 
 const SAF_DIR_KEY = 'excelio_downloads_directory_uri';
 
@@ -136,11 +135,11 @@ function buildStyledSheetWithBanner(rows, banner) {
  * للمشاركة كبديل مضمون).
  */
 async function saveBase64ToDownloadsAndroid(base64, finalName) {
+  let step = 'طلب إذن المجلد الأول';
   try {
     let dirUri = await AsyncStorage.getItem(SAF_DIR_KEY);
 
     if (!dirUri) {
-      showInfo('اختر مجلد التنزيلات (مرة واحدة فقط، وبيُحفظ لكل مرة بعدها)');
       const perm = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
       if (!perm.granted) return false;
       dirUri = perm.directoryUri;
@@ -148,6 +147,7 @@ async function saveBase64ToDownloadsAndroid(base64, finalName) {
     }
 
     let fileUri;
+    step = 'إنشاء الملف بالمجلد المحفوظ';
     try {
       fileUri = await FileSystem.StorageAccessFramework.createFileAsync(dirUri, finalName, XLSX_MIME);
     } catch (createErr) {
@@ -155,17 +155,25 @@ async function saveBase64ToDownloadsAndroid(base64, finalName) {
       // إعدادات النظام، أو النظام أسقط الإذن بعد إغلاق التطبيق بالكامل
       // على بعض الأجهزة) -- اطلب الإذن من جديد مرة وحدة وأعد المحاولة.
       await AsyncStorage.removeItem(SAF_DIR_KEY);
-      showInfo('انتهت صلاحية إذن المجلد السابق -- اختر مجلد التنزيلات من جديد');
+      step = 'طلب إذن مجلد جديد (بعد فشل الأول)';
       const perm = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
       if (!perm.granted) return false;
       await AsyncStorage.setItem(SAF_DIR_KEY, perm.directoryUri);
+      step = 'إنشاء الملف بالمجلد الجديد';
       fileUri = await FileSystem.StorageAccessFramework.createFileAsync(perm.directoryUri, finalName, XLSX_MIME);
     }
 
+    step = 'كتابة محتوى الملف';
     await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
     return true;
   } catch (err) {
-    showError('تعذّر الحفظ المباشر (' + (err?.message || 'خطأ غير معروف') + ') -- سيتم فتح قائمة المشاركة بدلاً');
+    // رسالة toast تختفي بسرعة على بعض الأجهزة قبل ما تُقرأ -- Alert ثابت
+    // يبقى لحد ما يضغط المستخدم "حسناً"، يعطي وقت كافي للقراءة أو لقطة شاشة.
+    Alert.alert(
+      'تعذّر الحفظ المباشر',
+      `فشلت الخطوة: ${step}\n\nنص الخطأ: ${err?.message || err?.code || JSON.stringify(err) || 'غير معروف'}\n\nسيتم فتح قائمة المشاركة كبديل.`,
+      [{ text: 'حسناً' }]
+    );
     return false;
   }
 }

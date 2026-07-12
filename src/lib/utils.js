@@ -88,5 +88,9 @@ export function getDeviceName() {
 
 /** نوع الجهاز — على تطبيق React Native فعلي، دايماً "mobile" */
 export function getDeviceType() {
-  return Platform.OS === 'web' ? 'web' : 'mobile';
+  // قيد قاعدة البيانات (devices_device_type_check) يسمح فقط بـ
+  // mobile/tablet/desktop -- 'web' كانت تكسر الإدراج فعلياً عند تسجيل
+  // الدخول من المتصفح (اكتُشف بمحاولة تصحيح بيانات قديمة، مو باختبار
+  // فعلي -- كانت لتنكسر بصمت أول تسجيل دخول ويب بعد النشر السابق).
+  return Platform.OS === 'web' ? 'desktop' : 'mobile';
 }

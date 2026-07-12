@@ -74,7 +74,15 @@ export default function DevicesScreen() {
           const owner = byUserId[d.user_id];
           return !!owner && canUserReviewRequest(profile, owner);
         });
-    return typeFilter ? base.filter((d) => (d.device_type || 'mobile') === typeFilter) : base;
+    if (!typeFilter) return base;
+    // 'desktop' قيمة قديمة من النسخة الأصلية بالويب (متصفح كمبيوتر) --
+    // تُحسب مع 'web' بفلتر الويب، أي شي غيرها (بما فيها القيم الفاضية
+    // القديمة قبل ما نميّز النوع أصلاً) يُحسب تطبيق.
+    return base.filter((d) => {
+      const t = d.device_type || 'mobile';
+      const isWebType = t === 'web' || t === 'desktop';
+      return typeFilter === 'web' ? isWebType : !isWebType;
+    });
   }, [devices, byUserId, isOwner, profile, typeFilter]);
 
   const canManage = (owner) => isOwner || (!!owner && canUserReviewRequest(profile, owner));

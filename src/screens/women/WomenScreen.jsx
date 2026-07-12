@@ -159,7 +159,12 @@ export default function WomenScreen() {
       .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [allWomen, filterCamp, womenType, specialFilter, ageMin, ageMax, search]);
 
-  const womenTypes = useMemo(() => [...new Set(womenData.map((w) => w.type))], [womenData]);
+  const RELATION_ICONS = { 'رأس الأسرة': '🏠', 'زوجة': '💍', 'أم': '👵', 'ابنة': '👧', 'أخت': '👭', 'أنثى': '👩' };
+  const relationTypes = useMemo(() => {
+    const counts = {};
+    campWomen.forEach((w) => { counts[w.type] = (counts[w.type] || 0) + 1; });
+    return Object.entries(counts).map(([type, count]) => ({ type, count }));
+  }, [campWomen]);
   const womenStats = useMemo(
     () => ({
       total: womenData.length,
@@ -300,10 +305,25 @@ export default function WomenScreen() {
               )}
             </View>
 
-            <View style={styles.chipsRow}>
-              <FilterChip label="كل الصلات" selected={!womenType} onPress={() => setWomenType('')} />
-              {womenTypes.map((t) => (
-                <FilterChip key={t} label={t} selected={womenType === t} onPress={() => setWomenType(t)} />
+            <View style={styles.categoryGrid}>
+              <Pressable
+                onPress={() => setWomenType('')}
+                style={[styles.categoryCell, !womenType && styles.categoryCellActive]}
+              >
+                <Text style={styles.categoryIcon}>👥</Text>
+                <Text style={[styles.categoryCount, !womenType && styles.categoryCountActive]}>{campWomen.length}</Text>
+                <Text style={styles.categoryLabel}>كل الصلات</Text>
+              </Pressable>
+              {relationTypes.map(({ type, count }) => (
+                <Pressable
+                  key={type}
+                  onPress={() => setWomenType(type)}
+                  style={[styles.categoryCell, womenType === type && styles.categoryCellActive]}
+                >
+                  <Text style={styles.categoryIcon}>{RELATION_ICONS[type] || '👩'}</Text>
+                  <Text style={[styles.categoryCount, womenType === type && styles.categoryCountActive]}>{count}</Text>
+                  <Text style={styles.categoryLabel}>{type}</Text>
+                </Pressable>
               ))}
             </View>
 

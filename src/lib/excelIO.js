@@ -12,11 +12,34 @@
  * بدعم تنسيق مجاني كامل: تلوين، تسطير، محاذاة) بدل xlsx العادية اللي
  * تتجاهل أي تنسيق صامتاً بالنسخة المجانية.
  */
+/**
+ * excelIO.js — تصدير واستيراد ملفات Excel على React Native
+ *
+ * الويب: يبني الملف كـ Blob وينزّله مباشرة (رابط تنزيل تلقائي، بدون أي
+ * قائمة اختيار) -- المتصفح دايماً متصل بالنت أصلاً.
+ *
+ * أندرويد: يحفظ مباشرة بمجلد يختاره المستخدم مرة وحدة بس (Storage Access
+ * Framework) -- الإذن يُحفظ محلياً (AsyncStorage) ويُعاد استخدامه تلقائياً
+ * بكل تصدير لاحق بدون أي طلب إذن جديد. جُرِّبت هذي الآلية سابقاً وترجّع
+ * عنها مؤقتاً بسبب ملاحظة إنها تطلب الإذن من جديد كل مرة على جهاز
+ * الاختبار -- بإعادة المحاولة هذي المرة: أسماء ملفات فريدة لمنع تعارض
+ * إنشاء الملف (سبب محتمل للمشكلة السابقة)، ورسائل toast واضحة بكل خطوة
+ * عشان لو تكرر الخلل نعرف بالضبط وين يفشل. لو فشل SAF لأي سبب (رفض
+ * الإذن، أو خطأ غير متوقع)، يرجع تلقائياً لقائمة "إرسال إلى" القياسية
+ * بدون ما يعلّق المستخدم.
+ *
+ * iOS: ما فيه مفهوم "تنزيلات" مماثل (قيود نظام التشغيل نفسه)، فتُستخدم
+ * قائمة المشاركة/الحفظ القياسية دائماً.
+ */
 import XLSX from 'xlsx-js-style';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { showInfo, showError } from '../utils/toast';
+
+const SAF_DIR_KEY = 'excelio_downloads_directory_uri';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -106,7 +129,49 @@ function buildStyledSheetWithBanner(rows, banner) {
   return ws;
 }
 
-/** يحفظ الملف مؤقتاً بالكاش، ثم يفتح قائمة "إرسال إلى" (فيها خيار نسخ). */
+/**
+ * يحفظ محتوى base64 كملف Excel بمجلد يختاره المستخدم مباشرة (أندرويد)
+ * عبر SAF، مع إعادة استخدام إذن المجلد المحفوظ من مرة سابقة لو موجود.
+ * يرجع true لو نجح الحفظ المباشر، أو false لو تعذّر (فيرجع الاستدعاء
+ * للمشاركة كبديل مضمون).
+ */
+async function saveBase64ToDownloadsAndroid(base64, finalName) {
+  try {
+    let dirUri = await AsyncStorage.getItem(SAF_DIR_KEY);
+
+    if (!dirUri) {
+      showInfo('اختر مجلد التنزيلات (مرة واحدة فقط، وبيُحفظ لكل مرة بعدها)');
+      const perm = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (!perm.granted) return false;
+      dirUri = perm.directoryUri;
+      await AsyncStorage.setItem(SAF_DIR_KEY, dirUri);
+    }
+
+    let fileUri;
+    try {
+      fileUri = await FileSystem.StorageAccessFramework.createFileAsync(dirUri, finalName, XLSX_MIME);
+    } catch (createErr) {
+      // الإذن المحفوظ صار غير صالح (المستخدم غيّر المجلد، ألغى الإذن من
+      // إعدادات النظام، أو النظام أسقط الإذن بعد إغلاق التطبيق بالكامل
+      // على بعض الأجهزة) -- اطلب الإذن من جديد مرة وحدة وأعد المحاولة.
+      await AsyncStorage.removeItem(SAF_DIR_KEY);
+      showInfo('انتهت صلاحية إذن المجلد السابق -- اختر مجلد التنزيلات من جديد');
+      const perm = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (!perm.granted) return false;
+      await AsyncStorage.setItem(SAF_DIR_KEY, perm.directoryUri);
+      fileUri = await FileSystem.StorageAccessFramework.createFileAsync(perm.directoryUri, finalName, XLSX_MIME);
+    }
+
+    await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+    return true;
+  } catch (err) {
+    showError('تعذّر الحفظ المباشر (' + (err?.message || 'خطأ غير معروف') + ') -- سيتم فتح قائمة المشاركة بدلاً');
+    return false;
+  }
+}
+
+/** يحفظ الملف بأفضل طريقة متاحة للمنصة -- تنزيل مباشر بالويب، حفظ مباشر
+ * بمجلد مُختار مرة واحدة بأندرويد، أو قائمة مشاركة/حفظ بـiOS. */
 async function saveAndShare(base64, finalName) {
   // الويب: لا وجود لـ FileSystem.cacheDirectory ولا Sharing على المتصفح --
   // نبني الملف كـ Blob وننزّله مباشرة عبر رابط تنزيل تلقائي (نفس سلوك أي
@@ -127,6 +192,12 @@ async function saveAndShare(base64, finalName) {
     return url;
   }
 
+  if (Platform.OS === 'android') {
+    const saved = await saveBase64ToDownloadsAndroid(base64, finalName);
+    if (saved) return true;
+    // فشل الحفظ المباشر لأي سبب -- نكمل بالطريقة الاحتياطية بالأسفل
+  }
+
   const cacheUri = FileSystem.cacheDirectory + finalName;
   await FileSystem.writeAsStringAsync(cacheUri, base64, { encoding: FileSystem.EncodingType.Base64 });
 
@@ -144,7 +215,7 @@ async function saveAndShare(base64, finalName) {
 function buildFinalName(fileName) {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
-  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}${pad(now.getMilliseconds()).padStart(3, '0')}`;
   return `${fileName}_${stamp}.xlsx`;
 }
 

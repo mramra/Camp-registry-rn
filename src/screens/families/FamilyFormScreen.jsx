@@ -152,8 +152,16 @@ export default function FamilyFormScreen() {
         }
 
         const mems = await fetchFamilyMembers([familyId]);
+        // ترتيب حسب تاريخ الميلاد (الأكبر سناً أولاً) -- الأفراد بلا تاريخ
+        // ميلاد مسجَّل ينزلوا لآخر القائمة بدل ما يتصدروها عشوائياً.
+        const sortedMems = [...mems].sort((a, b) => {
+          if (!a.dob && !b.dob) return 0;
+          if (!a.dob) return 1;
+          if (!b.dob) return -1;
+          return new Date(a.dob) - new Date(b.dob);
+        });
         setMembers(
-          mems.map((m) => {
+          sortedMems.map((m) => {
             const d2 = splitDob(m.dob);
             return {
               localId: m.id,

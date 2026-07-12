@@ -36,8 +36,20 @@ export function truncate(str, len = 30) {
   return str && str.length > len ? str.slice(0, len) + '…' : str
 }
 
+/**
+ * معرّف فريد -- crypto.randomUUID() خاص بمتصفحات الويب فقط، غير موجود
+ * إطلاقاً على محرك Hermes (أندرويد/iOS الحقيقي)، فاستخدامه المباشر كان
+ * يكسر أي شاشة تستدعي هذي الدالة (شاشة الأجهزة، بصمة الجهاز، إلخ) بخطأ
+ * "Property 'crypto' doesn't exist" على الجوال الحقيقي فقط -- الويب ما
+ * كان يكشفها لأن المتصفح فعلاً عنده crypto.randomUUID أصلي. توليد UUID v4
+ * يدوي هنا بديل يشتغل بكل مكان بدون أي اعتماد إضافي.
+ */
 export function generateId() {
-  return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  })
 }
 
 export function randomPassword(length = 10) {

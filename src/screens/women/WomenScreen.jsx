@@ -27,6 +27,8 @@ export default function WomenScreen() {
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [womenType, setWomenType] = useState('');
+  const [ageMin, setAgeMin] = useState('');
+  const [ageMax, setAgeMax] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
@@ -114,9 +116,11 @@ export default function WomenScreen() {
     return [...heads, ...relMembers]
       .filter((w) => !filterCamp || w.camp_id === filterCamp)
       .filter((w) => !womenType || w.type === womenType)
+      .filter((w) => !ageMin || (w.age !== null && w.age >= Number(ageMin)))
+      .filter((w) => !ageMax || (w.age !== null && w.age <= Number(ageMax)))
       .filter((w) => !search.trim() || (w.name || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
-  }, [families, members, famMap, campMap, filterCamp, womenType, search]);
+  }, [families, members, famMap, campMap, filterCamp, womenType, ageMin, ageMax, search]);
 
   const womenTypes = useMemo(() => [...new Set(womenData.map((w) => w.type))], [womenData]);
   const womenStats = useMemo(
@@ -200,12 +204,42 @@ export default function WomenScreen() {
             </View>
 
             <View style={styles.statsGrid}>
-              {[['الإجمالي', womenStats.total], ['ربات البيوت', womenStats.heads], ['حوامل', womenStats.pregnant]].map(([l, v]) => (
+              {[
+                [filterCamp ? `الإجمالي بـ${campMap[filterCamp]}` : 'الإجمالي', womenStats.total],
+                ['ربات البيوت', womenStats.heads],
+                ['حوامل', womenStats.pregnant],
+              ].map(([l, v]) => (
                 <View key={l} style={styles.statBox}>
                   <Text style={styles.statValue}>{v}</Text>
                   <Text style={styles.statLabel}>{l}</Text>
                 </View>
               ))}
+            </View>
+
+            <View style={styles.ageRow}>
+              <Text style={styles.ageLabel}>الفئة العمرية:</Text>
+              <TextInput
+                value={ageMin}
+                onChangeText={setAgeMin}
+                placeholder="من"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                style={styles.ageInput}
+              />
+              <Text style={styles.ageDash}>—</Text>
+              <TextInput
+                value={ageMax}
+                onChangeText={setAgeMax}
+                placeholder="إلى"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                style={styles.ageInput}
+              />
+              {(!!ageMin || !!ageMax) && (
+                <Pressable onPress={() => { setAgeMin(''); setAgeMax(''); }} style={styles.ageClear}>
+                  <Text style={styles.ageClearText}>✕ مسح</Text>
+                </Pressable>
+              )}
             </View>
 
             <View style={styles.chipsRow}>
@@ -254,6 +288,15 @@ const getStyles = () =>
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    ageRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 10 },
+    ageLabel: { color: colors.muted, fontSize: 12, marginStart: 4 },
+    ageInput: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 10,
+      paddingHorizontal: 10, paddingVertical: 8, color: colors.white, fontSize: 13, textAlign: 'center', width: 64,
+    },
+    ageDash: { color: colors.muted },
+    ageClear: { paddingHorizontal: 8, paddingVertical: 6 },
+    ageClearText: { color: colors.red, fontSize: 11 },
 
     statsGrid: { flexDirection: 'row', gap: 8, marginBottom: 10 },
     statBox: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, alignItems: 'center' },

@@ -34,6 +34,9 @@ export default function ChildrenScreen() {
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [ageFilter, setAgeFilter] = useState('');
+  const [ageMin, setAgeMin] = useState('');
+  const [ageMax, setAgeMax] = useState('');
+  const [orphansOnly, setOrphansOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
@@ -100,9 +103,21 @@ export default function ChildrenScreen() {
         const g = AGE_GROUPS.find((g) => g.key === ageFilter);
         return k.age >= g.min && k.age <= g.max;
       })
+      .filter((k) => !ageMin || k.age >= Number(ageMin))
+      .filter((k) => !ageMax || k.age <= Number(ageMax))
+      .filter((k) => !orphansOnly || !!k.orphan_status)
       .filter((k) => !search.trim() || (k.name || '').includes(search) || (k.famName || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
-  }, [members, famMap, campMap, filterCamp, ageFilter, search]);
+  }, [members, famMap, campMap, filterCamp, ageFilter, ageMin, ageMax, orphansOnly, search]);
+
+  const orphansCount = useMemo(() => {
+    return members
+      .filter((m) => {
+        const age = calcAge(m.dob);
+        const f = famMap[m.family_id] || {};
+        return age !== null && age < 18 && !!m.orphan_status && (!filterCamp || f.camp_id === filterCamp);
+      }).length;
+  }, [members, famMap, filterCamp]);
 
   const ageGroupCounts = useMemo(() => {
     const all = members.map((m) => calcAge(m.dob)).filter((a) => a !== null && a < 18);
@@ -153,6 +168,7 @@ export default function ChildrenScreen() {
                       'العمر': k.age,
                       'الصلة': k.relation || '',
                       'الجنس': k.gender || '',
+                      'يتيم؟': k.orphan_status ? 'نعم' : 'لا',
                       'رب الأسرة': k.famName,
                       'المخيم': k.camp,
                     }))
@@ -177,6 +193,7 @@ export default function ChildrenScreen() {
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
               />
+              <FilterChip label={`🔸 أيتام (${orphansCount})`} selected={orphansOnly} onPress={() => setOrphansOnly((v) => !v)} />
             </View>
 
             <View style={styles.ageGrid}>
@@ -192,6 +209,32 @@ export default function ChildrenScreen() {
               ))}
             </View>
 
+            <View style={styles.ageRow}>
+              <Text style={styles.ageRowLabel}>أو عمر مخصّص:</Text>
+              <TextInput
+                value={ageMin}
+                onChangeText={setAgeMin}
+                placeholder="من"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                style={styles.ageInput}
+              />
+              <Text style={styles.ageDash}>—</Text>
+              <TextInput
+                value={ageMax}
+                onChangeText={setAgeMax}
+                placeholder="إلى"
+                placeholderTextColor={colors.muted}
+                keyboardType="number-pad"
+                style={styles.ageInput}
+              />
+              {(!!ageMin || !!ageMax) && (
+                <Pressable onPress={() => { setAgeMin(''); setAgeMax(''); }} style={styles.ageClear}>
+                  <Text style={styles.ageClearText}>✕ مسح</Text>
+                </Pressable>
+              )}
+            </View>
+
             <TextInput
               value={search}
               onChangeText={setSearch}
@@ -200,7 +243,10 @@ export default function ChildrenScreen() {
               style={styles.searchInput}
             />
 
-            <Text style={styles.countText}>{childrenData.length} طفل</Text>
+            <Text style={styles.countText}>
+              {filterCamp ? `مجموع الأطفال (أقل من 18) بـ${campMap[filterCamp]}: ` : 'مجموع الأطفال (أقل من 18): '}
+              <Text style={styles.countValue}>{childrenData.length}</Text>
+            </Text>
           </View>
         }
         ListEmptyComponent={<EmptyState icon="🧒" title="لا توجد نتائج" />}
@@ -238,12 +284,22 @@ const getStyles = () =>
     ageCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
     ageCountActive: { color: colors.accent },
     ageLabel: { color: colors.muted, fontSize: 9, marginTop: 2 },
+    ageRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 10 },
+    ageRowLabel: { color: colors.muted, fontSize: 12 },
+    ageInput: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 10,
+      paddingHorizontal: 10, paddingVertical: 8, color: colors.white, fontSize: 13, textAlign: 'center', width: 64,
+    },
+    ageDash: { color: colors.muted },
+    ageClear: { paddingHorizontal: 8, paddingVertical: 6 },
+    ageClearText: { color: colors.red, fontSize: 11 },
 
     searchInput: {
       backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
       paddingHorizontal: 16, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 8,
     },
     countText: { color: colors.muted, fontSize: 11, marginBottom: 10, textAlign: 'right' },
+    countValue: { color: colors.accent, fontWeight: '900', fontSize: 13 },
 
     card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 8 },
     cardName: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right' },

@@ -22,6 +22,7 @@ const HEALTH_TYPES = [
   { key: 'chronic', label: 'أمراض مزمنة', icon: '💊' },
   { key: 'disability', label: 'إعاقات', icon: '♿' },
   { key: 'injury', label: 'إصابات', icon: '🩹' },
+  { key: 'needs', label: 'احتياجات صحية', icon: '🦽' },
 ];
 
 export default function HealthRecordsScreen() {
@@ -93,6 +94,7 @@ export default function HealthRecordsScreen() {
       chronic: { fField: 'head_chronic_diseases', mField: 'chronic_diseases', label: 'أمراض مزمنة' },
       disability: { fField: 'head_disabilities', mField: 'disabilities', label: 'إعاقة' },
       injury: { fField: 'head_injuries', mField: 'injuries', label: 'إصابة' },
+      needs: { fField: 'head_needs', mField: 'needs', label: 'احتياج صحي' },
     };
     const records = [];
 
@@ -147,7 +149,7 @@ export default function HealthRecordsScreen() {
       .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [families, members, famMap, campMap, filterCamp, healthType, search]);
 
-  const HEALTH_COLOR = { chronic: colors.accent, disability: colors.blue, injury: colors.red };
+  const HEALTH_COLOR = { chronic: colors.accent, disability: colors.blue, injury: colors.red, needs: colors.purple };
 
   const styles = getStyles();
 

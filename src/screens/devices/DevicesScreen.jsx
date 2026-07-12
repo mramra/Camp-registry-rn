@@ -105,18 +105,24 @@ export default function DevicesScreen() {
       showError('⛔ لا تملك صلاحية إزالة الأجهزة');
       return;
     }
-    Alert.alert('إزالة الجهاز', 'إزالة هذا الجهاز نهائياً؟', [
+    Alert.alert('إزالة الجهاز', `إزالة "${device.device_name}" (آخر نشاط: ${formatDate(device.last_seen)}) نهائياً؟`, [
       { text: 'إلغاء', style: 'cancel' },
       {
         text: 'إزالة',
         style: 'destructive',
         onPress: async () => {
+          setBusyId(device.id);
           try {
             await removeDevice(device.id);
+            // إزالة فورية من الواجهة بدل انتظار إعادة تحميل كاملة -- مع 10+
+            // جهاز بنفس الاسم العام (زي "Android" بس) كان صعب تلاحظ اختفاء
+            // وحدة وسط باقي المتطابقين، فيبدو الحذف "ما اشتغل" رغم نجاحه.
+            setDevices((prev) => prev.filter((d) => d.id !== device.id));
             showSuccess('✅ تم إزالة الجهاز');
-            loadDevices();
           } catch (e) {
             showError('خطأ: ' + e.message);
+          } finally {
+            setBusyId(null);
           }
         },
       },

@@ -246,11 +246,16 @@ export const checkDeviceApproval = async (userId, profile) => {
     const dev = existing?.[0];
 
     if (!dev) {
+      // لاحقة قصيرة (آخر 4 محارف من البصمة) عشان أجهزة بنفس النظام
+      // ("تطبيق أندرويد" مثلاً) تصير قابلة للتمييز بصرياً بشاشة الأجهزة --
+      // بدونها، عدة أجهزة مختلفة فعلياً تظهر بنفس الاسم بالضبط، فيصعب
+      // معرفة أي وحدة تحذفها أو تعتمدها.
+      const shortId = fingerprint.slice(-4).toUpperCase();
       await supabase.from('devices').insert({
         org_id: profile.org_id,
         user_id: userId,
         fingerprint,
-        device_name: getDeviceName(),
+        device_name: `${getDeviceName()} #${shortId}`,
         device_type: getDeviceType(),
         is_approved: isPlatformOwner,
         is_blocked: false,

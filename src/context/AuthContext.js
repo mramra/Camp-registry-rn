@@ -1,10 +1,17 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase, fetchAllPagePermissions } from '../lib/supabase';
+import { supabase, fetchAllPagePermissions, checkDeviceApproval } from '../lib/supabase';
 import { hasPermission, canAccessPageSync } from '../lib/permissions';
 import { cacheData, getCachedData, withTimeout } from '../lib/offlineCache';
 
 export const AuthContext = createContext({});
+
+// من المسؤول عن الموافقة على جهاز جديد حسب دور صاحبه (رسالة توضيحية فقط)
+const NEXT_DEVICE_APPROVER = {
+  assistant: 'مندوبك أو مدير الإيواء',
+  camp_delegate: 'مدير الإيواء أو مالك المنصة',
+  super_admin: 'مالك المنصة',
+};
 
 /**
  * قراءة الجلسة المحفوظة مباشرة من AsyncStorage، متجاوزين supabase.auth
@@ -133,6 +140,7 @@ export const AuthProvider = ({ children }) => {
       setProfile(data);
       cacheData('user_profile', userId, data);
       loadPagePermissions(data.org_id);
+      return data;
     } catch (err) {
       console.error('[fetchUserProfile]', err.message);
       // فشل جلب الملف الشخصي (غالباً انقطاع نت أو شبكة متعلّقة عند فتح
@@ -144,7 +152,9 @@ export const AuthProvider = ({ children }) => {
       if (cached?.data) {
         setProfile(cached.data);
         loadPagePermissions(cached.data.org_id);
+        return cached.data;
       }
+      return null;
     }
   }, []);
 
@@ -180,7 +190,25 @@ export const AuthProvider = ({ children }) => {
 
         setSession(data.session);
         setUser(data.session.user);
-        await fetchUserProfile(data.session.user.id);
+        const profileData = await fetchUserProfile(data.session.user.id);
+
+        // فحص/تسجيل الجهاز -- ميزة كانت موجودة بالأصل وناقصة كلياً بـRN.
+        // مالك المنصة معفى دائماً. غيره: جهاز جديد أو غير معتمد أو محظور
+        // يوقف الدخول فوراً (تسجيل خروج) لحد ما حد يعتمده من شاشة الأجهزة.
+        const deviceCheck = await checkDeviceApproval(data.session.user.id, profileData);
+        if (!deviceCheck.ok) {
+          await supabase.auth.signOut();
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          const approver = NEXT_DEVICE_APPROVER[deviceCheck.role] || 'المسؤول عنك';
+          const msg =
+            deviceCheck.status === 'blocked'
+              ? '🚫 جهازك محظور من الدخول لهذا الحساب.'
+              : `⏳ جهازك الجديد بانتظار الموافقة من: ${approver}`;
+          setError(msg);
+          return { success: false, error: msg, deviceStatus: deviceCheck.status };
+        }
 
         return { success: true };
       } catch (err) {

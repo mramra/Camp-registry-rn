@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
+import { getDeviceFingerprint, getDeviceName, getDeviceType } from './utils';
 
 const SUPABASE_URL = 'https://ojclpkenecicujkqhhlu.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_d6q8hoDDcohuZFHk3jxI7g_IBWWCmNu';
@@ -217,6 +218,61 @@ export const fetchDevices = async (orgId) => {
     .order('last_seen', { ascending: false });
   if (error) throw error;
   return data || [];
+};
+
+/**
+ * فحص/تسجيل الجهاز عند تسجيل الدخول -- منقولة حرفياً من camp-registry-react
+ * (كانت ناقصة بالكامل بـRN: getDeviceFingerprint موجودة بس محدش يستدعيها،
+ * فجدول devices ما كان يتعبى أبداً وشاشة الأجهزة تفضل فاضية للأبد).
+ *
+ * مالك المنصة: يُسجَّل الجهاز للعرض فقط (is_approved=true تلقائياً) ولا يُحجب أبداً.
+ * غيره: جهاز جديد → يُسجَّل "قيد الموافقة" ويُحجب؛ محظور → حجب نهائي؛ غير معتمد → حجب بانتظار المراجعة.
+ * عند أي عطل غير متوقع (شبكة، إلخ) لا نحجب الدخول — تجنباً لقفل المستخدمين بسبب خلل مؤقت.
+ * يُرجع: { ok, status: 'owner'|'approved'|'pending'|'blocked'|'error', role? }
+ */
+export const checkDeviceApproval = async (userId, profile) => {
+  try {
+    if (!profile) return { ok: true, status: 'no_profile' };
+    const isPlatformOwner = profile.role === 'platform_owner';
+    const fingerprint = await getDeviceFingerprint();
+    const now = new Date().toISOString();
+
+    const { data: existing } = await supabase
+      .from('devices')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('fingerprint', fingerprint)
+      .limit(1);
+    const dev = existing?.[0];
+
+    if (!dev) {
+      await supabase.from('devices').insert({
+        org_id: profile.org_id,
+        user_id: userId,
+        fingerprint,
+        device_name: getDeviceName(),
+        device_type: getDeviceType(),
+        is_approved: isPlatformOwner,
+        is_blocked: false,
+        last_seen: now,
+        created_at: now,
+      });
+      return isPlatformOwner
+        ? { ok: true, status: 'owner' }
+        : { ok: false, status: 'pending', role: profile.role };
+    }
+
+    if (isPlatformOwner) return { ok: true, status: 'owner' }; // معفى دائماً بصرف النظر عن حالة السجل
+
+    if (dev.is_blocked) return { ok: false, status: 'blocked', role: profile.role };
+    if (!dev.is_approved) return { ok: false, status: 'pending', role: profile.role };
+
+    await supabase.from('devices').update({ last_seen: now }).eq('id', dev.id);
+    return { ok: true, status: 'approved' };
+  } catch (e) {
+    console.warn('[checkDeviceApproval]', e.message);
+    return { ok: true, status: 'error' };
+  }
 };
 
 const logDeviceAudit = async (action, device, reviewer, orgId) => {

@@ -7,7 +7,7 @@ import { formatDateTime } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
-import { exportXLSX, pickAndParseXLSX } from '../../lib/excelIO';
+import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX } from '../../lib/excelIO';
 import { calcAge, isAgeInRange, getCampDelegateInfo } from '../../lib/helpers';
 import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
@@ -178,11 +178,24 @@ export default function ExportScreen() {
     const camp = camps.find((c) => c.id === campId);
     if (!camp) return null;
     const delegate = getCampDelegateInfo(camp, orgMembers);
-    return { name: camp.name, delegateName: delegate?.name, delegatePhone: delegate?.phone };
+    const coords = camp.latitude && camp.longitude ? `${camp.latitude}, ${camp.longitude}` : null;
+    return { name: camp.name, delegateName: delegate?.name, delegatePhone: delegate?.phone, coords };
   };
 
-  const bannerNote = (campInfo) =>
-    showBanner && campInfo ? `${campInfo.name} — ${campInfo.delegateName || '—'} — ${campInfo.delegatePhone || '—'}` : null;
+  // بانر حقيقي (صفين مدمجين بأعلى الملف) بدل عمود متكرر بكل صف -- اسم
+  // المخيم بخط أكبر، وبيانات المندوب تحته بخط أصغر. لو الاسم لا يبدأ
+  // بكلمة "مخيم" أصلاً نضيفها (بعض الأسماء زي "مخيم هند" مكتوبة بالفعل).
+  const buildBannerLines = (campInfo, enabled = showBanner) => {
+    if (!enabled || !campInfo) return null;
+    const rawName = campInfo.name || '—';
+    const displayName = rawName.trim().startsWith('مخيم') ? rawName : `مخيم ${rawName}`;
+    const parts = [`👤 المندوب: ${campInfo.delegateName || 'غير معيَّن'}`, `📱 ${campInfo.delegatePhone || '—'}`];
+    if (campInfo.coords) parts.push(`📍 ${campInfo.coords}`);
+    return [
+      { text: `🏕️ ${displayName}`, size: 18 },
+      { text: parts.join('   '), size: 11 },
+    ];
+  };
 
   // بدل إعادة الطلب من السيرفر كل مرة، نفلتر من allFamilies المحمّلة أصلاً
   // (بواسطة loadMeta) — هذا يخلي التصدير السريع يشتغل حتى بدون اتصال، طالما
@@ -206,13 +219,19 @@ export default function ExportScreen() {
       const rows = sorted.map((f) => {
         const wife = findWife(f.family_members);
         const row = {};
-        if (bannerNote(campInfo)) row['بيانات المخيم'] = bannerNote(campInfo);
         selectedCols.forEach((col) => {
           row[col.label] = resolveFamilyColumn(col.key, f, { membersCount: (f.family_members?.length || 0) + 1, wife });
         });
         return row;
       });
-      await exportXLSX(rows, campInfo?.name || 'كل المخيمات', `كشف_الأسر_${campInfo?.name || 'كل_المخيمات'}`);
+      const banner = buildBannerLines(campInfo);
+      const sheetName = (campInfo?.name || 'كل المخيمات').slice(0, 31);
+      const fname = `كشف_الأسر_${campInfo?.name || 'كل_المخيمات'}`;
+      if (banner) {
+        await exportXLSXMultiSheetWithBanners([{ name: sheetName, banner, rows }], fname);
+      } else {
+        await exportXLSX(rows, sheetName, fname);
+      }
       showToast(`تم تصدير ${data.length} أسرة`, 'success');
     } catch (e) {
       showToast('خطأ: ' + e.message, 'error');
@@ -239,12 +258,18 @@ export default function ExportScreen() {
         ];
         all.forEach((m) => {
           const row = {};
-          if (bannerNote(campInfo)) row['بيانات المخيم'] = bannerNote(campInfo);
           selectedCols.forEach((col) => { row[col.label] = resolveMemberColumn(col.key, m, f); });
           rows.push(row);
         });
       });
-      await exportXLSX(rows, campInfo?.name || 'كل المخيمات', `كشف_الأفراد_${campInfo?.name || 'كل_المخيمات'}`);
+      const banner = buildBannerLines(campInfo);
+      const sheetName = (campInfo?.name || 'كل المخيمات').slice(0, 31);
+      const fname = `كشف_الأفراد_${campInfo?.name || 'كل_المخيمات'}`;
+      if (banner) {
+        await exportXLSXMultiSheetWithBanners([{ name: sheetName, banner, rows }], fname);
+      } else {
+        await exportXLSX(rows, sheetName, fname);
+      }
       showToast(`تم تصدير ${rows.length} فرد`, 'success');
     } catch (e) {
       showToast('خطأ: ' + e.message, 'error');
@@ -440,11 +465,15 @@ export default function ExportScreen() {
           return row;
         });
       }
-      if (showBnr) {
-        const camp = camps.find((c) => c.id === cxCamp);
-        rows = rows.map((r) => ({ 'المخيم': camp?.name || '', 'المندوب': autoDelegate?.full_name || '—', ...r }));
+      const cxCampInfo = showBnr ? getCampInfo(cxCamp) : null;
+      const banner = buildBannerLines(cxCampInfo, showBnr);
+      const sheetName = (cxSheetName.slice(0, 31) || 'كشف مخصص');
+      const fname = cxSheetName || 'كشف_مخصص';
+      if (banner) {
+        await exportXLSXMultiSheetWithBanners([{ name: sheetName, banner, rows }], fname);
+      } else {
+        await exportXLSX(rows, sheetName, fname);
       }
-      await exportXLSX(rows, cxSheetName.slice(0, 31) || 'كشف مخصص', cxSheetName || 'كشف_مخصص');
       showToast(`تم تصدير ${cxSelected.size} ${isMem ? 'فرد' : 'أسرة'}`, 'success');
     } catch (e) {
       showToast('خطأ: ' + e.message, 'error');

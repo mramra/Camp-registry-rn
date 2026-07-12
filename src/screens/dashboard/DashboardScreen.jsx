@@ -224,6 +224,7 @@ export default function DashboardScreen() {
     { icon: '📦', label: 'التوزيعات', screen: 'Distributions' },
     { icon: '🧒', label: 'سجل الأطفال', screen: 'Children' },
     { icon: '👩', label: 'النساء', screen: 'Women' },
+    { icon: '👨', label: 'الرجال', screen: 'Men' },
     { icon: '🩺', label: 'سجل الحالات الصحية', screen: 'HealthRecords' },
     { icon: '💬', label: 'الرسائل', screen: 'SMS' },
     ...(profile?.role === 'platform_owner'

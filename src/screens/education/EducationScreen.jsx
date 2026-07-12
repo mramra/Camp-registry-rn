@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -19,6 +20,7 @@ import colors from '../../theme/colors';
 const ADULT_STAGES = ['دبلوم', 'بكالوريوس', 'ماجستير', 'دكتوراه'];
 
 export default function EducationScreen() {
+  const navigation = useNavigation();
   const { profile, orgId } = useAuth();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
   const canExport = hasPermission(profile, 'reports');
@@ -236,7 +238,11 @@ export default function EducationScreen() {
               const stageMeta = STAGE_ICONS.find((s) => s.key === p.stage);
               const isAdult = ADULT_STAGES.includes(p.stage);
               return (
-                <View key={p.id} style={styles.personCard}>
+                <Pressable
+                  key={p.id}
+                  style={styles.personCard}
+                  onPress={() => p.family_id && navigation.push('FamilyDetail', { familyId: p.family_id })}
+                >
                   <Text style={styles.personName}>{p.name || '—'}</Text>
                   <Text style={styles.personMeta}>
                     {p.age} سنة · {campMap[f.camp_id] || '—'} · 👨‍👩‍👧 {f.head_name || '—'}
@@ -252,7 +258,7 @@ export default function EducationScreen() {
                       </View>
                     )}
                   </View>
-                </View>
+                </Pressable>
               );
             })}
             {filtered.length > 100 && (

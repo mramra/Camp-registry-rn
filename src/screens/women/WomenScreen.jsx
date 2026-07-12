@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
@@ -17,6 +17,7 @@ import ExportButton from '../../components/ui/ExportButton';
 import colors from '../../theme/colors';
 
 export default function WomenScreen() {
+  const navigation = useNavigation();
   const { orgId, profile } = useAuth();
   const { getAllowedCampIds, getVisibleCamps } = useDataScope();
 
@@ -94,6 +95,7 @@ export default function WomenScreen() {
       .filter((f) => f.head_gender === 'أنثى')
       .map((f) => ({
         id: 'f-' + f.id,
+        famId: f.id,
         name: f.head_name,
         age: calcAge(f.head_dob),
         type: 'رأس الأسرة',
@@ -111,6 +113,7 @@ export default function WomenScreen() {
         const f = famMap[m.family_id] || {};
         return {
           id: 'm-' + m.id,
+          famId: m.family_id,
           name: m.name || '—',
           age: calcAge(m.dob),
           type: m.relation || 'أنثى',
@@ -187,12 +190,12 @@ export default function WomenScreen() {
   }
 
   const renderWoman = ({ item: w }) => (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={() => w.famId && navigation.push('FamilyDetail', { familyId: w.famId })}>
       <Text style={styles.cardName}>{w.name} <Text style={styles.typeTag}>({w.type})</Text></Text>
       <Text style={styles.cardMeta}>{w.age ?? '—'} سنة • {w.marital} {w.status ? `• 🔸${w.status}` : ''} {w.isNursing ? '• 🍼 مرضعة' : ''}</Text>
       {!!w.chronic && <Text style={styles.chronicText}>🩺 {w.chronic}</Text>}
-      <Text style={styles.cardSubMeta}>⛺{w.tent} 🏕️{w.camp}</Text>
-    </View>
+      <Text style={styles.cardSubMeta}>⛺{w.tent} 🏕️{w.camp} — اضغط للانتقال للأسرة ←</Text>
+    </Pressable>
   );
 
   return (
@@ -268,7 +271,6 @@ export default function WomenScreen() {
             <View style={styles.categoryGrid}>
               {[
                 { icon: '👩‍👧‍👦', label: filterCamp ? `الإجمالي بـ${campMap[filterCamp]}` : 'الإجمالي', count: womenStats.total },
-                { icon: '🏠', label: 'ربات البيوت', count: womenStats.heads },
                 { icon: '🤰', label: 'حوامل', count: womenStats.pregnant },
               ].map((c) => (
                 <View key={c.label} style={styles.categoryCell}>
@@ -276,6 +278,28 @@ export default function WomenScreen() {
                   <Text style={styles.categoryCount}>{c.count}</Text>
                   <Text style={styles.categoryLabel}>{c.label}</Text>
                 </View>
+              ))}
+            </View>
+
+            <View style={styles.categoryGrid}>
+              <Pressable
+                onPress={() => setWomenType('')}
+                style={[styles.categoryCell, !womenType && styles.categoryCellActive]}
+              >
+                <Text style={styles.categoryIcon}>👥</Text>
+                <Text style={[styles.categoryCount, !womenType && styles.categoryCountActive]}>{campWomen.length}</Text>
+                <Text style={styles.categoryLabel}>كل الصلات</Text>
+              </Pressable>
+              {relationTypes.map(({ type, count }) => (
+                <Pressable
+                  key={type}
+                  onPress={() => setWomenType(type)}
+                  style={[styles.categoryCell, womenType === type && styles.categoryCellActive]}
+                >
+                  <Text style={styles.categoryIcon}>{RELATION_ICONS[type] || '👩'}</Text>
+                  <Text style={[styles.categoryCount, womenType === type && styles.categoryCountActive]}>{count}</Text>
+                  <Text style={styles.categoryLabel}>{type}</Text>
+                </Pressable>
               ))}
             </View>
 
@@ -303,28 +327,6 @@ export default function WomenScreen() {
                   <Text style={styles.ageClearText}>✕ مسح</Text>
                 </Pressable>
               )}
-            </View>
-
-            <View style={styles.categoryGrid}>
-              <Pressable
-                onPress={() => setWomenType('')}
-                style={[styles.categoryCell, !womenType && styles.categoryCellActive]}
-              >
-                <Text style={styles.categoryIcon}>👥</Text>
-                <Text style={[styles.categoryCount, !womenType && styles.categoryCountActive]}>{campWomen.length}</Text>
-                <Text style={styles.categoryLabel}>كل الصلات</Text>
-              </Pressable>
-              {relationTypes.map(({ type, count }) => (
-                <Pressable
-                  key={type}
-                  onPress={() => setWomenType(type)}
-                  style={[styles.categoryCell, womenType === type && styles.categoryCellActive]}
-                >
-                  <Text style={styles.categoryIcon}>{RELATION_ICONS[type] || '👩'}</Text>
-                  <Text style={[styles.categoryCount, womenType === type && styles.categoryCountActive]}>{count}</Text>
-                  <Text style={styles.categoryLabel}>{type}</Text>
-                </Pressable>
-              ))}
             </View>
 
             <TextInput

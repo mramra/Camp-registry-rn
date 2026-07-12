@@ -222,7 +222,9 @@ export default function DashboardScreen() {
     { icon: '👥', label: 'المستخدمون', screen: 'UsersList' },
     { icon: '🚶', label: 'حركات الأسر', screen: 'Movements' },
     { icon: '📦', label: 'التوزيعات', screen: 'Distributions' },
-    { icon: '📋', label: 'السجلات', screen: 'Registers' },
+    { icon: '🧒', label: 'سجل الأطفال', screen: 'Children' },
+    { icon: '👩', label: 'النساء', screen: 'Women' },
+    { icon: '🩺', label: 'سجل الحالات الصحية', screen: 'HealthRecords' },
     { icon: '💬', label: 'الرسائل', screen: 'SMS' },
     ...(profile?.role === 'platform_owner'
       ? [{ icon: '🔐', label: 'إدارة الصلاحيات', screen: 'PermissionsAdmin' }]

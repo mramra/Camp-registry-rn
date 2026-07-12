@@ -85,7 +85,9 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       key: 'registers',
       title: '⚕️ السجلات الاجتماعية والصحية',
       items: [
-        { icon: '📋', label: 'السجلات', screen: 'Registers', pageKey: 'registers' },
+        { icon: '🧒', label: 'سجل الأطفال', screen: 'Children', pageKey: 'children' },
+        { icon: '👩', label: 'النساء', screen: 'Women', pageKey: 'women' },
+        { icon: '🩺', label: 'سجل الحالات الصحية', screen: 'HealthRecords', pageKey: 'health_records' },
         { icon: '🎓', label: 'الحالة الدراسية', screen: 'Education', pageKey: 'education_status' },
       ],
     },

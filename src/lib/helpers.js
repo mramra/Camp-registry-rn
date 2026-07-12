@@ -377,3 +377,47 @@ export function getCampDelegateInfo(camp, orgMembers) {
     phone: person?.phone || person?.national_id || '',
   };
 }
+
+/**
+ * قيم الحالات الصحية تختلف شكلها فعلياً حسب الجدول (تأكدنا من db.js الأصلي):
+ * - family_members.disabilities/injuries/chronic_diseases: مصفوفة Postgres حقيقية
+ *   (JS array فعلي عبر REST مباشرة)
+ * - families.head_disabilities/... : نص JSON (قد يصل كسلسلة نصية، أو أحياناً
+ *   يُفكّكه PostgREST تلقائياً حسب نوع العمود الفعلي بقاعدة البيانات)
+ * هذه الدالة تتعامل مع الحالتين بأمان بدل افتراض إنه نص دايماً (كان هذا
+ * بالضبط سبب خطأ 'trim is not a function' — القيمة كانت مصفوفة فعلية).
+ */
+export function normalizeHealthValue(raw, depth = 0) {
+  if (!raw || depth > 3) return '';
+  if (Array.isArray(raw)) {
+    // كل عنصر إما نص جاهز، أو كائن {type, detail} (شكل حقيقي بجدول family_members)
+    const parts = raw
+      .filter(Boolean)
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const type = item.type || '';
+          const detail = item.detail ? ` (${item.detail})` : '';
+          return type ? `${type}${detail}` : '';
+        }
+        return '';
+      })
+      .filter(Boolean);
+    return parts.join('، ');
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === '[]' || trimmed === '""' || trimmed === 'null') return '';
+    try {
+      const parsed = JSON.parse(trimmed);
+      // ترميز مزدوج محتمل (نص JSON داخل نص JSON) — نطبّع بشكل متكرر بحد أقصى
+      if (Array.isArray(parsed) || typeof parsed === 'string') {
+        return normalizeHealthValue(parsed, depth + 1);
+      }
+    } catch {
+      // ليست JSON — نص عادي فعلي، نُرجعه كما هو
+    }
+    return trimmed;
+  }
+  return String(raw);
+}

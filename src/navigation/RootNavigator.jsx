@@ -18,7 +18,9 @@ import MovementsScreen from '../screens/movements/MovementsScreen';
 import DistributionsScreen from '../screens/distributions/DistributionsScreen';
 import DistributionReceiveScreen from '../screens/distributions/DistributionReceiveScreen';
 import PermissionsAdminScreen from '../screens/permissions/PermissionsAdminScreen';
-import RegistersScreen from '../screens/registers/RegistersScreen';
+import ChildrenScreen from '../screens/children/ChildrenScreen';
+import WomenScreen from '../screens/women/WomenScreen';
+import HealthRecordsScreen from '../screens/health/HealthRecordsScreen';
 import SMSScreen from '../screens/sms/SMSScreen';
 import PendingRequestsScreen from '../screens/pending/PendingRequestsScreen';
 import AlertsScreen from '../screens/alerts/AlertsScreen';
@@ -122,7 +124,9 @@ const RootNavigator = () => {
             <Stack.Screen name="PermissionsAdmin" component={PermissionsAdminScreen} options={{ title: 'إدارة الصلاحيات' }} />
 
             {/* السجلات — منقولة (أطفال/نساء/صحة) */}
-            <Stack.Screen name="Registers" component={RegistersScreen} options={{ title: 'السجلات' }} />
+            <Stack.Screen name="Children" component={ChildrenScreen} options={{ title: 'سجل الأطفال' }} />
+            <Stack.Screen name="Women" component={WomenScreen} options={{ title: 'النساء' }} />
+            <Stack.Screen name="HealthRecords" component={HealthRecordsScreen} options={{ title: 'سجل الحالات الصحية' }} />
 
             {/* الرسائل — منقولة بالكامل */}
             <Stack.Screen name="SMS" component={SMSScreen} options={{ title: 'الرسائل' }} />

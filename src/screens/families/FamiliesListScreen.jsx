@@ -28,23 +28,23 @@ import colors from '../../theme/colors';
 
 // ── فلاتر ثابتة (نفس النسخة الأصلية) ──────────────────────
 const MISS_OPTIONS = [
-  { key: '', label: 'الكل' },
-  { key: 'incomplete', label: '⚠️ ناقص' },
-  { key: 'dup_id', label: '🔁 هوية مكررة' },
-  { key: 'dup_phone', label: '📞 جوال مكرر' },
+  { key: '', icon: '👥', label: 'الكل' },
+  { key: 'incomplete', icon: '⚠️', label: 'ناقص' },
+  { key: 'dup_id', icon: '🔁', label: 'هوية مكررة' },
+  { key: 'dup_phone', icon: '📞', label: 'جوال مكرر' },
 ];
 
 const APPROVAL_OPTIONS = [
-  { key: 'approved', label: '✅ مكتمل' },
-  { key: 'pending', label: '🔍 قيد المراجعة' },
-  { key: 'rejected', label: '❌ مرفوض' },
-  { key: '', label: 'الكل' },
+  { key: '', icon: '👥', label: 'الكل' },
+  { key: 'approved', icon: '✅', label: 'مكتمل' },
+  { key: 'pending', icon: '🔍', label: 'قيد المراجعة' },
+  { key: 'rejected', icon: '❌', label: 'مرفوض' },
 ];
 
 const GENDER_OPTIONS = [
-  { key: '', label: 'كل الجنس' },
-  { key: 'ذكر', label: '👨 ذكر' },
-  { key: 'أنثى', label: '👩 أنثى' },
+  { key: '', icon: '👥', label: 'كل الجنس' },
+  { key: 'ذكر', icon: '👨', label: 'ذكر' },
+  { key: 'أنثى', icon: '👩', label: 'أنثى' },
 ];
 
 export default function FamiliesListScreen() {
@@ -189,12 +189,15 @@ export default function FamiliesListScreen() {
   const counts = useMemo(() => {
     const base = filterCamp ? families.filter((f) => f.camp_id === filterCamp) : families;
     return {
+      all: base.length,
       incomplete: base.filter((f) => isIncomplete(f, membersByFamily[f.id])).length,
       dup_id: base.filter((f) => dupIdSet.has(f.id)).length,
       dup_phone: base.filter((f) => dupPhoneSet.has(f.id)).length,
       approved: base.filter((f) => (f.review_status || 'approved') === 'approved').length,
       pending: base.filter((f) => f.review_status === 'pending').length,
       rejected: base.filter((f) => f.review_status === 'rejected').length,
+      male: base.filter((f) => f.head_gender === 'ذكر').length,
+      female: base.filter((f) => f.head_gender === 'أنثى').length,
     };
   }, [families, filterCamp, membersByFamily, dupIdSet, dupPhoneSet]);
 
@@ -361,50 +364,69 @@ export default function FamiliesListScreen() {
               style={styles.searchInput}
             />
 
-            {/* فلتر جودة البيانات */}
-            <View style={styles.chipsRow}>
-              {MISS_OPTIONS.map((o) => (
-                <FilterChip
-                  key={o.key || 'all'}
-                  label={o.key ? `${o.label} (${counts[o.key]})` : `${o.label} (${families.length})`}
-                  selected={filterMiss === o.key}
-                  onPress={() => setFilterMiss(o.key)}
-                />
-              ))}
-            </View>
-
-            {/* فلتر حالة المراجعة */}
-            <View style={styles.chipsRow}>
-              {APPROVAL_OPTIONS.map((o) => (
-                <FilterChip
-                  key={o.key || 'all'}
-                  label={o.key ? `${o.label} (${counts[o.key]})` : `${o.label} (${families.length})`}
-                  selected={filterApproval === o.key}
-                  onPress={() => setFilterApproval(o.key)}
-                />
-              ))}
-            </View>
-
-            {/* المخيم + الجنس */}
+            {/* المخيم */}
             <View style={styles.chipsRow}>
               <FilterChip
                 label={filterCamp ? campMap[filterCamp] : `كل المخيمات (${families.length})`}
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
               />
-              {GENDER_OPTIONS.map((o) => (
-                <FilterChip
-                  key={o.key || 'all'}
-                  label={o.label}
-                  selected={filterGender === o.key}
-                  onPress={() => setFilterGender(o.key)}
-                />
-              ))}
               {hasFilter && (
                 <Pressable style={styles.resetBtn} onPress={resetFilters}>
                   <Text style={styles.resetText}>↺ إعادة</Text>
                 </Pressable>
               )}
+            </View>
+
+            {/* فلتر جودة البيانات */}
+            <View style={styles.categoryGrid}>
+              {MISS_OPTIONS.map((o) => (
+                <Pressable
+                  key={o.key || 'all'}
+                  onPress={() => setFilterMiss(o.key)}
+                  style={[styles.categoryCell, filterMiss === o.key && styles.categoryCellActive]}
+                >
+                  <Text style={styles.categoryIcon}>{o.icon}</Text>
+                  <Text style={[styles.categoryCount, filterMiss === o.key && styles.categoryCountActive]}>
+                    {o.key ? counts[o.key] : counts.all}
+                  </Text>
+                  <Text style={styles.categoryLabel}>{o.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* فلتر حالة المراجعة */}
+            <View style={styles.categoryGrid}>
+              {APPROVAL_OPTIONS.map((o) => (
+                <Pressable
+                  key={o.key || 'all'}
+                  onPress={() => setFilterApproval(o.key)}
+                  style={[styles.categoryCell, filterApproval === o.key && styles.categoryCellActive]}
+                >
+                  <Text style={styles.categoryIcon}>{o.icon}</Text>
+                  <Text style={[styles.categoryCount, filterApproval === o.key && styles.categoryCountActive]}>
+                    {o.key ? counts[o.key] : counts.all}
+                  </Text>
+                  <Text style={styles.categoryLabel}>{o.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* فلتر الجنس */}
+            <View style={styles.categoryGrid}>
+              {GENDER_OPTIONS.map((o) => (
+                <Pressable
+                  key={o.key || 'all'}
+                  onPress={() => setFilterGender(o.key)}
+                  style={[styles.categoryCell, filterGender === o.key && styles.categoryCellActive]}
+                >
+                  <Text style={styles.categoryIcon}>{o.icon}</Text>
+                  <Text style={[styles.categoryCount, filterGender === o.key && styles.categoryCountActive]}>
+                    {o.key === 'ذكر' ? counts.male : o.key === 'أنثى' ? counts.female : counts.all}
+                  </Text>
+                  <Text style={styles.categoryLabel}>{o.label}</Text>
+                </Pressable>
+              ))}
             </View>
 
             {/* فلتر العمر */}
@@ -504,6 +526,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  categoryCell: {
+    flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 12, paddingVertical: 10, alignItems: 'center',
+  },
+  categoryCellActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
+  categoryIcon: { fontSize: 18, marginBottom: 2 },
+  categoryCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
+  categoryCountActive: { color: colors.accent },
+  categoryLabel: { color: colors.muted, fontSize: 9, marginTop: 1, textAlign: 'center' },
   resetBtn: {
     borderWidth: 1,
     borderColor: colors.border,

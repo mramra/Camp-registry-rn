@@ -11,7 +11,7 @@ import {
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
-import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps } from '../../lib/supabase';
+import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps, fetchFamilies } from '../../lib/supabase';
 import { calcAge, checkFamilyIssues, getMemberIcon, arrLabel } from '../../lib/helpers';
 import { formatDate, formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
@@ -58,6 +58,7 @@ export default function FamilyDetailScreen() {
   const [exitReason, setExitReason] = useState('');
   const [exitSaving, setExitSaving] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
+  const [duplicates, setDuplicates] = useState([]);
 
   const load = useCallback(async () => {
     if (!familyId) return;
@@ -116,6 +117,29 @@ export default function FamilyDetailScreen() {
       setCampName(resolvedCampName);
       setOfflineInfo(null);
       cacheData(`family_detail_${familyId}`, profile?.id, { family: data, members: mems, campName: resolvedCampName });
+
+      // فحص تكرار رقم الهوية أو الجوال مقابل باقي أسر المنظمة -- تنبيه
+      // صامت (بلا حجب) عشان المستخدم يلاحظ ويقرر بنفسه هل هو خطأ إدخال
+      // فعلي أو مجرد جوال مشترك بالعائلة الواحدة.
+      if (data.org_id) {
+        try {
+          const allFams = await fetchFamilies(data.org_id);
+          const dups = [];
+          allFams.forEach((f) => {
+            if (f.id === familyId) return;
+            if (data.head_id && f.head_id && f.head_id === data.head_id) {
+              dups.push({ familyId: f.id, familyName: f.head_name, matchType: 'رقم الهوية' });
+            } else if (data.phone1 && f.phone1 && f.phone1 === data.phone1) {
+              dups.push({ familyId: f.id, familyName: f.head_name, matchType: 'رقم الجوال' });
+            } else if (data.phone1 && f.phone2 && f.phone2 === data.phone1) {
+              dups.push({ familyId: f.id, familyName: f.head_name, matchType: 'رقم الجوال' });
+            }
+          });
+          setDuplicates(dups);
+        } catch {
+          // فحص التكرار غير حرج -- تجاهل أي عطل فيه بصمت
+        }
+      }
     } catch (e) {
       if (!hadCache) showError('تعذّر تحميل بيانات الأسرة ولا توجد نسخة محفوظة');
     } finally {
@@ -206,6 +230,23 @@ export default function FamilyDetailScreen() {
             <Text style={styles.offlineBannerText}>
               📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة (التعديل/تسجيل الخروج غير متاح الآن)
             </Text>
+          </View>
+        )}
+
+        {duplicates.length > 0 && (
+          <View style={styles.dupBox}>
+            <Text style={styles.dupTitle}>🔁 بيانات مكررة مع أسرة ثانية</Text>
+            {duplicates.map((d, i) => (
+              <Pressable
+                key={i}
+                style={styles.dupBadge}
+                onPress={() => navigation.push('FamilyDetail', { familyId: d.familyId })}
+              >
+                <Text style={styles.dupBadgeText}>
+                  {d.matchType} مطابق لأسرة "{d.familyName}" — اضغط للانتقال ←
+                </Text>
+              </Pressable>
+            ))}
           </View>
         )}
 
@@ -351,6 +392,26 @@ const styles = StyleSheet.create({
   },
   warnTitle: { color: colors.red, fontWeight: 'bold', fontSize: 12, marginBottom: 4, textAlign: 'right' },
   warnItem: { color: colors.muted, fontSize: 11, textAlign: 'right' },
+
+  dupBox: {
+    backgroundColor: 'rgba(139,92,246,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(139,92,246,0.35)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  dupTitle: { color: colors.purple, fontWeight: 'bold', fontSize: 12, marginBottom: 6, textAlign: 'right' },
+  dupBadge: {
+    backgroundColor: 'rgba(139,92,246,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(139,92,246,0.4)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  dupBadgeText: { color: colors.white, fontSize: 11, textAlign: 'right' },
 
   panel: {
     backgroundColor: colors.surface2,

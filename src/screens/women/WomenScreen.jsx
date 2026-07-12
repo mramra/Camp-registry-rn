@@ -241,38 +241,35 @@ export default function WomenScreen() {
               />
             </View>
 
-            <View style={styles.chipsRow}>
-              <FilterChip
-                label={`🖤 أرامل (${specialCounts.widow})`}
-                selected={specialFilter === 'widow'}
-                onPress={() => setSpecialFilter((f) => (f === 'widow' ? '' : 'widow'))}
-              />
-              <FilterChip
-                label={`💔 مطلقات (${specialCounts.divorced})`}
-                selected={specialFilter === 'divorced'}
-                onPress={() => setSpecialFilter((f) => (f === 'divorced' ? '' : 'divorced'))}
-              />
-              <FilterChip
-                label={`🏠 معيلة أسرة (${specialCounts.head})`}
-                selected={specialFilter === 'head'}
-                onPress={() => setSpecialFilter((f) => (f === 'head' ? '' : 'head'))}
-              />
-              <FilterChip
-                label={`🍼 مرضعات (${specialCounts.nursing})`}
-                selected={specialFilter === 'nursing'}
-                onPress={() => setSpecialFilter((f) => (f === 'nursing' ? '' : 'nursing'))}
-              />
+            <View style={styles.categoryGrid}>
+              {[
+                { key: 'widow', icon: '🖤', label: 'أرامل', count: specialCounts.widow },
+                { key: 'divorced', icon: '💔', label: 'مطلقات', count: specialCounts.divorced },
+                { key: 'head', icon: '🏠', label: 'معيلة أسرة', count: specialCounts.head },
+                { key: 'nursing', icon: '🍼', label: 'مرضعات', count: specialCounts.nursing },
+              ].map((c) => (
+                <Pressable
+                  key={c.key}
+                  onPress={() => setSpecialFilter((f) => (f === c.key ? '' : c.key))}
+                  style={[styles.categoryCell, specialFilter === c.key && styles.categoryCellActive]}
+                >
+                  <Text style={styles.categoryIcon}>{c.icon}</Text>
+                  <Text style={[styles.categoryCount, specialFilter === c.key && styles.categoryCountActive]}>{c.count}</Text>
+                  <Text style={styles.categoryLabel}>{c.label}</Text>
+                </Pressable>
+              ))}
             </View>
 
-            <View style={styles.statsGrid}>
+            <View style={styles.categoryGrid}>
               {[
-                [filterCamp ? `الإجمالي بـ${campMap[filterCamp]}` : 'الإجمالي', womenStats.total],
-                ['ربات البيوت', womenStats.heads],
-                ['حوامل', womenStats.pregnant],
-              ].map(([l, v]) => (
-                <View key={l} style={styles.statBox}>
-                  <Text style={styles.statValue}>{v}</Text>
-                  <Text style={styles.statLabel}>{l}</Text>
+                { icon: '👩‍👧‍👦', label: filterCamp ? `الإجمالي بـ${campMap[filterCamp]}` : 'الإجمالي', count: womenStats.total },
+                { icon: '🏠', label: 'ربات البيوت', count: womenStats.heads },
+                { icon: '🤰', label: 'حوامل', count: womenStats.pregnant },
+              ].map((c) => (
+                <View key={c.label} style={styles.categoryCell}>
+                  <Text style={styles.categoryIcon}>{c.icon}</Text>
+                  <Text style={styles.categoryCount}>{c.count}</Text>
+                  <Text style={styles.categoryLabel}>{c.label}</Text>
                 </View>
               ))}
             </View>
@@ -359,10 +356,16 @@ const getStyles = () =>
     ageClear: { paddingHorizontal: 8, paddingVertical: 6 },
     ageClearText: { color: colors.red, fontSize: 11 },
 
-    statsGrid: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-    statBox: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, alignItems: 'center' },
-    statValue: { color: colors.accent, fontWeight: '900', fontSize: 16 },
-    statLabel: { color: colors.muted, fontSize: 9, marginTop: 2 },
+    categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    categoryCell: {
+      flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 12, paddingVertical: 10, alignItems: 'center',
+    },
+    categoryCellActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
+    categoryIcon: { fontSize: 18, marginBottom: 2 },
+    categoryCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
+    categoryCountActive: { color: colors.accent },
+    categoryLabel: { color: colors.muted, fontSize: 9, marginTop: 1, textAlign: 'center' },
 
     searchInput: {
       backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,

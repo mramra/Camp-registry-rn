@@ -204,17 +204,32 @@ export default function ChildrenScreen() {
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
               />
-              <FilterChip label={`🔸 أيتام (${orphansCount})`} selected={orphansOnly} onPress={() => setOrphansOnly((v) => !v)} />
-              <FilterChip label={`🍼 رضع (${infantsCount})`} selected={infantsOnly} onPress={() => setInfantsOnly((v) => !v)} />
             </View>
 
             <View style={styles.ageGrid}>
+              <Pressable
+                style={[styles.ageBox, orphansOnly && styles.ageBoxActive]}
+                onPress={() => setOrphansOnly((v) => !v)}
+              >
+                <Text style={styles.ageIcon}>🔸</Text>
+                <Text style={[styles.ageCount, orphansOnly && styles.ageCountActive]}>{orphansCount}</Text>
+                <Text style={styles.ageLabel}>أيتام</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.ageBox, infantsOnly && styles.ageBoxActive]}
+                onPress={() => setInfantsOnly((v) => !v)}
+              >
+                <Text style={styles.ageIcon}>🍼</Text>
+                <Text style={[styles.ageCount, infantsOnly && styles.ageCountActive]}>{infantsCount}</Text>
+                <Text style={styles.ageLabel}>رضع</Text>
+              </Pressable>
               {ageGroupCounts.map((g) => (
                 <Pressable
                   key={g.key}
                   style={[styles.ageBox, ageFilter === g.key && styles.ageBoxActive]}
                   onPress={() => setAgeFilter(ageFilter === g.key ? '' : g.key)}
                 >
+                  <Text style={styles.ageIcon}>🎂</Text>
                   <Text style={[styles.ageCount, ageFilter === g.key && styles.ageCountActive]}>{g.count}</Text>
                   <Text style={styles.ageLabel}>{g.key}</Text>
                 </Pressable>
@@ -290,12 +305,16 @@ const getStyles = () =>
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
 
-    ageGrid: { flexDirection: 'row', gap: 6, marginBottom: 12 },
-    ageBox: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 8, alignItems: 'center' },
+    ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+    ageBox: {
+      flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 12, paddingVertical: 10, alignItems: 'center',
+    },
     ageBoxActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
+    ageIcon: { fontSize: 18, marginBottom: 2 },
     ageCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
     ageCountActive: { color: colors.accent },
-    ageLabel: { color: colors.muted, fontSize: 9, marginTop: 2 },
+    ageLabel: { color: colors.muted, fontSize: 9, marginTop: 1 },
     ageRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 10 },
     ageRowLabel: { color: colors.muted, fontSize: 12 },
     ageInput: {

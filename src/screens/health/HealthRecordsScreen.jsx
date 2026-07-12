@@ -242,14 +242,17 @@ export default function HealthRecordsScreen() {
               />
             </View>
 
-            <View style={styles.chipsRow}>
+            <View style={styles.categoryGrid}>
               {HEALTH_TYPES.map((t) => (
-                <FilterChip
+                <Pressable
                   key={t.key}
-                  label={`${t.icon} ${t.label} (${typeCounts[t.key] || 0})`}
-                  selected={healthType === t.key}
                   onPress={() => setHealthType(t.key)}
-                />
+                  style={[styles.categoryCell, healthType === t.key && styles.categoryCellActive]}
+                >
+                  <Text style={styles.categoryIcon}>{t.icon}</Text>
+                  <Text style={[styles.categoryCount, healthType === t.key && styles.categoryCountActive]}>{typeCounts[t.key] || 0}</Text>
+                  <Text style={styles.categoryLabel}>{t.label}</Text>
+                </Pressable>
               ))}
             </View>
 
@@ -292,6 +295,16 @@ const getStyles = () =>
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    categoryCell: {
+      flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 12, paddingVertical: 10, alignItems: 'center',
+    },
+    categoryCellActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
+    categoryIcon: { fontSize: 18, marginBottom: 2 },
+    categoryCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
+    categoryCountActive: { color: colors.accent },
+    categoryLabel: { color: colors.muted, fontSize: 9, marginTop: 1, textAlign: 'center' },
 
     searchInput: {
       backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,

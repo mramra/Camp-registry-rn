@@ -167,18 +167,31 @@ async function saveBase64ToDownloadsAndroid(base64, finalName) {
     await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
     return true;
   } catch (err) {
+    const rawMsg = err?.message || err?.code || JSON.stringify(err) || 'غير معروف';
+
+    // قيد رسمي موثّق من Google نفسها: بدءاً من أندرويد 11، ممنوع منح صلاحية
+    // كتابة لمجلد "Downloads" الأساسي عبر SAF مهما حاولنا -- مو خلل بالتطبيق
+    // ولا بالمحاولة، النظام نفسه يرفضها دائماً لهذا المجلد بالذات (مصدر:
+    // developer.android.com/training/data-storage/shared/documents-files).
+    // نمسح الإذن المحفوظ فوراً عشان ما يعيد نفس المجلد المكسور تلقائياً،
+    // ونوضّح للمستخدم يختار مجلد ثاني المرة الجاية.
+    const isDownloadsRestriction = /downloads/i.test(rawMsg) && /writable|denial|denied|permission/i.test(rawMsg);
+    await AsyncStorage.removeItem(SAF_DIR_KEY);
+
+    const title = isDownloadsRestriction ? 'مجلد "التنزيلات" غير مسموح بالكتابة فيه' : 'تعذّر الحفظ المباشر';
+    const message = isDownloadsRestriction
+      ? 'هذا قيد من أندرويد نفسه (بدءاً من أندرويد 11): ممنوع أي تطبيق يكتب مباشرة بمجلد "Downloads" الأساسي، حتى لو وافقت على الإذن.\n\n' +
+        'الحل: المرة الجاية لما تظهر لك نافذة اختيار المجلد، اختر مجلد ثاني غير "Downloads" نفسه -- مثلاً افتح تطبيق "الملفات" بجوالك، سوّي مجلد جديد باسم "تقارير نبض المخيم" (أي مكان)، وبعدها اختره من نافذة الاختيار. أو اختر مجلد "Documents" لو موجود.\n\n' +
+        'بالضغط "حسناً" رح تفتح قائمة المشاركة كبديل حالياً.'
+      : `فشلت الخطوة: ${step}\n\nنص الخطأ: ${rawMsg}\n\nبالضغط "حسناً" رح تفتح قائمة المشاركة كبديل.`;
+
     // رسالة toast تختفي بسرعة على بعض الأجهزة قبل ما تُقرأ -- Alert ثابت
     // يبقى لحد ما يضغط المستخدم "حسناً". المهم هنا: ننتظر فعلياً ضغطة
     // المستخدم (await) قبل ما نرجع ونكمل لقائمة المشاركة -- قبل هذا
     // التعديل كان الكود يكمل فوراً لفتح قائمة المشاركة فوق نافذة التنبيه
     // فيسكّرها قبل ما تُقرأ، بالضبط نفس العرض اللي وصفه المستخدم.
     await new Promise((resolve) => {
-      Alert.alert(
-        'تعذّر الحفظ المباشر',
-        `فشلت الخطوة: ${step}\n\nنص الخطأ: ${err?.message || err?.code || JSON.stringify(err) || 'غير معروف'}\n\nبالضغط "حسناً" رح تفتح قائمة المشاركة كبديل.`,
-        [{ text: 'حسناً', onPress: resolve }],
-        { cancelable: false }
-      );
+      Alert.alert(title, message, [{ text: 'حسناً', onPress: resolve }], { cancelable: false });
     });
     return false;
   }

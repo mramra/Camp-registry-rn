@@ -16,6 +16,7 @@ import { ROLE_LABELS, canUserReviewRequest } from '../../lib/permissions';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
+import FilterChip from '../../components/ui/FilterChip';
 import Badge from '../../components/ui/Badge';
 import colors from '../../theme/colors';
 
@@ -35,6 +36,7 @@ export default function DevicesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [typeFilter, setTypeFilter] = useState(''); // '' | 'mobile' | 'web'
 
   const loadDevices = useCallback(async () => {
     if (!orgId) return;
@@ -65,13 +67,15 @@ export default function DevicesScreen() {
 
   // الرؤية: مالك المنصة يرى الكل. غيره يرى جهازه + أجهزة من يحق له مراجعتهم هرمياً.
   const visibleDevices = useMemo(() => {
-    if (isOwner) return devices;
-    return devices.filter((d) => {
-      if (d.user_id === profile?.user_id) return true;
-      const owner = byUserId[d.user_id];
-      return !!owner && canUserReviewRequest(profile, owner);
-    });
-  }, [devices, byUserId, isOwner, profile]);
+    const base = isOwner
+      ? devices
+      : devices.filter((d) => {
+          if (d.user_id === profile?.user_id) return true;
+          const owner = byUserId[d.user_id];
+          return !!owner && canUserReviewRequest(profile, owner);
+        });
+    return typeFilter ? base.filter((d) => (d.device_type || 'mobile') === typeFilter) : base;
+  }, [devices, byUserId, isOwner, profile, typeFilter]);
 
   const canManage = (owner) => isOwner || (!!owner && canUserReviewRequest(profile, owner));
 
@@ -204,15 +208,22 @@ export default function DevicesScreen() {
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
-          <PageHeader
-            icon="📱"
-            title="إدارة الأجهزة"
-            subtitle={
-              <Text style={styles.headerSubtitle}>
-                {visibleDevices.length} جهاز{pendingCount ? ` — ⏳ ${pendingCount} بانتظار الموافقة` : ''}
-              </Text>
-            }
-          />
+          <View>
+            <PageHeader
+              icon="📱"
+              title="إدارة الأجهزة"
+              subtitle={
+                <Text style={styles.headerSubtitle}>
+                  {visibleDevices.length} جهاز{pendingCount ? ` — ⏳ ${pendingCount} بانتظار الموافقة` : ''}
+                </Text>
+              }
+            />
+            <View style={styles.filterRow}>
+              <FilterChip label="الكل" selected={!typeFilter} onPress={() => setTypeFilter('')} />
+              <FilterChip label="📱 التطبيق" selected={typeFilter === 'mobile'} onPress={() => setTypeFilter('mobile')} />
+              <FilterChip label="🌐 الويب" selected={typeFilter === 'web'} onPress={() => setTypeFilter('web')} />
+            </View>
+          </View>
         }
         ListEmptyComponent={<EmptyState icon="📱" title="لا توجد أجهزة" />}
       />
@@ -225,6 +236,7 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, marginBottom: 4 },
 
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14, marginBottom: 8 },
   cardMine: { borderColor: 'rgba(245,158,11,0.4)' },

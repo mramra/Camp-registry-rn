@@ -69,12 +69,12 @@ export async function getDeviceFingerprint() {
 
 /** اسم وصفي للجهاز — Platform.OS بدل تحليل user agent (غير موجود على الموبايل) */
 export function getDeviceName() {
-  if (Platform.OS === 'android') return '🤖 Android';
-  if (Platform.OS === 'ios') return '🍎 iOS';
-  return '🌐 جهاز غير معروف';
+  if (Platform.OS === 'android') return '🤖 تطبيق أندرويد';
+  if (Platform.OS === 'ios') return '🍎 تطبيق iOS';
+  return '🌐 متصفح ويب';
 }
 
 /** نوع الجهاز — على تطبيق React Native فعلي، دايماً "mobile" */
 export function getDeviceType() {
-  return 'mobile';
+  return Platform.OS === 'web' ? 'web' : 'mobile';
 }

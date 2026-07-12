@@ -25,6 +25,13 @@ const HEALTH_TYPES = [
   { key: 'needs', label: 'احتياجات صحية', icon: '🦽' },
 ];
 
+const FIELD_MAP = {
+  chronic: { fField: 'head_chronic_diseases', mField: 'chronic_diseases', label: 'أمراض مزمنة' },
+  disability: { fField: 'head_disabilities', mField: 'disabilities', label: 'إعاقة' },
+  injury: { fField: 'head_injuries', mField: 'injuries', label: 'إصابة' },
+  needs: { fField: 'head_needs', mField: 'needs', label: 'احتياج صحي' },
+};
+
 export default function HealthRecordsScreen() {
   const navigation = useNavigation();
   const { orgId, profile } = useAuth();
@@ -89,18 +96,12 @@ export default function HealthRecordsScreen() {
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
   const famMap = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families]);
 
-  const healthData = useMemo(() => {
-    const FIELD_MAP = {
-      chronic: { fField: 'head_chronic_diseases', mField: 'chronic_diseases', label: 'أمراض مزمنة' },
-      disability: { fField: 'head_disabilities', mField: 'disabilities', label: 'إعاقة' },
-      injury: { fField: 'head_injuries', mField: 'injuries', label: 'إصابة' },
-      needs: { fField: 'head_needs', mField: 'needs', label: 'احتياج صحي' },
-    };
+  const allRecords = useMemo(() => {
     const records = [];
+    const allKeys = Object.keys(FIELD_MAP);
 
     families.forEach((f) => {
-      const entries = healthType === 'all' ? Object.keys(FIELD_MAP) : [healthType];
-      entries.forEach((key) => {
+      allKeys.forEach((key) => {
         const raw = f[FIELD_MAP[key].fField];
         const val = normalizeHealthValue(raw);
         if (val) {
@@ -122,8 +123,7 @@ export default function HealthRecordsScreen() {
 
     members.forEach((m) => {
       const f = famMap[m.family_id] || {};
-      const entries = healthType === 'all' ? Object.keys(FIELD_MAP) : [healthType];
-      entries.forEach((key) => {
+      allKeys.forEach((key) => {
         const raw = m[FIELD_MAP[key].mField];
         const val = normalizeHealthValue(raw);
         if (val) {
@@ -143,11 +143,29 @@ export default function HealthRecordsScreen() {
       });
     });
 
-    return records
-      .filter((r) => !filterCamp || r.camp_id === filterCamp)
+    return records;
+  }, [families, members, famMap, campMap]);
+
+  // أعداد كل فئة بالمخيم المختار (بلا تأثير فلتر النوع الحالي) عشان تظهر
+  // ثابتة جنب كل زر فلتر بغض النظر عن أي فئة مفعّلة حالياً
+  const campRecords = useMemo(
+    () => (filterCamp ? allRecords.filter((r) => r.camp_id === filterCamp) : allRecords),
+    [allRecords, filterCamp]
+  );
+  const typeCounts = useMemo(() => {
+    const counts = { all: campRecords.length };
+    Object.keys(FIELD_MAP).forEach((key) => {
+      counts[key] = campRecords.filter((r) => r.key === key).length;
+    });
+    return counts;
+  }, [campRecords]);
+
+  const healthData = useMemo(() => {
+    return campRecords
+      .filter((r) => healthType === 'all' || r.key === healthType)
       .filter((r) => !search.trim() || (r.name || '').includes(search) || (r.val || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
-  }, [families, members, famMap, campMap, filterCamp, healthType, search]);
+  }, [campRecords, healthType, search]);
 
   const HEALTH_COLOR = { chronic: colors.accent, disability: colors.blue, injury: colors.red, needs: colors.purple };
 
@@ -228,7 +246,7 @@ export default function HealthRecordsScreen() {
               {HEALTH_TYPES.map((t) => (
                 <FilterChip
                   key={t.key}
-                  label={`${t.icon} ${t.label}`}
+                  label={`${t.icon} ${t.label} (${typeCounts[t.key] || 0})`}
                   selected={healthType === t.key}
                   onPress={() => setHealthType(t.key)}
                 />

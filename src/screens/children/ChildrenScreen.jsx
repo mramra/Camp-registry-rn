@@ -37,6 +37,7 @@ export default function ChildrenScreen() {
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
   const [orphansOnly, setOrphansOnly] = useState(false);
+  const [infantsOnly, setInfantsOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
@@ -106,9 +107,10 @@ export default function ChildrenScreen() {
       .filter((k) => !ageMin || k.age >= Number(ageMin))
       .filter((k) => !ageMax || k.age <= Number(ageMax))
       .filter((k) => !orphansOnly || !!k.orphan_status)
+      .filter((k) => !infantsOnly || k.age < 2)
       .filter((k) => !search.trim() || (k.name || '').includes(search) || (k.famName || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
-  }, [members, famMap, campMap, filterCamp, ageFilter, ageMin, ageMax, orphansOnly, search]);
+  }, [members, famMap, campMap, filterCamp, ageFilter, ageMin, ageMax, orphansOnly, infantsOnly, search]);
 
   const orphansCount = useMemo(() => {
     return members
@@ -116,6 +118,15 @@ export default function ChildrenScreen() {
         const age = calcAge(m.dob);
         const f = famMap[m.family_id] || {};
         return age !== null && age < 18 && !!m.orphan_status && (!filterCamp || f.camp_id === filterCamp);
+      }).length;
+  }, [members, famMap, filterCamp]);
+
+  const infantsCount = useMemo(() => {
+    return members
+      .filter((m) => {
+        const age = calcAge(m.dob);
+        const f = famMap[m.family_id] || {};
+        return age !== null && age < 2 && (!filterCamp || f.camp_id === filterCamp);
       }).length;
   }, [members, famMap, filterCamp]);
 
@@ -194,6 +205,7 @@ export default function ChildrenScreen() {
                 onPress={() => setCampPickerVisible(true)}
               />
               <FilterChip label={`🔸 أيتام (${orphansCount})`} selected={orphansOnly} onPress={() => setOrphansOnly((v) => !v)} />
+              <FilterChip label={`🍼 رضع (${infantsCount})`} selected={infantsOnly} onPress={() => setInfantsOnly((v) => !v)} />
             </View>
 
             <View style={styles.ageGrid}>

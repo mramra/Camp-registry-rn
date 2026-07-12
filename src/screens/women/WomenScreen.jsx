@@ -27,6 +27,7 @@ export default function WomenScreen() {
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [womenType, setWomenType] = useState('');
+  const [specialFilter, setSpecialFilter] = useState(''); // '' | widow | divorced | head | nursing
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
   const [loading, setLoading] = useState(true);
@@ -81,7 +82,14 @@ export default function WomenScreen() {
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
   const famMap = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families]);
 
-  const womenData = useMemo(() => {
+  const allWomen = useMemo(() => {
+    // رضيع بالأسرة (أقل من سنتين) = أمها/زوجة رب الأسرة تُحسب "مرضعة" تلقائياً
+    const familyHasInfant = {};
+    members.forEach((m) => {
+      const age = calcAge(m.dob);
+      if (age !== null && age < 2) familyHasInfant[m.family_id] = true;
+    });
+
     const heads = families
       .filter((f) => f.head_gender === 'أنثى')
       .map((f) => ({
@@ -91,6 +99,7 @@ export default function WomenScreen() {
         type: 'رأس الأسرة',
         marital: f.head_marital || '—',
         status: f.head_female_status || '',
+        isNursing: !!familyHasInfant[f.id],
         chronic: normalizeHealthValue(f.head_chronic_diseases),
         camp: campMap[f.camp_id] || '—',
         camp_id: f.camp_id || '',
@@ -107,20 +116,48 @@ export default function WomenScreen() {
           type: m.relation || 'أنثى',
           marital: '—',
           status: '',
+          isNursing: m.relation === 'زوجة' && !!familyHasInfant[m.family_id],
           chronic: normalizeHealthValue(m.chronic_diseases),
           camp: campMap[f.camp_id] || '—',
           camp_id: f.camp_id || '',
           tent: f.tent || '—',
         };
       });
-    return [...heads, ...relMembers]
+    return [...heads, ...relMembers];
+  }, [families, members, famMap, campMap]);
+
+  // أعداد الفئات الخاصة بمخيم فقط (بلا تأثير الفلاتر التانية) عشان تظهر ثابتة بجانب كل زر
+  const campWomen = useMemo(
+    () => (filterCamp ? allWomen.filter((w) => w.camp_id === filterCamp) : allWomen),
+    [allWomen, filterCamp]
+  );
+  const specialCounts = useMemo(
+    () => ({
+      widow: campWomen.filter((w) => w.marital === 'أرملة' || w.marital === 'أرمل').length,
+      divorced: campWomen.filter((w) => w.marital === 'مطلقة' || w.marital === 'مطلق').length,
+      head: campWomen.filter((w) => w.type === 'رأس الأسرة').length,
+      nursing: campWomen.filter((w) => w.isNursing).length,
+    }),
+    [campWomen]
+  );
+
+  const womenData = useMemo(() => {
+    return allWomen
       .filter((w) => !filterCamp || w.camp_id === filterCamp)
       .filter((w) => !womenType || w.type === womenType)
+      .filter((w) => {
+        if (!specialFilter) return true;
+        if (specialFilter === 'widow') return w.marital === 'أرملة' || w.marital === 'أرمل';
+        if (specialFilter === 'divorced') return w.marital === 'مطلقة' || w.marital === 'مطلق';
+        if (specialFilter === 'head') return w.type === 'رأس الأسرة';
+        if (specialFilter === 'nursing') return w.isNursing;
+        return true;
+      })
       .filter((w) => !ageMin || (w.age !== null && w.age >= Number(ageMin)))
       .filter((w) => !ageMax || (w.age !== null && w.age <= Number(ageMax)))
       .filter((w) => !search.trim() || (w.name || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
-  }, [families, members, famMap, campMap, filterCamp, womenType, ageMin, ageMax, search]);
+  }, [allWomen, filterCamp, womenType, specialFilter, ageMin, ageMax, search]);
 
   const womenTypes = useMemo(() => [...new Set(womenData.map((w) => w.type))], [womenData]);
   const womenStats = useMemo(
@@ -147,7 +184,7 @@ export default function WomenScreen() {
   const renderWoman = ({ item: w }) => (
     <View style={styles.card}>
       <Text style={styles.cardName}>{w.name} <Text style={styles.typeTag}>({w.type})</Text></Text>
-      <Text style={styles.cardMeta}>{w.age ?? '—'} سنة • {w.marital} {w.status ? `• 🔸${w.status}` : ''}</Text>
+      <Text style={styles.cardMeta}>{w.age ?? '—'} سنة • {w.marital} {w.status ? `• 🔸${w.status}` : ''} {w.isNursing ? '• 🍼 مرضعة' : ''}</Text>
       {!!w.chronic && <Text style={styles.chronicText}>🩺 {w.chronic}</Text>}
       <Text style={styles.cardSubMeta}>⛺{w.tent} 🏕️{w.camp}</Text>
     </View>
@@ -177,6 +214,7 @@ export default function WomenScreen() {
                       'الصلة': w.type,
                       'الحالة الاجتماعية': w.marital,
                       'الوضع': w.status,
+                      'مرضعة؟': w.isNursing ? 'نعم' : 'لا',
                       'أمراض مزمنة': w.chronic,
                       'المخيم': w.camp,
                     }))
@@ -200,6 +238,29 @@ export default function WomenScreen() {
                 label={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
+              />
+            </View>
+
+            <View style={styles.chipsRow}>
+              <FilterChip
+                label={`🖤 أرامل (${specialCounts.widow})`}
+                selected={specialFilter === 'widow'}
+                onPress={() => setSpecialFilter((f) => (f === 'widow' ? '' : 'widow'))}
+              />
+              <FilterChip
+                label={`💔 مطلقات (${specialCounts.divorced})`}
+                selected={specialFilter === 'divorced'}
+                onPress={() => setSpecialFilter((f) => (f === 'divorced' ? '' : 'divorced'))}
+              />
+              <FilterChip
+                label={`🏠 معيلة أسرة (${specialCounts.head})`}
+                selected={specialFilter === 'head'}
+                onPress={() => setSpecialFilter((f) => (f === 'head' ? '' : 'head'))}
+              />
+              <FilterChip
+                label={`🍼 مرضعات (${specialCounts.nursing})`}
+                selected={specialFilter === 'nursing'}
+                onPress={() => setSpecialFilter((f) => (f === 'nursing' ? '' : 'nursing'))}
               />
             </View>
 

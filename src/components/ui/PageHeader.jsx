@@ -23,12 +23,11 @@ export default function PageHeader({ icon, title, subtitle, action }) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12,
   },
   titleBlock: { flex: 1 },
-  title: { color: colors.white, fontWeight: '900', fontSize: 18, textAlign: 'right' },
-  subtitle: { marginTop: 2 },
+  title: { color: colors.white, fontWeight: '900', fontSize: 18, textAlign: 'center' },
+  subtitle: { marginTop: 4, alignItems: 'center' },
   action: { flexDirection: 'row', gap: 8 },
 });

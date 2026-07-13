@@ -404,6 +404,13 @@ export default function ExportScreen() {
       .sort((a, b) => String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true }));
   }, [allFamilies, cxCamp, cxSearch]);
 
+  const cxFamilySizeMap = useMemo(() => {
+    const map = {};
+    allMembers.forEach((m) => { map[m.family_id] = (map[m.family_id] || 0) + 1; });
+    allFamilies.forEach((f) => { map[f.id] = (map[f.id] || 0) + 1; }); // +1 لرب الأسرة
+    return map;
+  }, [allMembers, allFamilies]);
+
   const cxFilteredMems = useMemo(() => {
     if (cxMode !== 'members') return [];
     return allMembers
@@ -419,10 +426,15 @@ export default function ExportScreen() {
       })
       .map((m) => {
         const fam = allFamilies.find((f) => f.id === m.family_id) || {};
-        return { ...m, fam_name: fam.head_name || '—', head_id: fam.head_id || '—', phone1: fam.phone1 || '—', tent: fam.tent || '—', camp: campMap[fam.camp_id] || '—', age: calcAge(m.dob) };
+        return {
+          ...m,
+          fam_name: fam.head_name || '—', head_id: fam.head_id || '—', phone1: fam.phone1 || '—',
+          tent: fam.tent || '—', camp: campMap[fam.camp_id] || '—', age: calcAge(m.dob),
+          familySize: cxFamilySizeMap[m.family_id] || 1,
+        };
       })
       .sort((a, b) => String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true }));
-  }, [allMembers, allFamilies, cxCamp, cxSearch, cxMode, cxAgeMin, cxAgeMax, campMap]);
+  }, [allMembers, allFamilies, cxCamp, cxSearch, cxMode, cxAgeMin, cxAgeMax, campMap, cxFamilySizeMap]);
 
   const cxList = cxMode === 'families' ? cxFilteredFams : cxFilteredMems;
 
@@ -449,19 +461,25 @@ export default function ExportScreen() {
           const wife = wifeMap[f.id];
           const row = { '#': fi + 1 };
           cols.forEach((col) => {
-            if (col.key === 'camp') row[col.label] = campMap[f.camp_id] || '—';
-            else if (col.key === 'members_count') row[col.label] = membersCountMap[f.id] || 0;
-            else if (col.key === 'wife_name') row[col.label] = wife?.name || '—';
-            else if (col.key === 'wife_id') row[col.label] = wife?.national_id || '—';
-            else row[col.label] = f[col.key] || '';
+            row[col.label] = resolveFamilyColumn(col.key, f, {
+              campName: campMap[f.camp_id],
+              membersCount: membersCountMap[f.id] || 1,
+              wife,
+            });
           });
           return row;
         });
       } else {
         const selMems = cxFilteredMems.filter((m) => cxSelected.has(m.id));
         rows = selMems.map((m, mi) => {
+          const fam = allFamilies.find((f) => f.id === m.family_id) || {};
           const row = { '#': mi + 1 };
-          cols.forEach((col) => { row[col.label] = m[col.key] ?? ''; });
+          cols.forEach((col) => {
+            row[col.label] = resolveMemberColumn(col.key, m, fam, {
+              campName: m.camp,
+              familySize: m.familySize,
+            });
+          });
           return row;
         });
       }

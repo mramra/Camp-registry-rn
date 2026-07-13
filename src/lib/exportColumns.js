@@ -3,7 +3,7 @@
  * (منقول حرفياً من camp-registry-react/src/lib/exportColumns.js)
  * يُستخدم في ExportScreen (التصدير السريع والتصدير المخصص معاً).
  */
-import { calcAge } from './helpers';
+import { calcAge, normalizeHealthValue } from './helpers';
 
 // ── حقول رباب الأسر (مع الزوجة) ─────────────────────────
 export const FAM_COLS = [
@@ -16,9 +16,15 @@ export const FAM_COLS = [
   { key: 'camp', label: 'المخيم', def: true },
   { key: 'tent', label: 'رقم الخيمة', def: true },
   { key: 'head_dob', label: 'تاريخ ميلاد رب الأسرة', def: false },
+  { key: 'head_age', label: 'عمر رب الأسرة', def: false },
   { key: 'head_gender', label: 'الجنس', def: false },
   { key: 'head_marital', label: 'الحالة الاجتماعية', def: true },
-  { key: 'members_count', label: 'عدد الأفراد', def: true },
+  { key: 'members_count', label: 'عدد أفراد الأسرة', def: true },
+  { key: 'head_chronic_diseases', label: 'أمراض مزمنة (رب الأسرة)', def: false },
+  { key: 'head_disabilities', label: 'إعاقات (رب الأسرة)', def: false },
+  { key: 'head_injuries', label: 'إصابات (رب الأسرة)', def: false },
+  { key: 'head_needs', label: 'احتياجات صحية (رب الأسرة)', def: false },
+  { key: 'head_female_status', label: 'حمل/رضاعة (لو رب الأسرة أنثى)', def: false },
   { key: 'category_tags', label: 'الفئة الاجتماعية', def: false },
   { key: 'original_address', label: 'العنوان الأصلي', def: false },
   { key: 'notes', label: 'ملاحظات', def: false },
@@ -37,9 +43,14 @@ export const MEM_COLS = [
   { key: 'dob', label: 'تاريخ الميلاد', def: false },
   { key: 'age', label: 'العمر', def: true },
   { key: 'gender', label: 'الجنس', def: false },
-  { key: 'health', label: 'الحالة الصحية', def: false },
+  { key: 'marital', label: 'الحالة الاجتماعية', def: false },
   { key: 'chronic_diseases', label: 'أمراض مزمنة', def: false },
   { key: 'disabilities', label: 'الإعاقات', def: false },
+  { key: 'injuries', label: 'الإصابات', def: false },
+  { key: 'needs', label: 'احتياجات صحية', def: false },
+  { key: 'female_status', label: 'حمل/رضاعة (لو أنثى)', def: false },
+  { key: 'is_orphan', label: 'يتيم؟', def: false },
+  { key: 'family_size', label: 'عدد أفراد الأسرة', def: false },
 ];
 
 /** يجد زوجة الأسرة من قائمة أفرادها (relation = زوجة/زوجه) */
@@ -59,9 +70,15 @@ export function resolveFamilyColumn(key, family, { campName, membersCount, wife 
     case 'camp': return campName ?? family.camps?.name ?? '';
     case 'tent': return family.tent || '';
     case 'head_dob': return family.head_dob || '';
+    case 'head_age': return calcAge(family.head_dob) ?? '';
     case 'head_gender': return family.head_gender || '';
     case 'head_marital': return family.head_marital || '';
     case 'members_count': return membersCount ?? ((family.family_members?.length || 0) + 1);
+    case 'head_chronic_diseases': return normalizeHealthValue(family.head_chronic_diseases);
+    case 'head_disabilities': return normalizeHealthValue(family.head_disabilities);
+    case 'head_injuries': return normalizeHealthValue(family.head_injuries);
+    case 'head_needs': return normalizeHealthValue(family.head_needs);
+    case 'head_female_status': return normalizeHealthValue(family.head_female_status);
     case 'category_tags': return (Array.isArray(family.category_tags) ? family.category_tags : []).join('، ');
     case 'original_address': return family.original_address || '';
     case 'notes': return family.notes || '';
@@ -70,7 +87,7 @@ export function resolveFamilyColumn(key, family, { campName, membersCount, wife 
 }
 
 /** يُرجع قيمة عمود فرد */
-export function resolveMemberColumn(key, member, family, { campName } = {}) {
+export function resolveMemberColumn(key, member, family, { campName, isOrphan, familySize } = {}) {
   switch (key) {
     case 'tent': return family?.tent || '';
     case 'fam_name': return family?.head_name || '';
@@ -83,9 +100,14 @@ export function resolveMemberColumn(key, member, family, { campName } = {}) {
     case 'dob': return member?.dob || '';
     case 'age': return calcAge(member?.dob) ?? '';
     case 'gender': return member?.gender || '';
-    case 'health': return member?.health || '';
-    case 'chronic_diseases': return member?.chronic_diseases || '';
-    case 'disabilities': return member?.disabilities || '';
+    case 'marital': return member?.marital || '';
+    case 'chronic_diseases': return normalizeHealthValue(member?.chronic_diseases);
+    case 'disabilities': return normalizeHealthValue(member?.disabilities);
+    case 'injuries': return normalizeHealthValue(member?.injuries);
+    case 'needs': return normalizeHealthValue(member?.needs);
+    case 'female_status': return normalizeHealthValue(member?.female_status);
+    case 'is_orphan': return (isOrphan ?? !!member?.orphan_status) ? 'نعم' : 'لا';
+    case 'family_size': return familySize ?? '';
     default: return '';
   }
 }

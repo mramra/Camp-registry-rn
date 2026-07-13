@@ -94,6 +94,7 @@ export default function ExportScreen() {
   const [filterCamp, setFilterCamp] = useState('');
   const [showBanner, setShowBanner] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [mainTab, setMainTab] = useState('quickFam'); // quickFam | quickMem | customFam | customMem | import
   const [importPreview, setImportPreview] = useState(null);
   const [importing, setImporting] = useState(false);
 
@@ -447,6 +448,12 @@ export default function ExportScreen() {
   const cxDeselectAll = () => setCxSelected(new Set());
   const cxSwitchMode = (m) => { setCxMode(m); setCxSelected(new Set()); };
 
+  const switchTab = (tab) => {
+    setMainTab(tab);
+    if (tab === 'customFam') cxSwitchMode('families');
+    if (tab === 'customMem') cxSwitchMode('members');
+  };
+
   const doCustomExport = async () => {
     const isMem = cxMode === 'members';
     const cols = orderedSelected(isMem ? cxMemCols : cxFamCols);
@@ -516,49 +523,74 @@ export default function ExportScreen() {
           </View>
         )}
 
-        <SelectField
-          value={campOptions.find((o) => o.value === filterCamp)?.label}
-          placeholder="🏕️ كل المخيمات"
-          options={campOptions}
-          onSelect={setFilterCamp}
-        />
-        <View style={styles.bannerRow}>
-          <Switch value={showBanner} onValueChange={setShowBanner} trackColor={{ true: colors.accent }} />
-          <Text style={styles.bannerLabel}>إظهار بيانات المخيم بأعلى الكشف</Text>
+        <View style={styles.tabsRow}>
+          {[
+            { key: 'quickFam', icon: '👨‍👩‍👧', label: 'سجل أرباب الأسر' },
+            { key: 'quickMem', icon: '👤', label: 'سجل أفراد الأسر' },
+            { key: 'customFam', icon: '🎯', label: 'أرباب الأسر مخصص' },
+            { key: 'customMem', icon: '🎯', label: 'أفراد الأسر مخصص' },
+            { key: 'import', icon: '📤', label: 'استيراد Excel' },
+          ].map((t) => (
+            <Pressable
+              key={t.key}
+              onPress={() => switchTab(t.key)}
+              style={[styles.tabBtn, mainTab === t.key && styles.tabBtnActive]}
+            >
+              <Text style={[styles.tabBtnText, mainTab === t.key && styles.tabBtnTextActive]}>{t.icon} {t.label}</Text>
+            </Pressable>
+          ))}
         </View>
 
-        <FormSection title="📥 تصدير سريع Excel">
-          {canExport ? (
-            <>
-              <FieldPicker title="📋 حقول رباب الأسر" cols={famCols} onChange={setFamCols} />
-              <Pressable style={styles.btnPrimary} onPress={exportFamilies} disabled={loading}>
-                <Text style={styles.btnPrimaryText}>👨‍👩‍👧 تصدير كشف رباب الأسر</Text>
-              </Pressable>
-
-              <FieldPicker title="📋 حقول الأفراد" cols={memCols} onChange={setMemCols} />
-              <Pressable style={styles.btnBlue} onPress={exportMembers} disabled={loading}>
-                <Text style={styles.btnBlueText}>👤 تصدير كشف أفراد الأسر</Text>
-              </Pressable>
-
-              <Pressable style={styles.btnRed} onPress={exportMissing} disabled={loading}>
-                <Text style={styles.btnRedText}>⚠️ الأسر الناقصة</Text>
-              </Pressable>
-            </>
-          ) : (
-            <Text style={styles.lockedText}>🔒 لا تملك صلاحية التصدير</Text>
-          )}
-        </FormSection>
-
-        {canExport && (
-          <FormSection title={`🎯 تصدير مخصص (${allFamilies.length} أسرة محمّلة)`}>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-              <Pressable style={[styles.modeBtn, cxMode === 'families' && styles.modeBtnActive]} onPress={() => cxSwitchMode('families')}>
-                <Text style={[styles.modeBtnText, cxMode === 'families' && styles.modeBtnTextActive]}>👨‍👩‍👧 رباب الأسر</Text>
-              </Pressable>
-              <Pressable style={[styles.modeBtn, cxMode === 'members' && styles.modeBtnActive]} onPress={() => cxSwitchMode('members')}>
-                <Text style={[styles.modeBtnText, cxMode === 'members' && styles.modeBtnTextActive]}>👤 أفراد الأسر</Text>
-              </Pressable>
+        {(mainTab === 'quickFam' || mainTab === 'quickMem') && (
+          <>
+            <SelectField
+              value={campOptions.find((o) => o.value === filterCamp)?.label}
+              placeholder="🏕️ كل المخيمات"
+              options={campOptions}
+              onSelect={setFilterCamp}
+            />
+            <View style={styles.bannerRow}>
+              <Switch value={showBanner} onValueChange={setShowBanner} trackColor={{ true: colors.accent }} />
+              <Text style={styles.bannerLabel}>إظهار بيانات المخيم بأعلى الكشف</Text>
             </View>
+          </>
+        )}
+
+        {mainTab === 'quickFam' && (
+          <FormSection title="👨‍👩‍👧 سجل أرباب الأسر">
+            {canExport ? (
+              <>
+                <FieldPicker title="📋 حقول رباب الأسر" cols={famCols} onChange={setFamCols} />
+                <Pressable style={styles.btnPrimary} onPress={exportFamilies} disabled={loading}>
+                  <Text style={styles.btnPrimaryText}>👨‍👩‍👧 تصدير كشف رباب الأسر</Text>
+                </Pressable>
+                <Pressable style={styles.btnRed} onPress={exportMissing} disabled={loading}>
+                  <Text style={styles.btnRedText}>⚠️ الأسر الناقصة</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Text style={styles.lockedText}>🔒 لا تملك صلاحية التصدير</Text>
+            )}
+          </FormSection>
+        )}
+
+        {mainTab === 'quickMem' && (
+          <FormSection title="👤 سجل أفراد الأسر">
+            {canExport ? (
+              <>
+                <FieldPicker title="📋 حقول الأفراد" cols={memCols} onChange={setMemCols} />
+                <Pressable style={styles.btnBlue} onPress={exportMembers} disabled={loading}>
+                  <Text style={styles.btnBlueText}>👤 تصدير كشف أفراد الأسر</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Text style={styles.lockedText}>🔒 لا تملك صلاحية التصدير</Text>
+            )}
+          </FormSection>
+        )}
+
+        {(mainTab === 'customFam' || mainTab === 'customMem') && canExport && (
+          <FormSection title={`🎯 ${mainTab === 'customFam' ? 'سجل أرباب الأسر' : 'سجل أفراد الأسر'} مخصص (${allFamilies.length} أسرة محمّلة)`}>
 
             <TextInput
               value={cxSheetName}
@@ -644,6 +676,7 @@ export default function ExportScreen() {
           </FormSection>
         )}
 
+        {mainTab === 'import' && (
         <FormSection title="📤 استيراد Excel">
           {canImport && !offlineInfo ? (
             <>
@@ -693,6 +726,7 @@ export default function ExportScreen() {
             </Text>
           )}
         </FormSection>
+        )}
 
         {loading && <ActivityIndicator color={colors.accent} style={{ marginTop: 12 }} />}
       </ScrollView>
@@ -748,6 +782,14 @@ const styles = StyleSheet.create({
   modeBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   modeBtnText: { color: colors.muted, fontWeight: '900', fontSize: 12 },
   modeBtnTextActive: { color: colors.bg },
+  tabsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
+  tabBtn: {
+    flexGrow: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 10, paddingVertical: 9, paddingHorizontal: 8, alignItems: 'center', minWidth: '30%',
+  },
+  tabBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  tabBtnText: { color: colors.muted, fontWeight: 'bold', fontSize: 10, textAlign: 'center' },
+  tabBtnTextActive: { color: colors.bg },
 
   delegateNote: { fontSize: 11, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10, textAlign: 'right' },
   delegateOk: { color: colors.green, backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' },

@@ -98,7 +98,6 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       title: '📊 التحليل والتقارير',
       items: [
         { icon: '📈', label: 'التقارير والتحليلات', screen: 'Analysis', pageKey: 'analysis' },
-        { icon: '📋', label: 'تقارير الاحتياجات', screen: 'NeedsReport', pageKey: 'needs_report' },
         { icon: '🏕️', label: 'مقارنة المخيمات', screen: 'CampCompare', pageKey: 'camp_compare' },
         { icon: '💾', label: 'استيراد وتصدير', screen: 'Export', pageKey: 'export' },
       ],

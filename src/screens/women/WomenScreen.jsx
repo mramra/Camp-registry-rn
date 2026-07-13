@@ -16,7 +16,7 @@ import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
 import colors from '../../theme/colors';
 
-export default function MenScreen() {
+export default function WomenScreen() {
   const navigation = useNavigation();
   const { orgId, profile } = useAuth();
   const { getAllowedCampIds, getVisibleCamps } = useDataScope();
@@ -28,8 +28,8 @@ export default function MenScreen() {
   const [filterCamp, setFilterCamp] = useState('');
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
-  const [menType, setMenType] = useState('');
-  const [specialFilter, setSpecialFilter] = useState(''); // '' | widower | divorced | head | elderly
+  const [womenType, setWomenType] = useState('');
+  const [specialFilter, setSpecialFilter] = useState(''); // '' | widow | divorced | head | nursing
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
   const [loading, setLoading] = useState(true);
@@ -39,7 +39,7 @@ export default function MenScreen() {
   const loadData = useCallback(async () => {
     if (!orgId) return;
 
-    const cached = await getCachedData('men_registry', profile?.id);
+    const cached = await getCachedData('women_registry', profile?.id);
     const hadCache = !!cached?.data;
     if (hadCache) {
       setFamilies(cached.data.families || []);
@@ -70,7 +70,7 @@ export default function MenScreen() {
       setMembers(mems);
       setOrgMembers(members2);
       setOfflineInfo(null);
-      cacheData('men_registry', profile?.id, { families: fams, members: mems, camps: visibleCamps, orgMembers: members2 });
+      cacheData('women_registry', profile?.id, { families: fams, members: mems, camps: visibleCamps, orgMembers: members2 });
     } catch (e) {
       if (!hadCache) showError('تعذّر تحميل السجل ولا توجد نسخة محفوظة');
     } finally {
@@ -87,9 +87,25 @@ export default function MenScreen() {
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
   const famMap = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families]);
 
-  const allMen = useMemo(() => {
+  const allWomen = useMemo(() => {
+    // رضيع بالأسرة (أقل من سنتين) = أمها/زوجة رب الأسرة تُحسب "مرضعة" تلقائياً
+    const familyHasInfant = {};
+    members.forEach((m) => {
+      const age = calcAge(m.dob);
+      if (age !== null && age < 2) familyHasInfant[m.family_id] = true;
+    });
+
+    // عدد أفراد كل أسرة (رب الأسرة + كل الأفراد المسجّلين تحتها)
+    const familyMemberCount = {};
+    members.forEach((m) => {
+      familyMemberCount[m.family_id] = (familyMemberCount[m.family_id] || 0) + 1;
+    });
+    families.forEach((f) => {
+      familyMemberCount[f.id] = (familyMemberCount[f.id] || 0) + 1; // +1 لرب الأسرة نفسه
+    });
+
     const heads = families
-      .filter((f) => f.head_gender === 'ذكر')
+      .filter((f) => f.head_gender === 'أنثى')
       .map((f) => ({
         id: 'f-' + f.id,
         famId: f.id,
@@ -97,13 +113,16 @@ export default function MenScreen() {
         age: calcAge(f.head_dob),
         type: 'رأس الأسرة',
         marital: f.head_marital || '—',
+        status: f.head_female_status || '',
+        isNursing: !!familyHasInfant[f.id],
         chronic: normalizeHealthValue(f.head_chronic_diseases),
+        familySize: familyMemberCount[f.id] || 1,
         camp: campMap[f.camp_id] || '—',
         camp_id: f.camp_id || '',
         tent: f.tent || '—',
       }));
     const relMembers = members
-      .filter((m) => m.gender === 'ذكر' || ['زوج', 'أب', 'ابن', 'أخ'].includes(m.relation || ''))
+      .filter((m) => m.gender === 'أنثى' || ['زوجة', 'أم', 'ابنة', 'أخت'].includes(m.relation || ''))
       .map((m) => {
         const f = famMap[m.family_id] || {};
         return {
@@ -111,9 +130,12 @@ export default function MenScreen() {
           famId: m.family_id,
           name: m.name || '—',
           age: calcAge(m.dob),
-          type: m.relation || 'ذكر',
+          type: m.relation || 'أنثى',
           marital: '—',
+          status: '',
+          isNursing: m.relation === 'زوجة' && !!familyHasInfant[m.family_id],
           chronic: normalizeHealthValue(m.chronic_diseases),
+          familySize: familyMemberCount[m.family_id] || 1,
           camp: campMap[f.camp_id] || '—',
           camp_id: f.camp_id || '',
           tent: f.tent || '—',
@@ -123,47 +145,51 @@ export default function MenScreen() {
   }, [families, members, famMap, campMap]);
 
   // أعداد الفئات الخاصة بمخيم فقط (بلا تأثير الفلاتر التانية) عشان تظهر ثابتة بجانب كل زر
-  const campMen = useMemo(
-    () => (filterCamp ? allMen.filter((w) => w.camp_id === filterCamp) : allMen),
-    [allMen, filterCamp]
+  const campWomen = useMemo(
+    () => (filterCamp ? allWomen.filter((w) => w.camp_id === filterCamp) : allWomen),
+    [allWomen, filterCamp]
   );
   const specialCounts = useMemo(
     () => ({
-      widower: campMen.filter((w) => w.marital === 'أرمل' || w.marital === 'أرملة').length,
-      divorced: campMen.filter((w) => w.marital === 'مطلق' || w.marital === 'مطلقة').length,
-      head: campMen.filter((w) => w.type === 'رأس الأسرة').length,
-      elderly: campMen.filter((w) => w.age !== null && w.age >= 60).length,
+      widow: campWomen.filter((w) => w.marital === 'أرملة' || w.marital === 'أرمل').length,
+      divorced: campWomen.filter((w) => w.marital === 'مطلقة' || w.marital === 'مطلق').length,
+      head: campWomen.filter((w) => w.type === 'رأس الأسرة').length,
+      nursing: campWomen.filter((w) => w.isNursing).length,
     }),
-    [campMen]
+    [campWomen]
   );
 
-  const menData = useMemo(() => {
-    return allMen
+  const womenData = useMemo(() => {
+    return allWomen
       .filter((w) => !filterCamp || w.camp_id === filterCamp)
-      .filter((w) => !menType || w.type === menType)
+      .filter((w) => !womenType || w.type === womenType)
       .filter((w) => {
         if (!specialFilter) return true;
-        if (specialFilter === 'widower') return w.marital === 'أرمل' || w.marital === 'أرملة';
-        if (specialFilter === 'divorced') return w.marital === 'مطلق' || w.marital === 'مطلقة';
+        if (specialFilter === 'widow') return w.marital === 'أرملة' || w.marital === 'أرمل';
+        if (specialFilter === 'divorced') return w.marital === 'مطلقة' || w.marital === 'مطلق';
         if (specialFilter === 'head') return w.type === 'رأس الأسرة';
-        if (specialFilter === 'elderly') return w.age !== null && w.age >= 60;
+        if (specialFilter === 'nursing') return w.isNursing;
         return true;
       })
       .filter((w) => !ageMin || (w.age !== null && w.age >= Number(ageMin)))
       .filter((w) => !ageMax || (w.age !== null && w.age <= Number(ageMax)))
       .filter((w) => !search.trim() || (w.name || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
-  }, [allMen, filterCamp, menType, specialFilter, ageMin, ageMax, search]);
+  }, [allWomen, filterCamp, womenType, specialFilter, ageMin, ageMax, search]);
 
-  const RELATION_ICONS = { 'رأس الأسرة': '🏠', 'زوج': '🤵', 'أب': '👴', 'ابن': '👦', 'أخ': '👬', 'ذكر': '👨' };
+  const RELATION_ICONS = { 'رأس الأسرة': '🏠', 'زوجة': '💍', 'أم': '👵', 'ابنة': '👧', 'أخت': '👭', 'أنثى': '👩' };
   const relationTypes = useMemo(() => {
     const counts = {};
-    campMen.forEach((w) => { counts[w.type] = (counts[w.type] || 0) + 1; });
+    campWomen.forEach((w) => { counts[w.type] = (counts[w.type] || 0) + 1; });
     return Object.entries(counts).map(([type, count]) => ({ type, count }));
-  }, [campMen]);
-  const menStats = useMemo(
-    () => ({ total: menData.length }),
-    [menData]
+  }, [campWomen]);
+  const womenStats = useMemo(
+    () => ({
+      total: womenData.length,
+      heads: womenData.filter((w) => w.type === 'رأس الأسرة').length,
+      pregnant: womenData.filter((w) => w.status === 'حامل').length,
+    }),
+    [womenData]
   );
 
   const styles = getStyles();
@@ -178,44 +204,45 @@ export default function MenScreen() {
     );
   }
 
-  const renderMan = ({ item: w }) => (
+  const renderWoman = ({ item: w }) => (
     <Pressable style={styles.card} onPress={() => w.famId && navigation.push('FamilyDetail', { familyId: w.famId })}>
       <Text style={styles.cardName}>{w.name} <Text style={styles.typeTag}>({w.type})</Text></Text>
-      <Text style={styles.cardMeta}>{w.age ?? '—'} سنة • {w.marital}</Text>
+      <Text style={styles.cardMeta}>{w.age ?? '—'} سنة • {w.marital} {w.status ? `• 🔸${w.status}` : ''} {w.isNursing ? '• 🍼 مرضعة' : ''}</Text>
       {!!w.chronic && <Text style={styles.chronicText}>🩺 {w.chronic}</Text>}
-      <Text style={styles.cardSubMeta}>⛺{w.tent} 🏕️{w.camp} — اضغط للانتقال للأسرة ←</Text>
+      <Text style={styles.cardSubMeta}>⛺{w.tent} 🏕️{w.camp} 👨‍👩‍👧 {w.familySize} فرد — اضغط للانتقال للأسرة ←</Text>
     </Pressable>
   );
 
   return (
     <SafeAreaView style={styles.screen}>
       <FlatList
-        data={menData}
+        data={womenData}
         keyExtractor={(item) => item.id}
-        renderItem={renderMan}
+        renderItem={renderWoman}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <View>
             <PageHeader
-              icon="👨"
-              title="الرجال"
+              icon="👩"
+              title="النساء"
               action={
                 <ExportButton
                   getRows={() =>
-                    menData.map((w, i) => ({
+                    womenData.map((w, i) => ({
                       '#': i + 1,
                       'الخيمة': w.tent,
                       'الاسم': w.name,
                       'العمر': w.age ?? '',
                       'الصلة': w.type,
                       'الحالة الاجتماعية': w.marital,
+                      'الوضع': w.status,
+                      'مرضعة؟': w.isNursing ? 'نعم' : 'لا',
+                      'عدد أفراد الأسرة': w.familySize,
                       'أمراض مزمنة': w.chronic,
                       'المخيم': w.camp,
                     }))
                   }
-                  sheetName="الرجال"
-                  fileName="سجل_الرجال"
                   getBanner={() => {
                     if (!filterCamp) return null;
                     const camp = camps.find((c) => c.id === filterCamp);
@@ -228,6 +255,8 @@ export default function MenScreen() {
                       { text: `👤 المندوب: ${delegate?.name || 'غير معيَّن'}   📱 ${delegate?.phone || '—'}`, size: 11 },
                     ];
                   }}
+                  sheetName="النساء"
+                  fileName="سجل_النساء"
                 />
               }
             />
@@ -250,10 +279,10 @@ export default function MenScreen() {
 
             <View style={styles.categoryGrid}>
               {[
-                { key: 'widower', icon: '🖤', label: 'أرامل', count: specialCounts.widower },
-                { key: 'divorced', icon: '💔', label: 'مطلقين', count: specialCounts.divorced },
-                { key: 'head', icon: '🏠', label: 'معيل أسرة', count: specialCounts.head },
-                { key: 'elderly', icon: '👴', label: 'كبار السن (60+)', count: specialCounts.elderly },
+                { key: 'widow', icon: '🖤', label: 'أرامل', count: specialCounts.widow },
+                { key: 'divorced', icon: '💔', label: 'مطلقات', count: specialCounts.divorced },
+                { key: 'head', icon: '🏠', label: 'معيلة أسرة', count: specialCounts.head },
+                { key: 'nursing', icon: '🍼', label: 'مرضعات', count: specialCounts.nursing },
               ].map((c) => (
                 <Pressable
                   key={c.key}
@@ -268,30 +297,35 @@ export default function MenScreen() {
             </View>
 
             <View style={styles.categoryGrid}>
-              <View style={styles.categoryCell}>
-                <Text style={styles.categoryIcon}>👨‍👨‍👦</Text>
-                <Text style={styles.categoryCount}>{menStats.total}</Text>
-                <Text style={styles.categoryLabel}>{filterCamp ? `الإجمالي بـ${campMap[filterCamp]}` : 'الإجمالي'}</Text>
-              </View>
+              {[
+                { icon: '👩‍👧‍👦', label: filterCamp ? `الإجمالي بـ${campMap[filterCamp]}` : 'الإجمالي', count: womenStats.total },
+                { icon: '🤰', label: 'حوامل', count: womenStats.pregnant },
+              ].map((c) => (
+                <View key={c.label} style={styles.categoryCell}>
+                  <Text style={styles.categoryIcon}>{c.icon}</Text>
+                  <Text style={styles.categoryCount}>{c.count}</Text>
+                  <Text style={styles.categoryLabel}>{c.label}</Text>
+                </View>
+              ))}
             </View>
 
             <View style={styles.categoryGrid}>
               <Pressable
-                onPress={() => setMenType('')}
-                style={[styles.categoryCell, !menType && styles.categoryCellActive]}
+                onPress={() => setWomenType('')}
+                style={[styles.categoryCell, !womenType && styles.categoryCellActive]}
               >
                 <Text style={styles.categoryIcon}>👥</Text>
-                <Text style={[styles.categoryCount, !menType && styles.categoryCountActive]}>{campMen.length}</Text>
+                <Text style={[styles.categoryCount, !womenType && styles.categoryCountActive]}>{campWomen.length}</Text>
                 <Text style={styles.categoryLabel}>كل الصلات</Text>
               </Pressable>
               {relationTypes.map(({ type, count }) => (
                 <Pressable
                   key={type}
-                  onPress={() => setMenType(type)}
-                  style={[styles.categoryCell, menType === type && styles.categoryCellActive]}
+                  onPress={() => setWomenType(type)}
+                  style={[styles.categoryCell, womenType === type && styles.categoryCellActive]}
                 >
-                  <Text style={styles.categoryIcon}>{RELATION_ICONS[type] || '👨'}</Text>
-                  <Text style={[styles.categoryCount, menType === type && styles.categoryCountActive]}>{count}</Text>
+                  <Text style={styles.categoryIcon}>{RELATION_ICONS[type] || '👩'}</Text>
+                  <Text style={[styles.categoryCount, womenType === type && styles.categoryCountActive]}>{count}</Text>
                   <Text style={styles.categoryLabel}>{type}</Text>
                 </Pressable>
               ))}
@@ -331,10 +365,10 @@ export default function MenScreen() {
               style={styles.searchInput}
             />
 
-            <Text style={styles.countText}>{menData.length} رجل</Text>
+            <Text style={styles.countText}>{womenData.length} امرأة</Text>
           </View>
         }
-        ListEmptyComponent={<EmptyState icon="👨" title="لا توجد نتائج" />}
+        ListEmptyComponent={<EmptyState icon="👩" title="لا توجد نتائج" />}
       />
 
       <BottomSheetModal visible={campPickerVisible} onClose={() => setCampPickerVisible(false)} title="اختر المخيم">

@@ -26,9 +26,6 @@ const AGE_GROUPS = [
 const TABS = [
   { key: 'overview', label: '📊 عام' },
   { key: 'age', label: '🎂 الأعمار' },
-  { key: 'health', label: '🏥 الصحة' },
-  { key: 'women', label: '👩 نساء' },
-  { key: 'children', label: '🧒 أطفال' },
   { key: 'camps', label: '🏕️ مخيمات' },
 ];
 
@@ -345,108 +342,6 @@ export default function AnalysisScreen() {
                 onPress={() => openDrillDownPersons(g.label, g.persons)}
               />
             ))}
-          </View>
-        )}
-
-        {tab === 'health' && (
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>🏥 الحالات الصحية</Text>
-            <StatBar label="✅ سليم" count={stats.healthData.سليم} total={stats.totalPersons} color={colors.green} />
-            <StatBar
-              label="♿ إعاقة"
-              count={stats.healthData.معاق}
-              total={stats.totalPersons}
-              color={colors.blue}
-              onPress={() => openDrillDownPersons('ذوو إعاقة', stats.healthPersons.معاق)}
-            />
-            <StatBar
-              label="🩹 إصابة"
-              count={stats.healthData.مصاب}
-              total={stats.totalPersons}
-              color={colors.red}
-              onPress={() => openDrillDownPersons('المصابون', stats.healthPersons.مصاب)}
-            />
-            <StatBar
-              label="💊 مرض مزمن"
-              count={stats.healthData.مزمن}
-              total={stats.totalPersons}
-              color={colors.accent}
-              onPress={() => openDrillDownPersons('أصحاب الأمراض المزمنة', stats.healthPersons.مزمن)}
-            />
-            <StatBar
-              label="🦽 احتياجات صحية"
-              count={stats.healthData.احتياج}
-              total={stats.totalPersons}
-              color={colors.purple}
-              onPress={() => openDrillDownPersons('أصحاب الاحتياجات الصحية', stats.healthPersons.احتياج)}
-            />
-          </View>
-        )}
-
-        {tab === 'women' && (
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>👩 النساء ({stats.women})</Text>
-            <StatBar
-              label="🖤 أرامل"
-              count={stats.widows.length}
-              total={stats.women}
-              color={colors.muted}
-              onPress={() => openDrillDownPersons('أرامل', stats.widows)}
-            />
-            <StatBar
-              label="💔 مطلقات"
-              count={stats.divorced.length}
-              total={stats.women}
-              color={colors.red}
-              onPress={() => openDrillDownPersons('مطلقات', stats.divorced)}
-            />
-            <StatBar
-              label="🏠 معيلة أسرة"
-              count={stats.womenHeads.length}
-              total={stats.women}
-              color={colors.accent}
-              onPress={() => openDrillDownPersons('معيلات أسر', stats.womenHeads)}
-            />
-            <StatBar
-              label="🍼 مرضعات"
-              count={stats.nursingWomen.length}
-              total={stats.women}
-              color={colors.green}
-              onPress={() => openDrillDownPersons('مرضعات', stats.nursingWomen)}
-            />
-            <Text style={styles.subPanelTitle}>حسب الفئة العمرية</Text>
-            {stats.womenGroups.map((g) => (
-              <StatBar
-                key={g.label}
-                label={g.label}
-                count={g.count}
-                total={stats.women}
-                color={colors.blue}
-                onPress={() => openDrillDownPersons(`نساء — ${g.label}`, g.persons)}
-              />
-            ))}
-          </View>
-        )}
-
-        {tab === 'children' && (
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>🧒 الأطفال ({stats.children})</Text>
-            <StatBar
-              label="🍼 رضع (أقل من سنتين)"
-              count={stats.infantPersons.length}
-              total={stats.children}
-              color={colors.blue}
-              onPress={() => openDrillDownPersons('الرضع', stats.infantPersons)}
-            />
-            <StatBar
-              label="🕊️ أيتام"
-              count={stats.orphans}
-              total={stats.children}
-              color={colors.muted}
-            />
-            <Pressable style={styles.viewAllBtn} onPress={() => openDrillDownPersons('كل الأطفال', stats.childPersons)}>
-              <Text style={styles.viewAllText}>عرض كل الأطفال ←</Text>
-            </Pressable>
           </View>
         )}
 

@@ -18,6 +18,9 @@ import MovementsScreen from '../screens/movements/MovementsScreen';
 import DistributionsScreen from '../screens/distributions/DistributionsScreen';
 import DistributionReceiveScreen from '../screens/distributions/DistributionReceiveScreen';
 import PermissionsAdminScreen from '../screens/permissions/PermissionsAdminScreen';
+import ChildrenScreen from '../screens/children/ChildrenScreen';
+import WomenScreen from '../screens/women/WomenScreen';
+import HealthRecordsScreen from '../screens/health/HealthRecordsScreen';
 import MenScreen from '../screens/men/MenScreen';
 import ActivityLogScreen from '../screens/activity/ActivityLogScreen';
 import SMSScreen from '../screens/sms/SMSScreen';
@@ -35,7 +38,6 @@ import SubscriptionScreen from '../screens/subscription/SubscriptionScreen';
 import HelpScreen from '../screens/help/HelpScreen';
 import EducationScreen from '../screens/education/EducationScreen';
 import ExportScreen from '../screens/export/ExportScreen';
-import HealthReportScreen from '../screens/health/HealthReportScreen';
 import DataScreen from '../screens/data/DataScreen';
 import AppDrawer from './AppDrawer';
 import colors from '../theme/colors';
@@ -123,6 +125,9 @@ const RootNavigator = () => {
             <Stack.Screen name="PermissionsAdmin" component={PermissionsAdminScreen} options={{ title: 'إدارة الصلاحيات' }} />
 
             {/* السجلات — الرجال والتعديلات بس (أطفال/نساء/صحة اعتمدنا شاشات التحليل بدلها) */}
+            <Stack.Screen name="Children" component={ChildrenScreen} options={{ title: 'سجل الأطفال' }} />
+            <Stack.Screen name="Women" component={WomenScreen} options={{ title: 'النساء' }} />
+            <Stack.Screen name="HealthRecords" component={HealthRecordsScreen} options={{ title: 'سجل الحالات الصحية' }} />
             <Stack.Screen name="Men" component={MenScreen} options={{ title: 'الرجال' }} />
             <Stack.Screen name="ActivityLog" component={ActivityLogScreen} options={{ title: 'آخر التعديلات على الأسر' }} />
 
@@ -144,7 +149,6 @@ const RootNavigator = () => {
             <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'المساعدة والدعم' }} />
             <Stack.Screen name="Education" component={EducationScreen} options={{ title: 'الحالة الدراسية' }} />
             <Stack.Screen name="Export" component={ExportScreen} options={{ title: 'استيراد وتصدير' }} />
-            <Stack.Screen name="HealthReport" component={HealthReportScreen} options={{ title: 'كشف الحالات الصحية' }} />
             <Stack.Screen name="Data" component={DataScreen} options={{ title: 'إدارة البيانات' }} />
           </>
         )}

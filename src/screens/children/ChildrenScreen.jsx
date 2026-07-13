@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { calcAge, naturalCompare, normalizeHealthValue, getCampDelegateInfo } from '../../lib/helpers';
+import { calcAge, naturalCompare, getCampDelegateInfo } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -16,7 +16,14 @@ import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
 import colors from '../../theme/colors';
 
-export default function MenScreen() {
+const AGE_GROUPS = [
+  { key: '0-2', min: 0, max: 2 },
+  { key: '3-6', min: 3, max: 6 },
+  { key: '7-12', min: 7, max: 12 },
+  { key: '13-17', min: 13, max: 17 },
+];
+
+export default function ChildrenScreen() {
   const navigation = useNavigation();
   const { orgId, profile } = useAuth();
   const { getAllowedCampIds, getVisibleCamps } = useDataScope();
@@ -28,10 +35,11 @@ export default function MenScreen() {
   const [filterCamp, setFilterCamp] = useState('');
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
-  const [menType, setMenType] = useState('');
-  const [specialFilter, setSpecialFilter] = useState(''); // '' | widower | divorced | head | elderly
+  const [ageFilter, setAgeFilter] = useState('');
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
+  const [orphansOnly, setOrphansOnly] = useState(false);
+  const [infantsOnly, setInfantsOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
@@ -39,7 +47,7 @@ export default function MenScreen() {
   const loadData = useCallback(async () => {
     if (!orgId) return;
 
-    const cached = await getCachedData('men_registry', profile?.id);
+    const cached = await getCachedData('children_registry', profile?.id);
     const hadCache = !!cached?.data;
     if (hadCache) {
       setFamilies(cached.data.families || []);
@@ -70,7 +78,7 @@ export default function MenScreen() {
       setMembers(mems);
       setOrgMembers(members2);
       setOfflineInfo(null);
-      cacheData('men_registry', profile?.id, { families: fams, members: mems, camps: visibleCamps, orgMembers: members2 });
+      cacheData('children_registry', profile?.id, { families: fams, members: mems, camps: visibleCamps, orgMembers: members2 });
     } catch (e) {
       if (!hadCache) showError('تعذّر تحميل السجل ولا توجد نسخة محفوظة');
     } finally {
@@ -87,84 +95,50 @@ export default function MenScreen() {
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
   const famMap = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families]);
 
-  const allMen = useMemo(() => {
-    const heads = families
-      .filter((f) => f.head_gender === 'ذكر')
-      .map((f) => ({
-        id: 'f-' + f.id,
-        famId: f.id,
-        name: f.head_name,
-        age: calcAge(f.head_dob),
-        type: 'رأس الأسرة',
-        marital: f.head_marital || '—',
-        chronic: normalizeHealthValue(f.head_chronic_diseases),
-        camp: campMap[f.camp_id] || '—',
-        camp_id: f.camp_id || '',
-        tent: f.tent || '—',
-      }));
-    const relMembers = members
-      .filter((m) => m.gender === 'ذكر' || ['زوج', 'أب', 'ابن', 'أخ'].includes(m.relation || ''))
+  const childrenData = useMemo(() => {
+    return members
       .map((m) => {
+        const age = calcAge(m.dob);
         const f = famMap[m.family_id] || {};
-        return {
-          id: 'm-' + m.id,
-          famId: m.family_id,
-          name: m.name || '—',
-          age: calcAge(m.dob),
-          type: m.relation || 'ذكر',
-          marital: '—',
-          chronic: normalizeHealthValue(m.chronic_diseases),
-          camp: campMap[f.camp_id] || '—',
-          camp_id: f.camp_id || '',
-          tent: f.tent || '—',
-        };
-      });
-    return [...heads, ...relMembers];
-  }, [families, members, famMap, campMap]);
-
-  // أعداد الفئات الخاصة بمخيم فقط (بلا تأثير الفلاتر التانية) عشان تظهر ثابتة بجانب كل زر
-  const campMen = useMemo(
-    () => (filterCamp ? allMen.filter((w) => w.camp_id === filterCamp) : allMen),
-    [allMen, filterCamp]
-  );
-  const specialCounts = useMemo(
-    () => ({
-      widower: campMen.filter((w) => w.marital === 'أرمل' || w.marital === 'أرملة').length,
-      divorced: campMen.filter((w) => w.marital === 'مطلق' || w.marital === 'مطلقة').length,
-      head: campMen.filter((w) => w.type === 'رأس الأسرة').length,
-      elderly: campMen.filter((w) => w.age !== null && w.age >= 60).length,
-    }),
-    [campMen]
-  );
-
-  const menData = useMemo(() => {
-    return allMen
-      .filter((w) => !filterCamp || w.camp_id === filterCamp)
-      .filter((w) => !menType || w.type === menType)
-      .filter((w) => {
-        if (!specialFilter) return true;
-        if (specialFilter === 'widower') return w.marital === 'أرمل' || w.marital === 'أرملة';
-        if (specialFilter === 'divorced') return w.marital === 'مطلق' || w.marital === 'مطلقة';
-        if (specialFilter === 'head') return w.type === 'رأس الأسرة';
-        if (specialFilter === 'elderly') return w.age !== null && w.age >= 60;
-        return true;
+        return { ...m, age, famName: f.head_name || '—', camp: campMap[f.camp_id] || '—', camp_id: f.camp_id || '', tent: f.tent || '—' };
       })
-      .filter((w) => !ageMin || (w.age !== null && w.age >= Number(ageMin)))
-      .filter((w) => !ageMax || (w.age !== null && w.age <= Number(ageMax)))
-      .filter((w) => !search.trim() || (w.name || '').includes(search))
+      .filter((k) => k.age !== null && k.age < 18)
+      .filter((k) => !filterCamp || k.camp_id === filterCamp)
+      .filter((k) => {
+        if (!ageFilter) return true;
+        const g = AGE_GROUPS.find((g) => g.key === ageFilter);
+        return k.age >= g.min && k.age <= g.max;
+      })
+      .filter((k) => !ageMin || k.age >= Number(ageMin))
+      .filter((k) => !ageMax || k.age <= Number(ageMax))
+      .filter((k) => !orphansOnly || !!k.orphan_status)
+      .filter((k) => !infantsOnly || k.age < 2)
+      .filter((k) => !search.trim() || (k.name || '').includes(search) || (k.famName || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
-  }, [allMen, filterCamp, menType, specialFilter, ageMin, ageMax, search]);
+  }, [members, famMap, campMap, filterCamp, ageFilter, ageMin, ageMax, orphansOnly, infantsOnly, search]);
 
-  const RELATION_ICONS = { 'رأس الأسرة': '🏠', 'زوج': '🤵', 'أب': '👴', 'ابن': '👦', 'أخ': '👬', 'ذكر': '👨' };
-  const relationTypes = useMemo(() => {
-    const counts = {};
-    campMen.forEach((w) => { counts[w.type] = (counts[w.type] || 0) + 1; });
-    return Object.entries(counts).map(([type, count]) => ({ type, count }));
-  }, [campMen]);
-  const menStats = useMemo(
-    () => ({ total: menData.length }),
-    [menData]
-  );
+  const orphansCount = useMemo(() => {
+    return members
+      .filter((m) => {
+        const age = calcAge(m.dob);
+        const f = famMap[m.family_id] || {};
+        return age !== null && age < 18 && !!m.orphan_status && (!filterCamp || f.camp_id === filterCamp);
+      }).length;
+  }, [members, famMap, filterCamp]);
+
+  const infantsCount = useMemo(() => {
+    return members
+      .filter((m) => {
+        const age = calcAge(m.dob);
+        const f = famMap[m.family_id] || {};
+        return age !== null && age < 2 && (!filterCamp || f.camp_id === filterCamp);
+      }).length;
+  }, [members, famMap, filterCamp]);
+
+  const ageGroupCounts = useMemo(() => {
+    const all = members.map((m) => calcAge(m.dob)).filter((a) => a !== null && a < 18);
+    return AGE_GROUPS.map((g) => ({ ...g, count: all.filter((a) => a >= g.min && a <= g.max).length }));
+  }, [members]);
 
   const styles = getStyles();
 
@@ -178,44 +152,45 @@ export default function MenScreen() {
     );
   }
 
-  const renderMan = ({ item: w }) => (
-    <Pressable style={styles.card} onPress={() => w.famId && navigation.push('FamilyDetail', { familyId: w.famId })}>
-      <Text style={styles.cardName}>{w.name} <Text style={styles.typeTag}>({w.type})</Text></Text>
-      <Text style={styles.cardMeta}>{w.age ?? '—'} سنة • {w.marital}</Text>
-      {!!w.chronic && <Text style={styles.chronicText}>🩺 {w.chronic}</Text>}
-      <Text style={styles.cardSubMeta}>⛺{w.tent} 🏕️{w.camp} — اضغط للانتقال للأسرة ←</Text>
+  const renderChild = ({ item: k }) => (
+    <Pressable style={styles.card} onPress={() => k.family_id && navigation.push('FamilyDetail', { familyId: k.family_id })}>
+      <Text style={styles.cardName}>{k.name} <Text style={styles.ageTag}>({k.age})</Text></Text>
+      <Text style={styles.cardMeta}>{k.relation} {k.gender ? `• ${k.gender}` : ''} {k.orphan_status ? '• 🔸يتيم' : ''}</Text>
+      <Text style={styles.cardSubMeta}>⛺{k.tent} 🏕️{k.camp} 👨‍👩‍👧{k.famName} — اضغط للانتقال للأسرة ←</Text>
     </Pressable>
   );
 
   return (
     <SafeAreaView style={styles.screen}>
       <FlatList
-        data={menData}
+        data={childrenData}
         keyExtractor={(item) => item.id}
-        renderItem={renderMan}
+        renderItem={renderChild}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <View>
             <PageHeader
-              icon="👨"
-              title="الرجال"
+              icon="🧒"
+              title="سجل الأطفال"
               action={
                 <ExportButton
                   getRows={() =>
-                    menData.map((w, i) => ({
+                    childrenData.map((k, i) => ({
                       '#': i + 1,
-                      'الخيمة': w.tent,
-                      'الاسم': w.name,
-                      'العمر': w.age ?? '',
-                      'الصلة': w.type,
-                      'الحالة الاجتماعية': w.marital,
-                      'أمراض مزمنة': w.chronic,
-                      'المخيم': w.camp,
+                      'الخيمة': k.tent,
+                      'الاسم': k.name,
+                      'رقم الهوية': k.national_id || '',
+                      'العمر': k.age,
+                      'الصلة': k.relation || '',
+                      'الجنس': k.gender || '',
+                      'يتيم؟': k.orphan_status ? 'نعم' : 'لا',
+                      'رب الأسرة': k.famName,
+                      'المخيم': k.camp,
                     }))
                   }
-                  sheetName="الرجال"
-                  fileName="سجل_الرجال"
+                  sheetName="الأطفال"
+                  fileName="سجل_الأطفال"
                   getBanner={() => {
                     if (!filterCamp) return null;
                     const camp = camps.find((c) => c.id === filterCamp);
@@ -248,57 +223,38 @@ export default function MenScreen() {
               />
             </View>
 
-            <View style={styles.categoryGrid}>
-              {[
-                { key: 'widower', icon: '🖤', label: 'أرامل', count: specialCounts.widower },
-                { key: 'divorced', icon: '💔', label: 'مطلقين', count: specialCounts.divorced },
-                { key: 'head', icon: '🏠', label: 'معيل أسرة', count: specialCounts.head },
-                { key: 'elderly', icon: '👴', label: 'كبار السن (60+)', count: specialCounts.elderly },
-              ].map((c) => (
-                <Pressable
-                  key={c.key}
-                  onPress={() => setSpecialFilter((f) => (f === c.key ? '' : c.key))}
-                  style={[styles.categoryCell, specialFilter === c.key && styles.categoryCellActive]}
-                >
-                  <Text style={styles.categoryIcon}>{c.icon}</Text>
-                  <Text style={[styles.categoryCount, specialFilter === c.key && styles.categoryCountActive]}>{c.count}</Text>
-                  <Text style={styles.categoryLabel}>{c.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={styles.categoryGrid}>
-              <View style={styles.categoryCell}>
-                <Text style={styles.categoryIcon}>👨‍👨‍👦</Text>
-                <Text style={styles.categoryCount}>{menStats.total}</Text>
-                <Text style={styles.categoryLabel}>{filterCamp ? `الإجمالي بـ${campMap[filterCamp]}` : 'الإجمالي'}</Text>
-              </View>
-            </View>
-
-            <View style={styles.categoryGrid}>
+            <View style={styles.ageGrid}>
               <Pressable
-                onPress={() => setMenType('')}
-                style={[styles.categoryCell, !menType && styles.categoryCellActive]}
+                style={[styles.ageBox, orphansOnly && styles.ageBoxActive]}
+                onPress={() => setOrphansOnly((v) => !v)}
               >
-                <Text style={styles.categoryIcon}>👥</Text>
-                <Text style={[styles.categoryCount, !menType && styles.categoryCountActive]}>{campMen.length}</Text>
-                <Text style={styles.categoryLabel}>كل الصلات</Text>
+                <Text style={styles.ageIcon}>🔸</Text>
+                <Text style={[styles.ageCount, orphansOnly && styles.ageCountActive]}>{orphansCount}</Text>
+                <Text style={styles.ageLabel}>أيتام</Text>
               </Pressable>
-              {relationTypes.map(({ type, count }) => (
+              <Pressable
+                style={[styles.ageBox, infantsOnly && styles.ageBoxActive]}
+                onPress={() => setInfantsOnly((v) => !v)}
+              >
+                <Text style={styles.ageIcon}>🍼</Text>
+                <Text style={[styles.ageCount, infantsOnly && styles.ageCountActive]}>{infantsCount}</Text>
+                <Text style={styles.ageLabel}>رضع</Text>
+              </Pressable>
+              {ageGroupCounts.map((g) => (
                 <Pressable
-                  key={type}
-                  onPress={() => setMenType(type)}
-                  style={[styles.categoryCell, menType === type && styles.categoryCellActive]}
+                  key={g.key}
+                  style={[styles.ageBox, ageFilter === g.key && styles.ageBoxActive]}
+                  onPress={() => setAgeFilter(ageFilter === g.key ? '' : g.key)}
                 >
-                  <Text style={styles.categoryIcon}>{RELATION_ICONS[type] || '👨'}</Text>
-                  <Text style={[styles.categoryCount, menType === type && styles.categoryCountActive]}>{count}</Text>
-                  <Text style={styles.categoryLabel}>{type}</Text>
+                  <Text style={styles.ageIcon}>🎂</Text>
+                  <Text style={[styles.ageCount, ageFilter === g.key && styles.ageCountActive]}>{g.count}</Text>
+                  <Text style={styles.ageLabel}>{g.key}</Text>
                 </Pressable>
               ))}
             </View>
 
             <View style={styles.ageRow}>
-              <Text style={styles.ageLabel}>الفئة العمرية:</Text>
+              <Text style={styles.ageRowLabel}>أو عمر مخصّص:</Text>
               <TextInput
                 value={ageMin}
                 onChangeText={setAgeMin}
@@ -331,10 +287,13 @@ export default function MenScreen() {
               style={styles.searchInput}
             />
 
-            <Text style={styles.countText}>{menData.length} رجل</Text>
+            <Text style={styles.countText}>
+              {filterCamp ? `مجموع الأطفال (أقل من 18) بـ${campMap[filterCamp]}: ` : 'مجموع الأطفال (أقل من 18): '}
+              <Text style={styles.countValue}>{childrenData.length}</Text>
+            </Text>
           </View>
         }
-        ListEmptyComponent={<EmptyState icon="👨" title="لا توجد نتائج" />}
+        ListEmptyComponent={<EmptyState icon="🧒" title="لا توجد نتائج" />}
       />
 
       <BottomSheetModal visible={campPickerVisible} onClose={() => setCampPickerVisible(false)} title="اختر المخيم">
@@ -362,8 +321,19 @@ const getStyles = () =>
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+
+    ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+    ageBox: {
+      flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 12, paddingVertical: 10, alignItems: 'center',
+    },
+    ageBoxActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
+    ageIcon: { fontSize: 18, marginBottom: 2 },
+    ageCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
+    ageCountActive: { color: colors.accent },
+    ageLabel: { color: colors.muted, fontSize: 9, marginTop: 1 },
     ageRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 10 },
-    ageLabel: { color: colors.muted, fontSize: 12, marginStart: 4 },
+    ageRowLabel: { color: colors.muted, fontSize: 12 },
     ageInput: {
       backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 10,
       paddingHorizontal: 10, paddingVertical: 8, color: colors.white, fontSize: 13, textAlign: 'center', width: 64,
@@ -372,29 +342,18 @@ const getStyles = () =>
     ageClear: { paddingHorizontal: 8, paddingVertical: 6 },
     ageClearText: { color: colors.red, fontSize: 11 },
 
-    categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-    categoryCell: {
-      flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-      borderRadius: 12, paddingVertical: 10, alignItems: 'center',
-    },
-    categoryCellActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
-    categoryIcon: { fontSize: 18, marginBottom: 2 },
-    categoryCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
-    categoryCountActive: { color: colors.accent },
-    categoryLabel: { color: colors.muted, fontSize: 9, marginTop: 1, textAlign: 'center' },
-
     searchInput: {
       backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
       paddingHorizontal: 16, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 8,
     },
     countText: { color: colors.muted, fontSize: 11, marginBottom: 10, textAlign: 'right' },
+    countValue: { color: colors.accent, fontWeight: '900', fontSize: 13 },
 
     card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 8 },
     cardName: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right' },
-    typeTag: { color: colors.muted, fontWeight: 'normal', fontSize: 11 },
+    ageTag: { color: colors.accent, fontWeight: '900' },
     cardMeta: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
     cardSubMeta: { color: colors.muted, fontSize: 10, marginTop: 4, textAlign: 'right' },
-    chronicText: { color: colors.accent, fontSize: 10, marginTop: 2, textAlign: 'right' },
 
     campOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
     campOptionText: { color: colors.white, fontSize: 13, textAlign: 'right' },

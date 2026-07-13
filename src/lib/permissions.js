@@ -57,8 +57,10 @@ export const PAGE_REGISTRY = {
   movements: { label: '🔄 حركات الأسر' },
   distributions: { label: '📦 التوزيعات' },
   activity_log: { label: '📝 آخر التعديلات على الأسر' },
+  women: { label: '👩 النساء' },
   men: { label: '👨 الرجال' },
-  health_report: { label: '⚕️ كشف الحالات الصحية' },
+  children: { label: '🧒 سجل الأطفال' },
+  health_records: { label: '🩺 سجل الحالات الصحية' },
   education_status: { label: '🎒 الحالة الدراسية' },
   analysis: { label: '📊 التحليل' },
   needs_report: { label: '📋 تقارير الاحتياجات' },
@@ -115,27 +117,28 @@ const LEGACY_PAGE_KEY_MAP = {
   families: 'page-families',
   movements: 'page-movements',
   distributions: 'page-dist',
+  children: 'page-children',
 };
 
 const DEFAULT_ROLE_ACCESS = {
   platform_owner: () => true,
   super_admin: {
     dashboard: true, families: true, camps: true, movements: true, distributions: true, activity_log: true,
-    men: true, health_report: true, education_status: true,
+    women: true, men: true, children: true, health_records: true, education_status: true,
     analysis: true, needs_report: true, camp_compare: true, export: true,
     users: true, audit: true, alerts: true, data: false, diagnostics: true, security_audit: false,
     devices: true, sms: true, settings: true, subscription: true, help: true, page_permissions: false, pending_requests: true,
   },
   camp_delegate: {
     dashboard: true, families: true, camps: true, movements: true, distributions: true, activity_log: true,
-    men: true, health_report: true, education_status: true,
+    women: true, men: true, children: true, health_records: true, education_status: true,
     analysis: true, needs_report: true, camp_compare: true, export: true,
     users: true, audit: true, alerts: true, data: false, diagnostics: true, security_audit: false,
     devices: true, sms: true, settings: true, subscription: true, help: true, page_permissions: false, pending_requests: true,
   },
   assistant: {
     dashboard: true, families: false, camps: false, movements: false, distributions: false, activity_log: false,
-    men: false, health_report: false, education_status: false,
+    women: false, men: false, children: false, health_records: false, education_status: false,
     analysis: false, needs_report: false, camp_compare: false, export: false,
     users: false, audit: false, alerts: false, data: false, diagnostics: false, security_audit: false,
     devices: false, sms: false, settings: true, subscription: false, help: true, page_permissions: false, pending_requests: false,

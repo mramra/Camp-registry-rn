@@ -6,6 +6,9 @@ import {
   Pressable,
   FlatList,
   Linking,
+  Platform,
+  PermissionsAndroid,
+  Alert,
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
@@ -72,6 +75,8 @@ export default function SMSScreen() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(new Set());
   const [message, setMessage] = useState('');
+  const [directSending, setDirectSending] = useState(false);
+  const [directProgress, setDirectProgress] = useState(null); // { done, total }
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
@@ -183,6 +188,77 @@ export default function SMSScreen() {
     const phone = f.phone1.replace(/^0/, '970'); // تحويل الصفر الأول لمفتاح فلسطين الدولي
     await Linking.openURL(`whatsapp://send?phone=${phone}&text=${encodeURIComponent(msg)}`);
     showSuccess('📲 جارٍ فتح واتساب...');
+  };
+
+  // إرسال مباشر من داخل التطبيق (بدون فتح تطبيق الرسائل) -- أندرويد فقط.
+  // استيراد المكتبة يصير هنا بالداخل (مو بأعلى الملف) عمداً: المكتبة
+  // أصلية (native) وتنهار فوراً لو استُدعيت بمنصة غير أندرويد (الويب أو
+  // iOS) -- الاستدعاء الشرطي هذا يمنع كسر نسخة الويب بالكامل.
+  const sendDirect = async () => {
+    if (Platform.OS !== 'android') {
+      return showError('الإرسال المباشر متاح على تطبيق أندرويد فقط');
+    }
+    const sel = selectedFamilies;
+    const text = message.trim();
+    if (!sel.length) return showError('لم تختر أي مستلم');
+    if (!text) return showError('يرجى كتابة نص الرسالة');
+
+    const proceed = await new Promise((resolve) => {
+      Alert.alert(
+        'إرسال مباشر',
+        `رح تُرسَل الرسالة فوراً لـ${sel.length} مستلم من رصيدك بدون فتح تطبيق الرسائل.${
+          sel.length > 25 ? '\n\n⚠️ العدد كبير -- أندرويد نفسه ممكن يوقف الإرسال ويطلب تأكيدك يدوياً كإجراء حماية من السبام (سلوك النظام، مو عطل بالتطبيق).' : ''
+        }\n\nمتأكد تكمل؟`,
+        [
+          { text: 'إلغاء', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'إرسال', style: 'destructive', onPress: () => resolve(true) },
+        ],
+        { cancelable: false }
+      );
+    });
+    if (!proceed) return;
+
+    const SmsManager = require('expo-sms-manager');
+
+    try {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.SEND_SMS, {
+        title: 'إذن إرسال الرسائل',
+        message: 'يحتاج التطبيق إذنك لإرسال رسائل SMS مباشرة من رقمك بدل فتح تطبيق الرسائل.',
+        buttonPositive: 'موافق',
+        buttonNegative: 'إلغاء',
+      });
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        return showError('تم رفض إذن إرسال الرسائل');
+      }
+    } catch (e) {
+      return showError('تعذّر طلب الإذن: ' + e.message);
+    }
+
+    setDirectSending(true);
+    setDirectProgress({ done: 0, total: sel.length });
+    let ok = 0;
+    let fail = 0;
+
+    for (let i = 0; i < sel.length; i++) {
+      const f = sel[i];
+      const msg = text.replace(/\{اسم\}/g, shortName(f.head_name)) + '\n' + getSig(f.camp_id, campMap);
+      try {
+        const res = await SmsManager.sendLongSms(f.phone1, msg, { requestStatusReport: false });
+        if (res?.sent === 'sent' || res?.sent === 'sent_no_confirmation') ok++;
+        else fail++;
+      } catch {
+        fail++;
+      }
+      setDirectProgress({ done: i + 1, total: sel.length });
+      // فاصل بسيط بين كل رسالة وأخرى -- يقلّل احتمال تفعيل حماية أندرويد
+      // ضد السبام (مو ضمانة كاملة، بس يخفف الاحتمال).
+      await new Promise((r) => setTimeout(r, 350));
+    }
+
+    setDirectSending(false);
+    setDirectProgress(null);
+    if (fail === 0) showSuccess(`✅ اترسلت ${ok} رسالة بنجاح`);
+    else showError(`✅ نجح ${ok} — ❌ فشل ${fail} (تأكد من الرصيد أو تغطية الشبكة)`);
   };
 
   const renderRecipient = ({ item: f }) => {
@@ -317,6 +393,36 @@ export default function SMSScreen() {
                 <Text style={styles.whatsBtnText}>📲 إرسال عبر واتساب لهذا المستلم</Text>
               </Pressable>
             )}
+
+            {Platform.OS === 'android' && (
+              <>
+                <Pressable
+                  style={[styles.directBtn, directSending && styles.disabled]}
+                  onPress={sendDirect}
+                  disabled={directSending}
+                >
+                  {directSending ? (
+                    <ActivityIndicator size="small" color={colors.accent} />
+                  ) : (
+                    <Text style={styles.directBtnText}>⚡ إرسال مباشر (بدون فتح تطبيق الرسائل)</Text>
+                  )}
+                </Pressable>
+                {directSending && directProgress && (
+                  <View style={styles.progressBox}>
+                    <Text style={styles.progressText}>
+                      جارٍ الإرسال: {directProgress.done} من {directProgress.total}
+                    </Text>
+                    <View style={styles.progressTrack}>
+                      <View style={[styles.progressFill, { width: `${(directProgress.done / directProgress.total) * 100}%` }]} />
+                    </View>
+                  </View>
+                )}
+                <Text style={styles.directHint}>
+                  ⚡ يرسل مباشرة من رصيدك بدون فتح أي تطبيق -- يحتاج إذنك أول مرة. لو العدد كبير، أندرويد ممكن يطلب تأكيد إضافي (حماية نظام، مو عطل).
+                </Text>
+              </>
+            )}
+
             <Text style={styles.footerHint}>📱 يفتح تطبيق الرسائل بالأرقام المحددة — اضغط إرسال وسيُرسل للكل.</Text>
           </View>
         }
@@ -411,6 +517,13 @@ const styles = StyleSheet.create({
   sendRow: { flexDirection: 'row', gap: 8 },
   whatsBtn: { backgroundColor: 'rgba(37,211,102,0.12)', borderWidth: 1, borderColor: '#25D366', paddingVertical: 11, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   whatsBtnText: { color: '#25D366', fontWeight: 'bold', fontSize: 12 },
+  directBtn: { backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: colors.accent, paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  directBtnText: { color: colors.accent, fontWeight: '900', fontSize: 12 },
+  directHint: { color: colors.muted, fontSize: 10, marginTop: 6, textAlign: 'right', lineHeight: 15 },
+  progressBox: { marginTop: 8 },
+  progressText: { color: colors.white, fontSize: 11, textAlign: 'right', marginBottom: 4 },
+  progressTrack: { height: 6, backgroundColor: colors.surface2, borderRadius: 999, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 999 },
   sendBtn: { flex: 1, backgroundColor: colors.accent, paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
   disabled: { opacity: 0.6 },
   sendBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },

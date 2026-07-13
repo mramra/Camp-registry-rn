@@ -124,17 +124,58 @@ export default function FamilyDetailScreen() {
       if (data.org_id) {
         try {
           const allFams = await fetchFamilies(data.org_id);
-          const dups = [];
+          const allMems = await fetchFamilyMembers(allFams.map((f) => f.id));
+          const famById = Object.fromEntries(allFams.map((f) => [f.id, f]));
+
+          // خريطة: رقم هوية → كل الأسر اللي ظهر فيها (كرب أسرة أو كفرد
+          // بأي أسرة) -- عشان نلقط حالة "نفس الشخص مسجّل مرتين: مرة رب
+          // أسرة لحاله، ومرة فرد بأسرة ثانية" (بالضبط الحالة اللي طلعت
+          // بقائمة الأسر ومو ظاهرة هون قبل هذا التصحيح).
+          const idMap = {};
           allFams.forEach((f) => {
-            if (f.id === familyId) return;
-            if (data.head_id && f.head_id && f.head_id === data.head_id) {
-              dups.push({ familyId: f.id, familyName: f.head_name, matchType: 'رقم الهوية' });
-            } else if (data.phone1 && f.phone1 && f.phone1 === data.phone1) {
-              dups.push({ familyId: f.id, familyName: f.head_name, matchType: 'رقم الجوال' });
-            } else if (data.phone1 && f.phone2 && f.phone2 === data.phone1) {
+            if (!f.head_id) return;
+            if (!idMap[f.head_id]) idMap[f.head_id] = [];
+            idMap[f.head_id].push({ familyId: f.id, name: f.head_name });
+          });
+          allMems.forEach((m) => {
+            if (!m.national_id) return;
+            if (!idMap[m.national_id]) idMap[m.national_id] = [];
+            idMap[m.national_id].push({ familyId: m.family_id, name: m.name });
+          });
+
+          const dups = [];
+          const seenFamilyIds = new Set();
+
+          // تكرار رقم الهوية: رب الأسرة الحالية + كل أفراد الأسرة الحالية
+          const currentFamilyMemberIds = allMems
+            .filter((m) => m.family_id === familyId && m.national_id)
+            .map((m) => m.national_id);
+          const idsToCheck = [data.head_id, ...currentFamilyMemberIds];
+          idsToCheck.forEach((nid) => {
+            if (!nid || !idMap[nid]) return;
+            idMap[nid].forEach((entry) => {
+              if (entry.familyId === familyId || seenFamilyIds.has(entry.familyId)) return;
+              seenFamilyIds.add(entry.familyId);
+              dups.push({
+                familyId: entry.familyId,
+                familyName: famById[entry.familyId]?.head_name || entry.name,
+                matchType: `رقم الهوية (${entry.name})`,
+              });
+            });
+          });
+
+          // تكرار رقم الجوال (بين رؤساء الأسر فقط -- الأفراد ما عندهم جوال مسجَّل)
+          allFams.forEach((f) => {
+            if (f.id === familyId || seenFamilyIds.has(f.id)) return;
+            const matched =
+              (data.phone1 && f.phone1 && f.phone1 === data.phone1) ||
+              (data.phone1 && f.phone2 && f.phone2 === data.phone1);
+            if (matched) {
+              seenFamilyIds.add(f.id);
               dups.push({ familyId: f.id, familyName: f.head_name, matchType: 'رقم الجوال' });
             }
           });
+
           setDuplicates(dups);
         } catch {
           // فحص التكرار غير حرج -- تجاهل أي عطل فيه بصمت

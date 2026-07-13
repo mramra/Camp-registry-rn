@@ -13,23 +13,13 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
-import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchFamilyActivityLog } from '../../lib/supabase';
+import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { calcAge, isIncomplete } from '../../lib/helpers';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
 
-import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import colors from '../../theme/colors';
-
-const ACTIVITY_FIELD_LABELS = {
-  head_name: 'اسم رب الأسرة', head_id: 'رقم الهوية', head_dob: 'تاريخ الميلاد',
-  head_gender: 'الجنس', head_marital: 'الحالة الاجتماعية', phone1: 'رقم الجوال',
-  phone2: 'جوال بديل', camp_id: 'المخيم', tent: 'رقم الخيمة',
-  original_address: 'العنوان الأصلي', address_details: 'تفاصيل العنوان', notes: 'ملاحظات',
-  category_tags: 'الفئة الاجتماعية',
-  review_status: 'حالة المراجعة', head_qualification: 'المؤهل العلمي',
-};
 
 /**
  * الرئيسية — نسخة مطابقة للأصل (camp-registry-react/Dashboard.jsx):
@@ -38,7 +28,7 @@ const ACTIVITY_FIELD_LABELS = {
  */
 export default function DashboardScreen() {
   const navigation = useNavigation();
-  const { profile, logout } = useAuth();
+  const { profile } = useAuth();
   const { getAllowedCampIds, filterLocal } = useDataScope();
 
   const [stats, setStats] = useState(null);
@@ -47,8 +37,6 @@ export default function DashboardScreen() {
   const [members, setMembers] = useState([]);
   const [camps, setCamps] = useState([]);
   const [search, setSearch] = useState('');
-  const [activity, setActivity] = useState([]);
-  const [selectedActivity, setSelectedActivity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -65,7 +53,6 @@ export default function DashboardScreen() {
     const hadCache = cacheLooksValid;
     if (hadCache) {
       setStats(cached.data.stats);
-      setActivity(cached.data.activityLog || []);
       setFamilies(cached.data.families || []);
       setMembers(cached.data.members || []);
       setCamps(cached.data.camps || []);
@@ -84,11 +71,10 @@ export default function DashboardScreen() {
         return;
       }
 
-      const [famsRaw, camps, activityLog] = await withTimeout(
+      const [famsRaw, camps] = await withTimeout(
         Promise.all([
           fetchFamilies(profile.org_id),
           fetchCamps(profile.org_id),
-          fetchFamilyActivityLog(profile.org_id, 15),
         ]),
         12000,
         'انتهت مهلة تحميل البيانات'
@@ -148,12 +134,11 @@ export default function DashboardScreen() {
         campBars,
       };
       setStats(finalStats);
-      setActivity(activityLog);
       setFamilies(filteredFams);
       setMembers(members);
       setCamps(filteredCamps);
       setOfflineInfo(null); // المزامنة نجحت -- البيانات المعروضة الآن حيّة ومحدَّثة
-      cacheData('dashboard_stats', profile?.id, { stats: finalStats, families: filteredFams, members, camps: filteredCamps, activityLog });
+      cacheData('dashboard_stats', profile?.id, { stats: finalStats, families: filteredFams, members, camps: filteredCamps });
     } catch (e) {
       // فشلت المزامنة الحية -- لو ما عندنا نسخة محفوظة من الأساس، هذا فشل حقيقي
       if (!hadCache) showError('تعذّر تحميل البيانات ولا توجد نسخة محفوظة');
@@ -215,34 +200,11 @@ export default function DashboardScreen() {
     { icon: '⚠️', label: 'بيانات ناقصة', value: stats?.incomplete, color: (stats?.incomplete || 0) > 0 ? colors.red : colors.muted, screen: 'FamiliesList' },
   ];
 
-  const quickActions = [
-    { icon: '➕', label: 'إضافة أسرة', screen: 'FamilyForm' },
-    { icon: '🏕️', label: 'المخيمات', screen: 'CampsList' },
-    { icon: '👨‍👩‍👧‍👦', label: 'قائمة الأسر', screen: 'FamiliesList' },
-    { icon: '👥', label: 'المستخدمون', screen: 'UsersList' },
-    { icon: '🚶', label: 'حركات الأسر', screen: 'Movements' },
-    { icon: '📦', label: 'التوزيعات', screen: 'Distributions' },
-    { icon: '🧒', label: 'سجل الأطفال', screen: 'Children' },
-    { icon: '👩', label: 'النساء', screen: 'Women' },
-    { icon: '👨', label: 'الرجال', screen: 'Men' },
-    { icon: '🩺', label: 'سجل الحالات الصحية', screen: 'HealthRecords' },
-    { icon: '💬', label: 'الرسائل', screen: 'SMS' },
-    ...(profile?.role === 'platform_owner'
-      ? [{ icon: '🔐', label: 'إدارة الصلاحيات', screen: 'PermissionsAdmin' }]
-      : []),
-    { icon: '🚪', label: 'تسجيل الخروج', action: 'logout' },
-  ];
-
   const ageBars = stats ? [
     { label: 'أطفال 0-17', value: stats.children, color: colors.green },
     { label: 'بالغون 18-59', value: stats.adults, color: colors.blue },
     { label: 'كبار 60+', value: stats.elderly, color: colors.accent },
   ] : [];
-
-  const handleQuickAction = (a) => {
-    if (a.action === 'logout') logout();
-    else if (a.screen) navigation.push(a.screen);
-  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -360,53 +322,6 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* إجراءات سريعة */}
-        <View style={styles.panelFull}>
-          <Text style={styles.quickTitle}>⚡ إجراءات سريعة</Text>
-          <View style={styles.quickGrid}>
-            {quickActions.map((a) => (
-              <Pressable
-                key={a.label}
-                style={({ pressed }) => [styles.quickBtn, pressed && styles.pressed]}
-                onPress={() => handleQuickAction(a)}
-              >
-                <Text style={styles.quickIcon}>{a.icon}</Text>
-                <Text style={styles.quickLabel}>{a.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* آخر التعديلات على الأسر */}
-        {activity.length > 0 && (
-          <View style={styles.panelFull}>
-            <Text style={styles.quickTitle}>📝 آخر التعديلات على الأسر</Text>
-            {activity.map((a) => {
-              const meta =
-                a.action === 'insert' ? { icon: '➕', color: colors.green, label: 'إضافة' } :
-                a.action === 'delete' ? { icon: '🗑️', color: colors.red, label: 'حذف' } :
-                { icon: '✏️', color: colors.blue, label: 'تعديل' };
-              const when = new Date(a.created_at);
-              const timeStr = isNaN(when) ? '' : when.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-              return (
-                <Pressable key={a.id} style={styles.activityRow} onPress={() => setSelectedActivity(a)}>
-                  <View style={[styles.activityIconBox, { backgroundColor: `${meta.color}22` }]}>
-                    <Text style={styles.activityIcon}>{meta.icon}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.activityLine}>
-                      <Text style={{ color: meta.color, fontWeight: 'bold' }}>{meta.label}</Text> — {a.family_name || 'أسرة'}
-                      {a.members_count ? ` (${a.members_count} فرد)` : ''}
-                    </Text>
-                    <Text style={styles.activityMeta}>👤 {a.actor_name || 'غير معروف'} · 🕒 {timeStr}</Text>
-                  </View>
-                  <Text style={styles.activityChevron}>‹</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-
         {/* لا بيانات */}
         {!loading && stats?.families === 0 && (
           <View style={styles.emptyBox}>
@@ -419,78 +334,6 @@ export default function DashboardScreen() {
           </View>
         )}
       </ScrollView>
-
-      <BottomSheetModal
-        visible={!!selectedActivity}
-        onClose={() => setSelectedActivity(null)}
-        title="📝 تفاصيل الحركة"
-      >
-        {selectedActivity && (() => {
-          const a = selectedActivity;
-          const meta =
-            a.action === 'insert' ? { icon: '➕', color: colors.green, label: 'إضافة أسرة جديدة' } :
-            a.action === 'delete' ? { icon: '🗑️', color: colors.red, label: 'حذف أسرة' } :
-            { icon: '✏️', color: colors.blue, label: 'تعديل بيانات أسرة' };
-          const when = new Date(a.created_at);
-          const fullTime = isNaN(when)
-            ? '—'
-            : when.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-          const changeEntries = a.changes && typeof a.changes === 'object' ? Object.entries(a.changes) : [];
-
-          return (
-            <View>
-              <View style={[styles.detailBadge, { backgroundColor: `${meta.color}22` }]}>
-                <Text style={[styles.detailBadgeText, { color: meta.color }]}>{meta.icon} {meta.label}</Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>الأسرة</Text>
-                <Text style={styles.detailValue}>{a.family_name || '—'}</Text>
-              </View>
-              {!!a.members_count && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>عدد الأفراد</Text>
-                  <Text style={styles.detailValue}>{a.members_count}</Text>
-                </View>
-              )}
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>من قام بالإجراء</Text>
-                <Text style={styles.detailValue}>{a.actor_name || 'غير معروف'}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>التاريخ والوقت</Text>
-                <Text style={styles.detailValue}>{fullTime}</Text>
-              </View>
-
-              {changeEntries.length > 0 && (
-                <View style={{ marginTop: 12 }}>
-                  <Text style={styles.detailChangesTitle}>التغييرات ({changeEntries.length})</Text>
-                  {changeEntries.map(([field, val]) => (
-                    <View key={field} style={styles.changeCard}>
-                      <Text style={styles.changeField}>{ACTIVITY_FIELD_LABELS[field] || field}</Text>
-                      <View style={styles.changeValuesRow}>
-                        <View style={styles.changeOld}>
-                          <Text style={styles.changeOldLabel}>القديم</Text>
-                          <Text style={styles.changeOldValue}>{(val?.old ?? val?.from) || '(فارغ)'}</Text>
-                        </View>
-                        <Text style={styles.changeArrow}>←</Text>
-                        <View style={styles.changeNew}>
-                          <Text style={styles.changeNewLabel}>الجديد</Text>
-                          <Text style={styles.changeNewValue}>{val?.new ?? val?.to ?? '(فارغ)'}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {a.action === 'insert' && changeEntries.length === 0 && (
-                <Text style={styles.detailNote}>سجل إضافة جديد — لا تفاصيل تغييرات مسجّلة لهذا الحدث.</Text>
-              )}
-            </View>
-          );
-        })()}
-      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -527,7 +370,6 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
   },
-  pressed: { transform: [{ scale: 0.95 }] },
   statIcon: { fontSize: 24, marginBottom: 4 },
   statValue: { fontSize: 24, fontWeight: '900' },
   statLabel: { color: colors.muted, fontSize: 10, marginTop: 2 },
@@ -540,14 +382,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
   },
-  panelFull: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
   panelTitle: { fontSize: 12, fontWeight: 'bold', marginBottom: 12, textAlign: 'right' },
   barBlock: { marginBottom: 8 },
   barLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
@@ -557,47 +391,6 @@ const styles = StyleSheet.create({
   barFill: { height: '100%', borderRadius: 999 },
   noData: { color: colors.muted, fontSize: 10 },
   noAgeWarn: { color: colors.muted, fontSize: 9, marginTop: 4, textAlign: 'right' },
-  quickTitle: { color: colors.white, fontSize: 12, fontWeight: 'bold', marginBottom: 12, textAlign: 'right' },
-  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  quickBtn: {
-    width: '48.5%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  quickIcon: { fontSize: 18 },
-  quickLabel: { color: colors.white, fontSize: 12, fontWeight: 'bold' },
-  activityRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
-  activityIconBox: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  activityIcon: { fontSize: 14 },
-  activityLine: { color: colors.white, fontSize: 12, textAlign: 'right' },
-  activityMeta: { color: colors.muted, fontSize: 10, marginTop: 2, textAlign: 'right' },
-  activityChevron: { color: colors.muted, fontSize: 18 },
-
-  detailBadge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 14 },
-  detailBadgeText: { fontWeight: '900', fontSize: 13 },
-  detailRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: colors.border },
-  detailLabel: { color: colors.muted, fontSize: 12 },
-  detailValue: { color: colors.white, fontSize: 12, fontWeight: 'bold' },
-  detailChangesTitle: { color: colors.accent, fontWeight: '900', fontSize: 12, marginBottom: 8, textAlign: 'right' },
-  detailNote: { color: colors.muted, fontSize: 11, marginTop: 12, textAlign: 'right', lineHeight: 17 },
-
-  changeCard: { backgroundColor: colors.surface2, borderRadius: 12, padding: 10, marginBottom: 8 },
-  changeField: { color: colors.white, fontWeight: 'bold', fontSize: 12, marginBottom: 6, textAlign: 'right' },
-  changeValuesRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  changeOld: { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: 8 },
-  changeOldLabel: { color: colors.red, fontSize: 9, fontWeight: 'bold', textAlign: 'right' },
-  changeOldValue: { color: colors.white, fontSize: 11, marginTop: 2, textAlign: 'right' },
-  changeArrow: { color: colors.muted, fontSize: 14 },
-  changeNew: { flex: 1, backgroundColor: 'rgba(16,185,129,0.1)', borderRadius: 8, padding: 8 },
-  changeNewLabel: { color: colors.green, fontSize: 9, fontWeight: 'bold', textAlign: 'right' },
-  changeNewValue: { color: colors.white, fontSize: 11, marginTop: 2, textAlign: 'right' },
   emptyBox: { alignItems: 'center', paddingVertical: 32 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { color: colors.white, fontWeight: 'bold', marginBottom: 4 },

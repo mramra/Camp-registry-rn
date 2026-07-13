@@ -68,6 +68,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         { icon: '👨‍👩‍👧‍👦', label: 'قائمة الأسر', screen: 'FamiliesList', pageKey: 'families' },
         { icon: '🚶', label: 'حركات الأسر', screen: 'Movements', pageKey: 'movements' },
         { icon: '📦', label: 'التوزيعات', screen: 'Distributions', pageKey: 'distributions' },
+        { icon: '📝', label: 'آخر التعديلات على الأسر', screen: 'ActivityLog', pageKey: 'activity_log' },
         ...(isOwner ? [{ icon: '🚪', label: 'الأسر الخارجة', screen: 'ExitedFamilies' }] : []),
       ],
     },
@@ -258,7 +259,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
   },
-  sectionTitle: { color: colors.muted, fontSize: 11, fontWeight: 'bold', textAlign: 'right' },
+  sectionTitle: { color: colors.white, fontSize: 15, fontWeight: '900', textAlign: 'right' },
   chevron: { color: colors.muted, fontSize: 10 },
   item: {
     flexDirection: 'row-reverse',

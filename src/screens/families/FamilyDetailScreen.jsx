@@ -135,23 +135,26 @@ export default function FamilyDetailScreen() {
           allFams.forEach((f) => {
             if (!f.head_id) return;
             if (!idMap[f.head_id]) idMap[f.head_id] = [];
-            idMap[f.head_id].push({ familyId: f.id, name: f.head_name });
+            idMap[f.head_id].push({ familyId: f.id, name: f.head_name, role: 'رب أسرة' });
           });
           allMems.forEach((m) => {
             if (!m.national_id) return;
             if (!idMap[m.national_id]) idMap[m.national_id] = [];
-            idMap[m.national_id].push({ familyId: m.family_id, name: m.name });
+            idMap[m.national_id].push({ familyId: m.family_id, name: m.name, role: 'فرد' });
           });
 
           const dups = [];
           const seenFamilyIds = new Set();
 
-          // تكرار رقم الهوية: رب الأسرة الحالية + كل أفراد الأسرة الحالية
-          const currentFamilyMemberIds = allMems
-            .filter((m) => m.family_id === familyId && m.national_id)
-            .map((m) => m.national_id);
-          const idsToCheck = [data.head_id, ...currentFamilyMemberIds];
-          idsToCheck.forEach((nid) => {
+          // تكرار رقم الهوية: رب الأسرة الحالية + كل أفراد الأسرة الحالية.
+          // كل رقم نفحصه مربوط باسم صاحبه بهذي الأسرة (مو بس رقم مجرّد)
+          // عشان الرسالة توضح "هوية مين" بالضبط تطابقت مع "مين" بالأسرة الثانية.
+          const currentFamilyMembers = allMems.filter((m) => m.family_id === familyId && m.national_id);
+          const idsToCheck = [
+            { nid: data.head_id, ownerName: data.head_name },
+            ...currentFamilyMembers.map((m) => ({ nid: m.national_id, ownerName: m.name })),
+          ];
+          idsToCheck.forEach(({ nid, ownerName }) => {
             if (!nid || !idMap[nid]) return;
             idMap[nid].forEach((entry) => {
               if (entry.familyId === familyId || seenFamilyIds.has(entry.familyId)) return;
@@ -159,7 +162,7 @@ export default function FamilyDetailScreen() {
               dups.push({
                 familyId: entry.familyId,
                 familyName: famById[entry.familyId]?.head_name || entry.name,
-                matchType: `رقم الهوية (${entry.name})`,
+                message: `رقم هوية "${ownerName}" مطابق لرقم هوية ${entry.role} اسمه "${entry.name}" بأسرة "${famById[entry.familyId]?.head_name || entry.name}"`,
               });
             });
           });
@@ -172,7 +175,11 @@ export default function FamilyDetailScreen() {
               (data.phone1 && f.phone2 && f.phone2 === data.phone1);
             if (matched) {
               seenFamilyIds.add(f.id);
-              dups.push({ familyId: f.id, familyName: f.head_name, matchType: 'رقم الجوال' });
+              dups.push({
+                familyId: f.id,
+                familyName: f.head_name,
+                message: `رقم جوال هذي الأسرة مطابق لرقم جوال أسرة "${f.head_name}"`,
+              });
             }
           });
 
@@ -284,7 +291,7 @@ export default function FamilyDetailScreen() {
                 onPress={() => navigation.push('FamilyDetail', { familyId: d.familyId })}
               >
                 <Text style={styles.dupBadgeText}>
-                  {d.matchType} مطابق لأسرة "{d.familyName}" — اضغط للانتقال ←
+                  {d.message} — اضغط للانتقال ←
                 </Text>
               </Pressable>
             ))}

@@ -18,11 +18,8 @@ import MovementsScreen from '../screens/movements/MovementsScreen';
 import DistributionsScreen from '../screens/distributions/DistributionsScreen';
 import DistributionReceiveScreen from '../screens/distributions/DistributionReceiveScreen';
 import PermissionsAdminScreen from '../screens/permissions/PermissionsAdminScreen';
-import ChildrenScreen from '../screens/children/ChildrenScreen';
-import WomenScreen from '../screens/women/WomenScreen';
 import MenScreen from '../screens/men/MenScreen';
 import ActivityLogScreen from '../screens/activity/ActivityLogScreen';
-import HealthRecordsScreen from '../screens/health/HealthRecordsScreen';
 import SMSScreen from '../screens/sms/SMSScreen';
 import PendingRequestsScreen from '../screens/pending/PendingRequestsScreen';
 import AlertsScreen from '../screens/alerts/AlertsScreen';
@@ -125,12 +122,9 @@ const RootNavigator = () => {
             {/* إدارة الصلاحيات — منقولة بالكامل */}
             <Stack.Screen name="PermissionsAdmin" component={PermissionsAdminScreen} options={{ title: 'إدارة الصلاحيات' }} />
 
-            {/* السجلات — منقولة (أطفال/نساء/صحة) */}
-            <Stack.Screen name="Children" component={ChildrenScreen} options={{ title: 'سجل الأطفال' }} />
-            <Stack.Screen name="Women" component={WomenScreen} options={{ title: 'النساء' }} />
+            {/* السجلات — الرجال والتعديلات بس (أطفال/نساء/صحة اعتمدنا شاشات التحليل بدلها) */}
             <Stack.Screen name="Men" component={MenScreen} options={{ title: 'الرجال' }} />
             <Stack.Screen name="ActivityLog" component={ActivityLogScreen} options={{ title: 'آخر التعديلات على الأسر' }} />
-            <Stack.Screen name="HealthRecords" component={HealthRecordsScreen} options={{ title: 'سجل الحالات الصحية' }} />
 
             {/* الرسائل — منقولة بالكامل */}
             <Stack.Screen name="SMS" component={SMSScreen} options={{ title: 'الرسائل' }} />

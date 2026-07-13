@@ -21,6 +21,7 @@ const CATEGORIES = [
   { key: 'معاق', label: '🦽 إعاقة', color: colors.purple },
   { key: 'مصاب', label: '🩹 إصابة', color: colors.accent },
   { key: 'مزمن', label: '💊 مرض مزمن', color: colors.orange },
+  { key: 'احتياج', label: '🦽 احتياج صحي', color: colors.blue },
   { key: 'حامل', label: '🤰 حمل', color: colors.pink },
   { key: 'مرضع', label: '🤱 رضاعة', color: colors.green },
 ];
@@ -94,6 +95,7 @@ export default function HealthReportScreen() {
           age: calcAge(f.head_dob), gender: f.head_gender, relation: 'رب الأسرة',
           disabilities: f.head_disabilities, injuries: f.head_injuries,
           chronic: f.head_chronic_diseases, female_status: f.head_female_status,
+          needs: f.head_needs,
         });
       }
     });
@@ -104,6 +106,7 @@ export default function HealthReportScreen() {
         age: calcAge(m.dob), gender: m.gender, relation: m.relation,
         disabilities: m.disabilities, injuries: m.injuries,
         chronic: m.chronic_diseases, female_status: m.female_status,
+        needs: m.needs,
       });
     });
     return list;
@@ -132,6 +135,7 @@ export default function HealthReportScreen() {
       معاق: scoped.filter((p) => hasHealthData(p.disabilities)),
       مصاب: scoped.filter((p) => hasHealthData(p.injuries)),
       مزمن: scoped.filter((p) => hasHealthData(p.chronic)),
+      احتياج: scoped.filter((p) => hasHealthData(p.needs)),
       حامل: scoped.filter(isPregnant),
       مرضع: scoped.filter(isNursing),
     }),
@@ -151,7 +155,7 @@ export default function HealthReportScreen() {
   }, [groups, catFilter]);
 
   const exportReport = async (type) => {
-    const sourceMap = { all: filtered, disabled: groups['معاق'], injured: groups['مصاب'], chronic: groups['مزمن'] };
+    const sourceMap = { all: filtered, disabled: groups['معاق'], injured: groups['مصاب'], chronic: groups['مزمن'], needs: groups['احتياج'] };
     const source = sourceMap[type] || [];
     if (!source.length) return;
     const rows = source.map((p) => {
@@ -165,10 +169,11 @@ export default function HealthReportScreen() {
       if (type === 'disabled') row['نوع الإعاقة'] = arrLabel(p.disabilities);
       if (type === 'injured') row['نوع الإصابة'] = arrLabel(p.injuries);
       if (type === 'chronic') row['الأمراض المزمنة'] = arrLabel(p.chronic);
+      if (type === 'needs') row['الاحتياج الصحي'] = arrLabel(p.needs);
       return row;
     });
-    const sheetNames = { all: 'كشف شامل', disabled: 'إعاقات', injured: 'إصابات', chronic: 'أمراض مزمنة' };
-    const fileNames = { all: 'كشف_صحي_شامل', disabled: 'كشف_الإعاقات', injured: 'كشف_الإصابات', chronic: 'كشف_الأمراض_المزمنة' };
+    const sheetNames = { all: 'كشف شامل', disabled: 'إعاقات', injured: 'إصابات', chronic: 'أمراض مزمنة', needs: 'احتياجات صحية' };
+    const fileNames = { all: 'كشف_صحي_شامل', disabled: 'كشف_الإعاقات', injured: 'كشف_الإصابات', chronic: 'كشف_الأمراض_المزمنة', needs: 'كشف_الاحتياجات_الصحية' };
     await exportXLSX(rows, sheetNames[type], fileNames[type]);
   };
 
@@ -201,6 +206,9 @@ export default function HealthReportScreen() {
             </Pressable>
             <Pressable style={styles.expOrange} onPress={() => exportReport('chronic')}>
               <Text style={styles.expOrangeText}>💊 مزمن</Text>
+            </Pressable>
+            <Pressable style={styles.expPurple} onPress={() => exportReport('needs')}>
+              <Text style={styles.expPurpleText}>🦽 احتياجات</Text>
             </Pressable>
           </View>
         )}
@@ -246,6 +254,7 @@ export default function HealthReportScreen() {
               const disStr = arrLabel(p.disabilities);
               const injStr = arrLabel(p.injuries);
               const chrStr = arrLabel(p.chronic);
+              const needsStr = arrLabel(p.needs);
               const pregnant = isPregnant(p);
               const nursing = isNursing(p);
               return (
@@ -256,11 +265,12 @@ export default function HealthReportScreen() {
                   </Text>
                   {!!p.national_id && <Text style={styles.personId}>🪪 {p.national_id}</Text>}
                   <Text style={styles.personMeta}>👨‍👩‍👧 {f.head_name || '—'} · 📞 {f.phone1 || '—'}</Text>
-                  {(disStr || injStr || chrStr || pregnant || nursing) && (
+                  {(disStr || injStr || chrStr || needsStr || pregnant || nursing) && (
                     <View style={styles.badgeRow}>
                       {!!disStr && <View style={[styles.badge, { backgroundColor: 'rgba(139,92,246,0.2)' }]}><Text style={[styles.badgeText, { color: colors.purple }]}>🦽 {disStr}</Text></View>}
                       {!!injStr && <View style={[styles.badge, { backgroundColor: 'rgba(245,158,11,0.2)' }]}><Text style={[styles.badgeText, { color: colors.accent }]}>🩹 {injStr}</Text></View>}
                       {!!chrStr && <View style={[styles.badge, { backgroundColor: 'rgba(251,146,60,0.2)' }]}><Text style={[styles.badgeText, { color: colors.orange }]}>💊 {chrStr}</Text></View>}
+                      {!!needsStr && <View style={[styles.badge, { backgroundColor: 'rgba(59,130,246,0.2)' }]}><Text style={[styles.badgeText, { color: colors.blue }]}>🦽 {needsStr}</Text></View>}
                       {pregnant && <View style={[styles.badge, { backgroundColor: 'rgba(244,114,182,0.2)' }]}><Text style={[styles.badgeText, { color: colors.pink }]}>🤰 حامل</Text></View>}
                       {nursing && <View style={[styles.badge, { backgroundColor: 'rgba(16,185,129,0.2)' }]}><Text style={[styles.badgeText, { color: colors.green }]}>🤱 مرضع</Text></View>}
                     </View>

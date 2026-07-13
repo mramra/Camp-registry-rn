@@ -117,6 +117,13 @@ export default function AnalysisScreen() {
     const mems = members.filter((m) => famIds.has(m.family_id));
     const famNameMap = Object.fromEntries(fams.map((f) => [f.id, f.head_name]));
 
+    // رضيع بالأسرة (أقل من سنتين) = أمها/زوجة رب الأسرة تُحسب "مرضعة" تلقائياً
+    const familyHasInfant = {};
+    mems.forEach((m) => {
+      const a = calcAge(m.dob);
+      if (a !== null && a < 2) familyHasInfant[m.family_id] = true;
+    });
+
     const allPersons = [
       ...fams.map((f) => ({
         personName: f.head_name,
@@ -130,6 +137,9 @@ export default function AnalysisScreen() {
         disabilities: f.head_disabilities,
         injuries: f.head_injuries,
         chronic: f.head_chronic_diseases,
+        needs: f.head_needs,
+        marital: f.head_marital,
+        isNursing: f.head_gender === 'أنثى' && !!familyHasInfant[f.id],
       })),
       ...mems.map((m) => ({
         personName: m.name,
@@ -143,6 +153,9 @@ export default function AnalysisScreen() {
         disabilities: m.disabilities,
         injuries: m.injuries,
         chronic: m.chronic_diseases,
+        needs: m.needs,
+        marital: null,
+        isNursing: m.relation === 'زوجة' && !!familyHasInfant[m.family_id],
       })),
     ];
 
@@ -168,6 +181,7 @@ export default function AnalysisScreen() {
     const disabledPersons = allPersons.filter((p) => hasHealthData(p.disabilities));
     const injuredPersons = allPersons.filter((p) => hasHealthData(p.injuries));
     const chronicPersons = allPersons.filter((p) => hasHealthData(p.chronic));
+    const needsPersons = allPersons.filter((p) => hasHealthData(p.needs));
     const healthyCount =
       allPersons.length -
       new Set([...disabledPersons, ...injuredPersons, ...chronicPersons].map((p) => p.personId + p.famId)).size;
@@ -180,10 +194,18 @@ export default function AnalysisScreen() {
       });
       return { label: g.label, count: persons.length, persons };
     });
+    const widows = women.filter((w) => w.marital === 'أرملة' || w.marital === 'أرمل');
+    const divorced = women.filter((w) => w.marital === 'مطلقة' || w.marital === 'مطلق');
+    const womenHeads = women.filter((w) => w.relation === 'رب الأسرة');
+    const nursingWomen = women.filter((w) => w.isNursing);
 
     const childPersons = allPersons.filter((p) => {
       const a = calcAge(p.personDob);
       return a !== null && a < 18;
+    });
+    const infantPersons = allPersons.filter((p) => {
+      const a = calcAge(p.personDob);
+      return a !== null && a < 2;
     });
 
     const memsByFam = {};
@@ -211,12 +233,18 @@ export default function AnalysisScreen() {
         معاق: disabledPersons.length,
         مصاب: injuredPersons.length,
         مزمن: chronicPersons.length,
+        احتياج: needsPersons.length,
       },
-      healthPersons: { معاق: disabledPersons, مصاب: injuredPersons, مزمن: chronicPersons },
+      healthPersons: { معاق: disabledPersons, مصاب: injuredPersons, مزمن: chronicPersons, احتياج: needsPersons },
       women: women.length,
       womenGroups,
+      widows,
+      divorced,
+      womenHeads,
+      nursingWomen,
       children: childPersons.length,
       childPersons,
+      infantPersons,
       orphans,
       incomplete,
     };
@@ -345,12 +373,48 @@ export default function AnalysisScreen() {
               color={colors.accent}
               onPress={() => openDrillDownPersons('أصحاب الأمراض المزمنة', stats.healthPersons.مزمن)}
             />
+            <StatBar
+              label="🦽 احتياجات صحية"
+              count={stats.healthData.احتياج}
+              total={stats.totalPersons}
+              color={colors.purple}
+              onPress={() => openDrillDownPersons('أصحاب الاحتياجات الصحية', stats.healthPersons.احتياج)}
+            />
           </View>
         )}
 
         {tab === 'women' && (
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>👩 النساء ({stats.women})</Text>
+            <StatBar
+              label="🖤 أرامل"
+              count={stats.widows.length}
+              total={stats.women}
+              color={colors.muted}
+              onPress={() => openDrillDownPersons('أرامل', stats.widows)}
+            />
+            <StatBar
+              label="💔 مطلقات"
+              count={stats.divorced.length}
+              total={stats.women}
+              color={colors.red}
+              onPress={() => openDrillDownPersons('مطلقات', stats.divorced)}
+            />
+            <StatBar
+              label="🏠 معيلة أسرة"
+              count={stats.womenHeads.length}
+              total={stats.women}
+              color={colors.accent}
+              onPress={() => openDrillDownPersons('معيلات أسر', stats.womenHeads)}
+            />
+            <StatBar
+              label="🍼 مرضعات"
+              count={stats.nursingWomen.length}
+              total={stats.women}
+              color={colors.green}
+              onPress={() => openDrillDownPersons('مرضعات', stats.nursingWomen)}
+            />
+            <Text style={styles.subPanelTitle}>حسب الفئة العمرية</Text>
             {stats.womenGroups.map((g) => (
               <StatBar
                 key={g.label}
@@ -367,6 +431,13 @@ export default function AnalysisScreen() {
         {tab === 'children' && (
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>🧒 الأطفال ({stats.children})</Text>
+            <StatBar
+              label="🍼 رضع (أقل من سنتين)"
+              count={stats.infantPersons.length}
+              total={stats.children}
+              color={colors.blue}
+              onPress={() => openDrillDownPersons('الرضع', stats.infantPersons)}
+            />
             <StatBar
               label="🕊️ أيتام"
               count={stats.orphans}
@@ -469,6 +540,7 @@ const styles = StyleSheet.create({
 
   panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14 },
   panelTitle: { color: colors.accent, fontWeight: 'bold', fontSize: 13, marginBottom: 12, textAlign: 'right' },
+  subPanelTitle: { color: colors.muted, fontWeight: 'bold', fontSize: 11, marginTop: 8, marginBottom: 6, textAlign: 'right' },
   barBlock: { marginBottom: 12 },
   barLabelRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 4 },
   barName: { color: colors.white, fontSize: 11 },

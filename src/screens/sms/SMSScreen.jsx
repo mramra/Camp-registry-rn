@@ -36,6 +36,29 @@ const shortName = (fullName) => {
   return [parts[0], parts[1], parts[parts.length - 1]].join(' ');
 };
 
+// عدد أجزاء الرسالة الفعلي: العربي (وأي حرف خارج GSM-7) يستخدم ترميز
+// UCS-2 إجبارياً -- يحمل 70 حرف بالرسالة الواحدة بس (مو 160 زي الإنجليزي)،
+// و67 حرف بالجزء لو الرسالة طويلة ومتعددة الأجزاء. بدون هذا التصحيح كان
+// العداد يقلّل عدد الرسائل الفعلية بشكل كبير (يأثر على التكلفة الحقيقية).
+const GSM7_REGEX = /^[A-Za-z0-9@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&'()*+,\-./:;<=>?¡ÄÖÑÜ§¿äöñüà^{}\\\[~\]|€]*$/;
+function smsSegmentInfo(text) {
+  const len = text.length;
+  if (!len) return { count: 0, encoding: '' };
+  const isGsm7 = GSM7_REGEX.test(text);
+  const single = isGsm7 ? 160 : 70;
+  const multi = isGsm7 ? 153 : 67;
+  const count = len <= single ? 1 : Math.ceil(len / multi);
+  return { count, encoding: isGsm7 ? 'GSM-7' : 'UCS-2 (عربي)' };
+}
+
+// قوالب رسائل جاهزة لأكثر الحالات تكراراً -- اختيار سريع بدل الكتابة من الصفر
+const MESSAGE_TEMPLATES = [
+  { label: '📋 استكمال بيانات', text: 'السيد/ة {اسم}، يرجى مراجعتنا في أقرب وقت لاستكمال بياناتكم المسجّلة.' },
+  { label: '📦 توزيع', text: 'السيد/ة {اسم}، حان موعد استلام حصتكم من التوزيع. يرجى الحضور بالوقت المحدد ومعكم بطاقة الهوية.' },
+  { label: '🏥 مراجعة صحية', text: 'السيد/ة {اسم}، يرجى مراجعة العيادة الطبية لمتابعة الحالة الصحية لأحد أفراد أسرتكم.' },
+  { label: '📢 إعلان عام', text: 'السيد/ة {اسم}، نود إبلاغكم بخصوص أمر هام يرجى مراجعتنا.' },
+];
+
 export default function SMSScreen() {
   const { orgId } = useAuth();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
@@ -112,6 +135,14 @@ export default function SMSScreen() {
 
   const selectedFamilies = useMemo(() => families.filter((f) => selected.has(f.id) && f.phone1), [families, selected]);
 
+  // نص الرسالة الفعلي المُرسَل يشمل التوقيع دايماً -- نستخدم توقيع أول
+  // مستلم محدَّد كتمثيل واقعي لحساب عدد الأجزاء (يقارب الطول الحقيقي).
+  const segInfo = useMemo(() => {
+    const sig = selectedFamilies[0] ? getSig(selectedFamilies[0].camp_id, campMap) : 'إدارة المخيم';
+    const full = message.trim() ? `${message}\n${sig}` : '';
+    return smsSegmentInfo(full);
+  }, [message, selectedFamilies, campMap]);
+
   const sendSMS = async () => {
     const sel = selectedFamilies;
     const text = message.trim();
@@ -139,6 +170,19 @@ export default function SMSScreen() {
     if (!nums) return showError('لم تختر أي مستلم');
     await Clipboard.setStringAsync(nums);
     showInfo(`📋 تم نسخ ${selectedFamilies.length} رقم`);
+  };
+
+  // واتساب متاح بس لمستلم واحد محدَّد -- ما فيه إرسال جماعي حقيقي عبر رابط
+  // مباشر زي الرسائل النصية (كل محادثة واتساب لازم تُفتح لحالها يدوياً).
+  const sendWhatsApp = async () => {
+    if (selectedFamilies.length !== 1) return showError('اختر مستلم واحد بالضبط لإرسال واتساب');
+    const text = message.trim();
+    if (!text) return showError('يرجى كتابة نص الرسالة');
+    const f = selectedFamilies[0];
+    const msg = text.replace(/\{اسم\}/g, shortName(f.head_name)) + '\n' + getSig(f.camp_id, campMap);
+    const phone = f.phone1.replace(/^0/, '970'); // تحويل الصفر الأول لمفتاح فلسطين الدولي
+    await Linking.openURL(`whatsapp://send?phone=${phone}&text=${encodeURIComponent(msg)}`);
+    showSuccess('📲 جارٍ فتح واتساب...');
   };
 
   const renderRecipient = ({ item: f }) => {
@@ -230,6 +274,13 @@ export default function SMSScreen() {
         ListFooterComponent={
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>✍️ نص الرسالة</Text>
+            <View style={styles.templatesRow}>
+              {MESSAGE_TEMPLATES.map((t) => (
+                <Pressable key={t.label} style={styles.templateChip} onPress={() => setMessage(t.text)}>
+                  <Text style={styles.templateChipText}>{t.label}</Text>
+                </Pressable>
+              ))}
+            </View>
             <Text style={styles.hint}>
               💡 {'{اسم}'} يُستبدل باسم رب الأسرة تلقائياً
             </Text>
@@ -243,9 +294,16 @@ export default function SMSScreen() {
               style={styles.messageInput}
             />
             <View style={styles.countRow}>
-              <Text style={styles.countText}>{message.length} حرف</Text>
-              <Text style={styles.countText}>{Math.ceil(message.length / 160) || 0} رسالة</Text>
+              <Text style={styles.countText}>{message.length} حرف (بدون التوقيع)</Text>
+              <Text style={styles.countText}>
+                {segInfo.count || 0} رسالة{segInfo.encoding ? ` — ${segInfo.encoding}` : ''}
+              </Text>
             </View>
+            {segInfo.encoding === 'UCS-2 (عربي)' && segInfo.count > 1 && (
+              <Text style={styles.segWarnText}>
+                💡 الرسائل العربية تتحمّل 70 حرف بالرسالة الواحدة بس (مو 160) — نص رسالتك يتقسّم لـ{segInfo.count} رسائل فعلية عند شركة الاتصال، كل وحدة تُحسب لحالها بالتكلفة.
+              </Text>
+            )}
             <View style={styles.sendRow}>
               <Pressable style={[styles.sendBtn, !selected.size && styles.disabled]} onPress={sendSMS} disabled={!selected.size}>
                 <Text style={styles.sendBtnText}>📨 إرسال لـ {selectedFamilies.length} مستلم</Text>
@@ -254,6 +312,11 @@ export default function SMSScreen() {
                 <Text style={styles.copyBtnText}>📋 نسخ</Text>
               </Pressable>
             </View>
+            {selectedFamilies.length === 1 && (
+              <Pressable style={styles.whatsBtn} onPress={sendWhatsApp}>
+                <Text style={styles.whatsBtnText}>📲 إرسال عبر واتساب لهذا المستلم</Text>
+              </Pressable>
+            )}
             <Text style={styles.footerHint}>📱 يفتح تطبيق الرسائل بالأرقام المحددة — اضغط إرسال وسيُرسل للكل.</Text>
           </View>
         }
@@ -322,6 +385,12 @@ const styles = StyleSheet.create({
   warnText: { color: colors.red, fontSize: 10, fontWeight: 'bold' },
 
   hint: { color: colors.muted, fontSize: 11, marginBottom: 8, textAlign: 'right' },
+  templatesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  templateChip: {
+    backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.35)',
+    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  templateChipText: { color: colors.accent, fontSize: 11, fontWeight: 'bold' },
   messageInput: {
     backgroundColor: colors.surface2,
     borderWidth: 1,
@@ -338,7 +407,10 @@ const styles = StyleSheet.create({
   },
   countRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 10 },
   countText: { color: colors.muted, fontSize: 11 },
+  segWarnText: { color: colors.accent, fontSize: 10, marginBottom: 10, textAlign: 'right', lineHeight: 15 },
   sendRow: { flexDirection: 'row', gap: 8 },
+  whatsBtn: { backgroundColor: 'rgba(37,211,102,0.12)', borderWidth: 1, borderColor: '#25D366', paddingVertical: 11, borderRadius: 12, alignItems: 'center', marginTop: 8 },
+  whatsBtnText: { color: '#25D366', fontWeight: 'bold', fontSize: 12 },
   sendBtn: { flex: 1, backgroundColor: colors.accent, paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
   disabled: { opacity: 0.6 },
   sendBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },

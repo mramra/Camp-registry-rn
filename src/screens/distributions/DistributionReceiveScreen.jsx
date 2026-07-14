@@ -146,11 +146,20 @@ export default function DistributionReceiveScreen() {
 
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      list = list.filter((f) => (f.head_name || '').toLowerCase().includes(q) || (f.head_id || '').includes(q));
+      list = list.filter((f) => {
+        if ((f.head_name || '').toLowerCase().includes(q)) return true;
+        if ((f.head_id || '').includes(q)) return true;
+        // البحث يمتد لأسماء وهويات أفراد الأسرة كمان -- تدوّر باسم ابنها
+        // أو زوجها مثلاً، بيرجعلك الأسرة (باسم رب الأسرة) مباشرة.
+        const mems = membersByFamily[f.id] || [];
+        return mems.some(
+          (m) => (m.name || '').toLowerCase().includes(q) || (m.national_id || '').includes(q)
+        );
+      });
     }
 
     return list;
-  }, [families, filterCamp, filterOtherRound, otherRoundReceivedIds, search]);
+  }, [families, filterCamp, filterOtherRound, otherRoundReceivedIds, search, membersByFamily]);
 
   const pendingCount = baseFiltered.filter((f) => !receivedIds.has(f.id)).length;
   const receivedCount = baseFiltered.filter((f) => receivedIds.has(f.id)).length;

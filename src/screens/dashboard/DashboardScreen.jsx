@@ -13,7 +13,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
-import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
+import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchPendingRequestsCount, fetchPendingDevicesCount } from '../../lib/supabase';
 import { calcAge, isIncomplete } from '../../lib/helpers';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -28,7 +28,9 @@ import colors from '../../theme/colors';
  */
 export default function DashboardScreen() {
   const navigation = useNavigation();
-  const { profile } = useAuth();
+  const { profile, isOwner } = useAuth();
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [pendingDevicesCount, setPendingDevicesCount] = useState(0);
   const { getAllowedCampIds, filterLocal } = useDataScope();
 
   const [stats, setStats] = useState(null);
@@ -152,6 +154,16 @@ export default function DashboardScreen() {
   useEffect(() => { loadStats(); }, [loadStats]);
   useFocusEffect(useCallback(() => { loadStats(); }, [loadStats]));
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile?.org_id) return;
+      if (isOwner || profile?.can_review_approvals) {
+        fetchPendingRequestsCount(profile.org_id).then(setPendingRequestsCount);
+        fetchPendingDevicesCount(profile.org_id).then(setPendingDevicesCount);
+      }
+    }, [profile, isOwner])
+  );
+
   const onRefresh = () => { setRefreshing(true); loadStats(); };
 
   // بحث ذكي بجزء من الاسم أو رقم الهوية — أرباب الأسر والأفراد معاً.
@@ -261,6 +273,24 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        {(pendingRequestsCount > 0 || pendingDevicesCount > 0) && (
+          <View style={styles.pendingAlertBox}>
+            <Text style={styles.pendingAlertTitle}>🔔 يحتاج انتباهك</Text>
+            {pendingRequestsCount > 0 && (
+              <Pressable style={styles.pendingAlertRow} onPress={() => navigation.push('PendingRequests')}>
+                <Text style={styles.pendingAlertArrow}>←</Text>
+                <Text style={styles.pendingAlertText}>📋 {pendingRequestsCount} طلب معلّق بانتظار مراجعتك</Text>
+              </Pressable>
+            )}
+            {pendingDevicesCount > 0 && (
+              <Pressable style={styles.pendingAlertRow} onPress={() => navigation.push('Devices')}>
+                <Text style={styles.pendingAlertArrow}>←</Text>
+                <Text style={styles.pendingAlertText}>📱 {pendingDevicesCount} جهاز بانتظار اعتمادك</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
         {/* إحصائيات رئيسية 2×2 */}
         <View style={styles.statsGrid}>
           {statCards.map((s) => (
@@ -349,6 +379,17 @@ const styles = StyleSheet.create({
   },
   offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  pendingAlertBox: {
+    backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
+    borderRadius: 14, padding: 14, marginBottom: 16,
+  },
+  pendingAlertTitle: { color: colors.red, fontWeight: '900', fontSize: 13, marginBottom: 8, textAlign: 'right' },
+  pendingAlertRow: {
+    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginTop: 6,
+  },
+  pendingAlertText: { color: colors.white, fontWeight: 'bold', fontSize: 12 },
+  pendingAlertArrow: { color: colors.red, fontSize: 15 },
 
   searchInput: {
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,

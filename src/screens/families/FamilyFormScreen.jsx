@@ -4,6 +4,7 @@ import {
   Text,
   Pressable,
   ScrollView,
+  Alert,
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
@@ -28,7 +29,7 @@ import {
   FAMILY_CATEGORIES,
   REGIONS,
 } from '../../lib/formOptions';
-import { showError, showSuccess, showInfo } from '../../utils/toast';
+import { showError, showSuccess } from '../../utils/toast';
 import { emptyHealthFields, healthSummaryCount } from '../../lib/healthOptions';
 import HealthStatusModal from '../../components/ui/HealthStatusModal';
 import FormSection from '../../components/ui/FormSection';
@@ -83,6 +84,7 @@ export default function FamilyFormScreen() {
 
   const [headName, setHeadName] = useState('');
   const [headId, setHeadId] = useState('');
+  const [idDupWarning, setIdDupWarning] = useState('');
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
   const [headGender, setHeadGender] = useState('');
@@ -113,6 +115,47 @@ export default function FamilyFormScreen() {
   useEffect(() => {
     if (orgId) fetchCamps(orgId).then(setCamps);
   }, [orgId]);
+
+  // فحص تكرار رقم الهوية أثناء الكتابة (مع تأخير بسيط بعد التوقف) -- يشمل
+  // رؤساء الأسر الأخرى وأفراد أي أسرة ثانية كمان (مو رؤساء الأسر بس زي
+  // فحص لحظة الحفظ القديم)، وتحذير ثابت واضح بدل توست عابر يختفي بسرعة.
+  useEffect(() => {
+    const id = headId.trim();
+    if (!orgId || id.length < 9) {
+      setIdDupWarning('');
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const [{ data: famRows }, { data: memRows }] = await Promise.all([
+          supabase
+            .from('families')
+            .select('id, head_name')
+            .eq('org_id', orgId)
+            .eq('head_id', id)
+            .neq('id', familyId || '00000000-0000-0000-0000-000000000000')
+            .limit(1),
+          supabase
+            .from('family_members')
+            .select('id, name, family_id, families!inner(head_name, org_id)')
+            .eq('families.org_id', orgId)
+            .eq('national_id', id)
+            .neq('family_id', familyId || '00000000-0000-0000-0000-000000000000')
+            .limit(1),
+        ]);
+        if (famRows?.length > 0) {
+          setIdDupWarning(`⚠️ نفس رقم الهوية مسجَّل لرب أسرة "${famRows[0].head_name}"`);
+        } else if (memRows?.length > 0) {
+          setIdDupWarning(`⚠️ نفس رقم الهوية مسجَّل لفرد اسمه "${memRows[0].name}" بأسرة "${memRows[0].families?.head_name}"`);
+        } else {
+          setIdDupWarning('');
+        }
+      } catch {
+        // فحص التكرار غير حرج -- تجاهل أي عطل فيه بصمت
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [headId, orgId, familyId]);
 
   useEffect(() => {
     if (!familyId) return;
@@ -237,21 +280,51 @@ export default function FamilyFormScreen() {
 
   const handleSave = async () => {
     if (!validate()) return;
-    setSaving(true);
-    try {
-      const dobStr = joinDob(dobDay, dobMonth, dobYear);
 
-      if (!familyId || headId.trim() !== existingFamily?.head_id) {
-        const { data: dupRows } = await supabase
+    // فحص أخير قبل الحفظ (يحمي من حالات السباق لو الفحص الفوري ما وصل
+    // وقته) -- يشمل رؤساء الأسر والأفراد، وحاجز فعلي يوقف الحفظ لحد ما
+    // المستخدم يأكّد صراحة إنه قاصد يكمل رغم التكرار.
+    if (!familyId || headId.trim() !== existingFamily?.head_id) {
+      const id = headId.trim();
+      const [{ data: dupRows }, { data: memRows }] = await Promise.all([
+        supabase
           .from('families')
           .select('id, head_name')
           .eq('org_id', orgId)
-          .eq('head_id', headId.trim())
-          .neq('id', familyId || '00000000-0000-0000-0000-000000000000');
-        if (dupRows?.length > 0) {
-          showInfo(`⚠️ رقم الهوية مستخدم بالفعل لأسرة "${dupRows[0].head_name}"`);
-        }
+          .eq('head_id', id)
+          .neq('id', familyId || '00000000-0000-0000-0000-000000000000'),
+        supabase
+          .from('family_members')
+          .select('id, name, families!inner(head_name, org_id)')
+          .eq('families.org_id', orgId)
+          .eq('national_id', id)
+          .neq('family_id', familyId || '00000000-0000-0000-0000-000000000000')
+          .limit(1),
+      ]);
+      const conflictText =
+        dupRows?.length > 0
+          ? `رقم الهوية مستخدم بالفعل لرب أسرة "${dupRows[0].head_name}"`
+          : memRows?.length > 0
+          ? `رقم الهوية مستخدم بالفعل لفرد اسمه "${memRows[0].name}" بأسرة "${memRows[0].families?.head_name}"`
+          : '';
+      if (conflictText) {
+        const proceed = await new Promise((resolve) => {
+          Alert.alert(
+            '⚠️ رقم هوية مكرر',
+            `${conflictText}\n\nمتأكد تبي تكمل الحفظ رغم التكرار؟`,
+            [
+              { text: 'إلغاء', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'متابعة الحفظ', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        });
+        if (!proceed) return;
       }
+    }
+
+    setSaving(true);
+    try {
+      const dobStr = joinDob(dobDay, dobMonth, dobYear);
 
       const payload = {
         org_id: orgId,
@@ -376,6 +449,11 @@ export default function FamilyFormScreen() {
             maxLength={10}
             error={errors.headId}
           />
+          {!!idDupWarning && !errors.headId && (
+            <View style={styles.dupWarnBox}>
+              <Text style={styles.dupWarnText}>{idDupWarning}</Text>
+            </View>
+          )}
           <View style={styles.row}>
             <FormInput
               label="رقم الجوال"
@@ -601,6 +679,11 @@ export default function FamilyFormScreen() {
 }
 
 const styles = StyleSheet.create({
+  dupWarnBox: {
+    backgroundColor: 'rgba(239,68,68,0.12)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
+    borderRadius: 10, padding: 10, marginTop: -6, marginBottom: 12,
+  },
+  dupWarnText: { color: colors.red, fontSize: 11, textAlign: 'right', lineHeight: 16, fontWeight: 'bold' },
   campLockedBox: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 12 },
   campLockedLabel: { color: colors.muted, fontSize: 11, textAlign: 'right' },
   campLockedValue: { color: colors.white, fontWeight: 'bold', fontSize: 14, marginTop: 2, textAlign: 'right' },

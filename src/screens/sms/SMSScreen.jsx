@@ -33,11 +33,11 @@ const getSig = (campId, campMap) => {
   return name ? `إدارة مخيم ${name}` : 'إدارة المخيم';
 };
 
-// اسم مختصر للرسالة (٣ كلمات كحد أقصى)
+// اسم مختصر للرسالة: الاسم الأول والأخير بس دايماً (بغض النظر عن طول الاسم الكامل)
 const shortName = (fullName) => {
   const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length <= 3) return parts.join(' ');
-  return [parts[0], parts[1], parts[parts.length - 1]].join(' ');
+  if (parts.length <= 2) return parts.join(' ');
+  return [parts[0], parts[parts.length - 1]].join(' ');
 };
 
 // عدد أجزاء الرسالة الفعلي: العربي (وأي حرف خارج GSM-7) يستخدم ترميز
@@ -91,8 +91,8 @@ export default function SMSScreen() {
       setFamilies(scoped);
       setCamps(getVisibleCamps(campsData));
       setMembers(await fetchFamilyMembers(scoped.map((f) => f.id)));
-      // تحديد افتراضي: كل من معه رقم جوال
-      setSelected(new Set(scoped.filter((f) => f.phone1).map((f) => f.id)));
+      // ما فيه تحديد افتراضي -- الشاشة تبدأ دايماً بلا أي اسم محدَّد،
+      // المستخدم يختار بنفسه من نافذة المستلمين.
     } catch (e) {
       showError('تعذّر تحميل قائمة الأسر');
     } finally {
@@ -118,7 +118,7 @@ export default function SMSScreen() {
     if (filterCamp) list = list.filter((f) => f.camp_id === filterCamp);
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((f) => (f.head_name || '').toLowerCase().includes(q) || (f.phone1 || '').includes(q));
-    return [...list].sort((a, b) => naturalCompare(a.head_name, b.head_name));
+    return [...list].sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [families, filterCamp, search]);
 
   const toggle = (id) => {
@@ -245,7 +245,13 @@ export default function SMSScreen() {
       const f = sel[i];
       const msg = text.replace(/\{اسم\}/g, shortName(f.head_name)) + '\n' + getSig(f.camp_id, campMap);
       try {
-        const res = await SmsManager.sendLongSms(f.phone1, msg, { requestStatusReport: false });
+        // مهلة 15 ثانية إجبارية -- بدونها، لو المكتبة الأصلية علّقت بانتظار
+        // تقرير تسليم ما يوصل أبداً (سلوك معروف بالمكتبة على أجهزة حقيقية)،
+        // الإرسال كله يتوقف عند "0 من X" للأبد بدون أي رسالة خطأ.
+        const res = await Promise.race([
+          SmsManager.sendLongSms(f.phone1, msg, { requestStatusReport: false }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
+        ]);
         if (res?.sent === 'sent' || res?.sent === 'sent_no_confirmation') ok++;
         else fail++;
       } catch {
@@ -270,18 +276,15 @@ export default function SMSScreen() {
 
     return (
       <Pressable
-        style={[styles.recipientRow, !hasPhone && styles.recipientDisabled]}
+        style={[styles.recipientRow, isSelected && styles.recipientRowSelected, !hasPhone && styles.recipientDisabled]}
         onPress={() => hasPhone && toggle(f.id)}
         disabled={!hasPhone}
       >
-        <Text style={styles.phone}>{f.phone1 || '—'}</Text>
+        <Text style={styles.tentBadge}>⛺{f.tent || '—'}</Text>
         <View style={{ flex: 1, alignItems: 'flex-end' }}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{f.head_name}</Text>
-            <Text style={styles.checkbox}>{isSelected ? '☑️' : '⬜'}</Text>
-          </View>
+          <Text style={[styles.name, isSelected && styles.nameSelected]} numberOfLines={1}>{f.head_name}</Text>
           <View style={styles.metaRow}>
-            <Text style={styles.metaText}>{campMap[f.camp_id] || '—'}</Text>
+            <Text style={styles.metaText}>{f.phone1 || '—'} · {campMap[f.camp_id] || '—'}</Text>
             {issues.length > 0 && <Text style={styles.warnText}>⚠️ {issues.length} ناقص</Text>}
             {!hasPhone && <Text style={styles.warnText}>📵 لا جوال</Text>}
           </View>
@@ -508,11 +511,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     gap: 8,
   },
+  recipientRowSelected: { backgroundColor: 'rgba(245,158,11,0.18)', borderColor: colors.accent },
   recipientDisabled: { opacity: 0.5 },
-  phone: { color: colors.accent, fontSize: 11 },
-  nameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  tentBadge: { color: colors.accent, fontSize: 11, fontWeight: 'bold', minWidth: 40 },
   name: { color: colors.white, fontWeight: 'bold', fontSize: 13 },
-  checkbox: { fontSize: 14 },
+  nameSelected: { color: colors.accent },
   metaRow: { flexDirection: 'row-reverse', gap: 8, marginTop: 2 },
   metaText: { color: colors.muted, fontSize: 10 },
   warnText: { color: colors.red, fontSize: 10, fontWeight: 'bold' },

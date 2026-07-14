@@ -856,3 +856,23 @@ export const fetchPendingRequestsCount = async (orgId) => {
     return 0;
   }
 };
+
+// عدد الأجهزة قيد الموافقة -- يعتمد على قيود RLS بجدول devices نفسه
+// (SELECT: جهازك أنت، أو أجهزة اللي تقدر تراجع طلباتهم) فيرجع رقم مختلف
+// تلقائياً حسب دور كل مستخدم (مالك المنصة يشوف الكل، مدير الإيواء يشوف
+// أجهزة فريقه بس) بدون أي منطق فلترة إضافي بالكود.
+export const fetchPendingDevicesCount = async (orgId) => {
+  try {
+    const { count, error } = await supabase
+      .from('devices')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .eq('is_approved', false)
+      .eq('is_blocked', false);
+    if (error) throw error;
+    return count || 0;
+  } catch (err) {
+    console.error('[fetchPendingDevicesCount]', err.message);
+    return 0;
+  }
+};

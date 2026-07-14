@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useDataScope } from '../lib/useDataScope';
-import { fetchPendingRequestsCount, fetchFamilies, fetchFamilyMembers, fetchCamps } from '../lib/supabase';
+import { fetchPendingRequestsCount, fetchPendingDevicesCount, fetchFamilies, fetchFamilyMembers, fetchCamps } from '../lib/supabase';
 import { isIncomplete } from '../lib/helpers';
 import colors from '../theme/colors';
 
@@ -24,6 +24,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
   // خفيف (عدد الأسر ببيانات ناقصة فقط -- أشيع نوع تنبيه) بدل حساب كل أنواع
   // التنبيهات الكامل (أثقل بكثير ومطابق لما تحسبه شاشة التنبيهات نفسها).
   const [pendingCount, setPendingCount] = useState(0);
+  const [devicesPendingCount, setDevicesPendingCount] = useState(0);
   const [alertsCount, setAlertsCount] = useState(0);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
 
     if (isOwner || profile?.can_review_approvals) {
       fetchPendingRequestsCount(orgId).then(setPendingCount);
+      fetchPendingDevicesCount(orgId).then(setDevicesPendingCount);
     }
 
     (async () => {
@@ -78,7 +80,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       items: [
         { icon: '🏕️', label: 'المخيمات', screen: 'CampsList', pageKey: 'camps' },
         { icon: '👥', label: 'المستخدمون', screen: 'UsersList', pageKey: 'users' },
-        { icon: '📱', label: 'الأجهزة', screen: 'Devices', pageKey: 'devices' },
+        { icon: '📱', label: 'الأجهزة', screen: 'Devices', count: devicesPendingCount, pageKey: 'devices' },
         ...(isOwner ? [{ icon: '🔐', label: 'إدارة الصلاحيات', screen: 'PermissionsAdmin' }] : []),
       ],
     },

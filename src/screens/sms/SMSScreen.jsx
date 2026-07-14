@@ -5,6 +5,7 @@ import {
   TextInput,
   Pressable,
   FlatList,
+  ScrollView,
   Linking,
   Platform,
   PermissionsAndroid,
@@ -75,6 +76,7 @@ export default function SMSScreen() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(new Set());
   const [message, setMessage] = useState('');
+  const [recipientsModalVisible, setRecipientsModalVisible] = useState(false);
   const [directSending, setDirectSending] = useState(false);
   const [directProgress, setDirectProgress] = useState(null); // { done, total }
 
@@ -300,133 +302,148 @@ export default function SMSScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={renderRecipient}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={
-          <View>
-            <PageHeader
-              icon="💬"
-              title="إرسال رسائل SMS"
-              subtitle={<Text style={styles.headerSubtitle}>{selected.size} محدَّد</Text>}
-            />
+      <ScrollView contentContainerStyle={styles.listContent}>
+        <PageHeader
+          icon="💬"
+          title="إرسال رسائل SMS"
+          subtitle={<Text style={styles.headerSubtitle}>{selected.size} محدَّد</Text>}
+        />
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🎯 المستلمون</Text>
-
-              <View style={styles.chipsRow}>
-                <FilterChip
-                  label={filterCamp ? campMap[filterCamp] : '⛺ كل المخيمات'}
-                  selected={!!filterCamp}
-                  onPress={() => setCampPickerVisible(true)}
-                />
-              </View>
-
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder="بحث بالاسم أو الجوال..."
-                placeholderTextColor={colors.muted}
-                style={styles.searchInput}
-              />
-
-              <View style={styles.actionsRow}>
-                <Pressable style={styles.smallBtn} onPress={selectAll}>
-                  <Text style={styles.smallBtnText}>تحديد الكل</Text>
-                </Pressable>
-                <Pressable style={styles.smallBtn} onPress={deselectAll}>
-                  <Text style={styles.smallBtnText}>إلغاء الكل</Text>
-                </Pressable>
-                <Pressable style={styles.warnBtn} onPress={selectIncomplete}>
-                  <Text style={styles.warnBtnText}>⚠️ الناقصين</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        }
-        ListEmptyComponent={<EmptyState icon="👥" title="لا توجد أسر" />}
-        ListFooterComponent={
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>✍️ نص الرسالة</Text>
-            <View style={styles.templatesRow}>
-              {MESSAGE_TEMPLATES.map((t) => (
-                <Pressable key={t.label} style={styles.templateChip} onPress={() => setMessage(t.text)}>
-                  <Text style={styles.templateChipText}>{t.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.hint}>
-              💡 {'{اسم}'} يُستبدل باسم رب الأسرة تلقائياً
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🎯 المستلمون</Text>
+          <Pressable style={styles.recipientsSummaryBtn} onPress={() => setRecipientsModalVisible(true)}>
+            <Text style={styles.recipientsSummaryArrow}>←</Text>
+            <Text style={styles.recipientsSummaryText}>
+              {selected.size > 0 ? `✅ ${selected.size} مستلم محدَّد — تعديل` : '👥 اضغط لاختيار المستلمين'}
             </Text>
-            <TextInput
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              numberOfLines={4}
-              placeholder="مثال: السيد/ة {اسم}، يرجى مراجعتنا لاستكمال بياناتكم."
-              placeholderTextColor={colors.muted}
-              style={styles.messageInput}
-            />
-            <View style={styles.countRow}>
-              <Text style={styles.countText}>{message.length} حرف (بدون التوقيع)</Text>
-              <Text style={styles.countText}>
-                {segInfo.count || 0} رسالة{segInfo.encoding ? ` — ${segInfo.encoding}` : ''}
-              </Text>
-            </View>
-            {segInfo.encoding === 'UCS-2 (عربي)' && segInfo.count > 1 && (
-              <Text style={styles.segWarnText}>
-                💡 الرسائل العربية تتحمّل 70 حرف بالرسالة الواحدة بس (مو 160) — نص رسالتك يتقسّم لـ{segInfo.count} رسائل فعلية عند شركة الاتصال، كل وحدة تُحسب لحالها بالتكلفة.
-              </Text>
-            )}
-            <View style={styles.sendRow}>
-              <Pressable style={[styles.sendBtn, !selected.size && styles.disabled]} onPress={sendSMS} disabled={!selected.size}>
-                <Text style={styles.sendBtnText}>📨 إرسال لـ {selectedFamilies.length} مستلم</Text>
-              </Pressable>
-              <Pressable style={styles.copyBtn} onPress={copyNums}>
-                <Text style={styles.copyBtnText}>📋 نسخ</Text>
-              </Pressable>
-            </View>
-            {selectedFamilies.length === 1 && (
-              <Pressable style={styles.whatsBtn} onPress={sendWhatsApp}>
-                <Text style={styles.whatsBtnText}>📲 إرسال عبر واتساب لهذا المستلم</Text>
-              </Pressable>
-            )}
+          </Pressable>
+          {!!filterCamp && (
+            <Text style={styles.recipientsSummaryHint}>مفلترة حالياً على: {campMap[filterCamp]}</Text>
+          )}
+        </View>
 
-            {Platform.OS === 'android' && (
-              <>
-                <Pressable
-                  style={[styles.directBtn, directSending && styles.disabled]}
-                  onPress={sendDirect}
-                  disabled={directSending}
-                >
-                  {directSending ? (
-                    <ActivityIndicator size="small" color={colors.accent} />
-                  ) : (
-                    <Text style={styles.directBtnText}>⚡ إرسال مباشر (بدون فتح تطبيق الرسائل)</Text>
-                  )}
-                </Pressable>
-                {directSending && directProgress && (
-                  <View style={styles.progressBox}>
-                    <Text style={styles.progressText}>
-                      جارٍ الإرسال: {directProgress.done} من {directProgress.total}
-                    </Text>
-                    <View style={styles.progressTrack}>
-                      <View style={[styles.progressFill, { width: `${(directProgress.done / directProgress.total) * 100}%` }]} />
-                    </View>
-                  </View>
-                )}
-                <Text style={styles.directHint}>
-                  ⚡ يرسل مباشرة من رصيدك بدون فتح أي تطبيق -- يحتاج إذنك أول مرة. لو العدد كبير، أندرويد ممكن يطلب تأكيد إضافي (حماية نظام، مو عطل).
-                </Text>
-              </>
-            )}
-
-            <Text style={styles.footerHint}>📱 يفتح تطبيق الرسائل بالأرقام المحددة — اضغط إرسال وسيُرسل للكل.</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>✍️ نص الرسالة</Text>
+          <View style={styles.templatesRow}>
+            {MESSAGE_TEMPLATES.map((t) => (
+              <Pressable key={t.label} style={styles.templateChip} onPress={() => setMessage(t.text)}>
+                <Text style={styles.templateChipText}>{t.label}</Text>
+              </Pressable>
+            ))}
           </View>
-        }
-      />
+          <Text style={styles.hint}>
+            💡 {'{اسم}'} يُستبدل باسم رب الأسرة تلقائياً
+          </Text>
+          <TextInput
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            numberOfLines={4}
+            placeholder="مثال: السيد/ة {اسم}، يرجى مراجعتنا لاستكمال بياناتكم."
+            placeholderTextColor={colors.muted}
+            style={styles.messageInput}
+          />
+          <View style={styles.countRow}>
+            <Text style={styles.countText}>{message.length} حرف (بدون التوقيع)</Text>
+            <Text style={styles.countText}>
+              {segInfo.count || 0} رسالة{segInfo.encoding ? ` — ${segInfo.encoding}` : ''}
+            </Text>
+          </View>
+          {segInfo.encoding === 'UCS-2 (عربي)' && segInfo.count > 1 && (
+            <Text style={styles.segWarnText}>
+              💡 الرسائل العربية تتحمّل 70 حرف بالرسالة الواحدة بس (مو 160) — نص رسالتك يتقسّم لـ{segInfo.count} رسائل فعلية عند شركة الاتصال، كل وحدة تُحسب لحالها بالتكلفة.
+            </Text>
+          )}
+          <View style={styles.sendRow}>
+            <Pressable style={[styles.sendBtn, !selected.size && styles.disabled]} onPress={sendSMS} disabled={!selected.size}>
+              <Text style={styles.sendBtnText}>📨 إرسال لـ {selectedFamilies.length} مستلم</Text>
+            </Pressable>
+            <Pressable style={styles.copyBtn} onPress={copyNums}>
+              <Text style={styles.copyBtnText}>📋 نسخ</Text>
+            </Pressable>
+          </View>
+          {selectedFamilies.length === 1 && (
+            <Pressable style={styles.whatsBtn} onPress={sendWhatsApp}>
+              <Text style={styles.whatsBtnText}>📲 إرسال عبر واتساب لهذا المستلم</Text>
+            </Pressable>
+          )}
+
+          {Platform.OS === 'android' && (
+            <>
+              <Pressable
+                style={[styles.directBtn, directSending && styles.disabled]}
+                onPress={sendDirect}
+                disabled={directSending}
+              >
+                {directSending ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <Text style={styles.directBtnText}>⚡ إرسال مباشر (بدون فتح تطبيق الرسائل)</Text>
+                )}
+              </Pressable>
+              {directSending && directProgress && (
+                <View style={styles.progressBox}>
+                  <Text style={styles.progressText}>
+                    جارٍ الإرسال: {directProgress.done} من {directProgress.total}
+                  </Text>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${(directProgress.done / directProgress.total) * 100}%` }]} />
+                  </View>
+                </View>
+              )}
+              <Text style={styles.directHint}>
+                ⚡ يرسل مباشرة من رصيدك بدون فتح أي تطبيق -- يحتاج إذنك أول مرة. لو العدد كبير، أندرويد ممكن يطلب تأكيد إضافي (حماية نظام، مو عطل).
+              </Text>
+            </>
+          )}
+
+          <Text style={styles.footerHint}>📱 يفتح تطبيق الرسائل بالأرقام المحددة — اضغط إرسال وسيُرسل للكل.</Text>
+        </View>
+      </ScrollView>
+
+      <BottomSheetModal
+        visible={recipientsModalVisible}
+        onClose={() => setRecipientsModalVisible(false)}
+        title={`👥 اختيار المستلمين (${selected.size} محدَّد)`}
+      >
+        <View style={styles.chipsRow}>
+          <FilterChip
+            label={filterCamp ? campMap[filterCamp] : '⛺ كل المخيمات'}
+            selected={!!filterCamp}
+            onPress={() => setCampPickerVisible(true)}
+          />
+        </View>
+
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="بحث بالاسم أو الجوال..."
+          placeholderTextColor={colors.muted}
+          style={styles.searchInput}
+        />
+
+        <View style={styles.actionsRow}>
+          <Pressable style={styles.smallBtn} onPress={selectAll}>
+            <Text style={styles.smallBtnText}>تحديد الكل</Text>
+          </Pressable>
+          <Pressable style={styles.smallBtn} onPress={deselectAll}>
+            <Text style={styles.smallBtnText}>إلغاء الكل</Text>
+          </Pressable>
+          <Pressable style={styles.warnBtn} onPress={selectIncomplete}>
+            <Text style={styles.warnBtnText}>⚠️ الناقصين</Text>
+          </Pressable>
+        </View>
+
+        {filtered.length === 0 ? (
+          <EmptyState icon="👥" title="لا توجد أسر" />
+        ) : (
+          filtered.map((f) => <View key={f.id}>{renderRecipient({ item: f })}</View>)
+        )}
+
+        <Pressable style={styles.doneBtn} onPress={() => setRecipientsModalVisible(false)}>
+          <Text style={styles.doneBtnText}>✅ تم — {selected.size} محدَّد</Text>
+        </Pressable>
+      </BottomSheetModal>
 
       <BottomSheetModal visible={campPickerVisible} onClose={() => setCampPickerVisible(false)} title="اختر المخيم">
         <Pressable style={styles.campOption} onPress={() => { setFilterCamp(''); setCampPickerVisible(false); }}>
@@ -450,6 +467,16 @@ const styles = StyleSheet.create({
 
   section: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14, marginBottom: 12 },
   sectionTitle: { color: colors.accent, fontWeight: 'bold', fontSize: 13, marginBottom: 10, textAlign: 'right' },
+  recipientsSummaryBtn: {
+    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
+  },
+  recipientsSummaryText: { color: colors.white, fontWeight: 'bold', fontSize: 13 },
+  recipientsSummaryArrow: { color: colors.accent, fontSize: 16 },
+  recipientsSummaryHint: { color: colors.muted, fontSize: 10, marginTop: 6, textAlign: 'right' },
+  doneBtn: { backgroundColor: colors.accent, paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginTop: 12 },
+  doneBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },
 
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   searchInput: {

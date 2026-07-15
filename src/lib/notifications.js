@@ -3,13 +3,28 @@ import * as Notifications from 'expo-notifications';
 
 // طريقة عرض الإشعار وقت وصوله والتطبيق مفتوح بالمقدمة (foreground) --
 // بدونها إشعارات المقدمة ما تظهر إطلاقاً على أندرويد بمكتبة expo-notifications.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+//
+// ⚠️ محاط بـ try/catch إجبارياً: هذا استدعاء أصلي (native) يشتغل فوراً
+// عند تحميل الملف (استيراد App.js له) -- لو المكتبة الأصلية غير موجودة
+// فعلياً بالـ APK المثبَّت (نسخة قديمة قبل هذا التحديث) أو على الويب
+// (غير مدعوم إطلاقاً)، بدون هذه الحماية كان الاستدعاء يكسر تحميل
+// التطبيق بالكامل فوراً = شاشة بيضاء خالية عند كل فتح. هذا بالضبط ما
+// حصل بعد أول رفع لهذا الملف قبل إضافة الحماية.
+if (Platform.OS !== 'web') {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch {
+    // فشل تسجيل معالج الإشعارات غير حرج -- التطبيق يستمر عادياً بدون
+    // إشعارات فقط (يصير هذا تحديداً على أي APK قديم قبل تثبيت النسخة
+    // الجديدة التي تحوي مكتبة expo-notifications الأصلية فعلياً)
+  }
+}
 
 let permissionAsked = false;
 

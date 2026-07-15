@@ -13,6 +13,7 @@ import {
   calcAge, getStageGroup, getGradeDelay, getExpectedGrade, STAGE_ICONS, buildCampExportBanner,
 } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
+import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import SelectField from '../../components/ui/SelectField';
 import EmptyState from '../../components/ui/EmptyState';
 import colors from '../../theme/colors';
@@ -31,6 +32,7 @@ export default function EducationScreen() {
   const [orgMembers, setOrgMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [campFilter, setCampFilter] = useState('');
+  const [showBanner, setShowBanner] = useState(true);
   const [stageFilter, setStageFilter] = useState('');
   const [search, setSearch] = useState('');
   const [offlineInfo, setOfflineInfo] = useState(null);
@@ -171,7 +173,7 @@ export default function EducationScreen() {
       };
     });
     const fileName = stageFilter ? `طلاب_${stageFilter}` : 'طلاب_الكل';
-    const banner = campFilter ? buildCampExportBanner(camps.find((c) => c.id === campFilter), orgMembers) : null;
+    const banner = campFilter && showBanner ? buildCampExportBanner(camps.find((c) => c.id === campFilter), orgMembers) : null;
     if (banner) {
       await exportXLSXMultiSheetWithBanners([{ name: 'الحالة الدراسية', banner, rows }], fileName);
     } else {
@@ -203,6 +205,13 @@ export default function EducationScreen() {
           placeholder="⛺ كل المخيمات"
           options={campOptions}
           onSelect={setCampFilter}
+        />
+
+        <CampDelegatePanel
+          camp={camps.find((c) => c.id === campFilter)}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
         />
 
         <View style={styles.stageGrid}>

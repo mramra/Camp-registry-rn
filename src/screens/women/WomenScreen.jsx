@@ -14,6 +14,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
+import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import colors from '../../theme/colors';
 
 export default function WomenScreen() {
@@ -26,6 +27,7 @@ export default function WomenScreen() {
   const [camps, setCamps] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
+  const [showBanner, setShowBanner] = useState(true);
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [womenType, setWomenType] = useState('');
@@ -244,7 +246,7 @@ export default function WomenScreen() {
                     }))
                   }
                   getBanner={() => {
-                    if (!filterCamp) return null;
+                    if (!filterCamp || !showBanner) return null;
                     const camp = camps.find((c) => c.id === filterCamp);
                     return buildCampExportBanner(camp, orgMembers);
                   }}
@@ -269,6 +271,13 @@ export default function WomenScreen() {
                 onPress={() => setCampPickerVisible(true)}
               />
             </View>
+
+            <CampDelegatePanel
+              camp={camps.find((c) => c.id === filterCamp)}
+              orgMembers={orgMembers}
+              showBanner={showBanner}
+              onToggleBanner={setShowBanner}
+            />
 
             <View style={styles.categoryGrid}>
               {[

@@ -20,6 +20,7 @@ import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { buildCampExportBanner } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
+import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import SelectField from '../../components/ui/SelectField';
@@ -47,6 +48,8 @@ export default function DistributionReceiveScreen() {
   const [families, setFamilies] = useState([]);
   const [membersByFamily, setMembersByFamily] = useState({});
   const [camps, setCamps] = useState([]);
+  const [orgMembers, setOrgMembers] = useState([]);
+  const [showBanner, setShowBanner] = useState(true);
   const [otherRounds, setOtherRounds] = useState([]);
   const [receivedIds, setReceivedIds] = useState(new Set());
   const [otherRoundReceivedIds, setOtherRoundReceivedIds] = useState(null);
@@ -71,6 +74,9 @@ export default function DistributionReceiveScreen() {
       const allowedCampIds = getAllowedCampIds(campsData);
       const visibleCamps = getVisibleCamps(campsData);
       setCamps(visibleCamps);
+
+      const orgMembersData = await withTimeout(fetchOrgMembers(orgId), 12000, 'انتهت مهلة تحميل البيانات');
+      setOrgMembers(orgMembersData);
 
       const famsRaw = await withTimeout(fetchFamilies(orgId), 12000, 'انتهت مهلة تحميل البيانات');
       const fams = filterLocal(famsRaw, allowedCampIds);
@@ -290,13 +296,12 @@ export default function DistributionReceiveScreen() {
       const rows = received.map(buildExportRow);
       const fileName = `تقرير_استلام_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`;
 
-      if (round?.camp_id) {
+      if (round?.camp_id && showBanner) {
         // الجولة عندها مخيم بانر محدّد وقت الإنشاء -- بانر مبني بالدالة
         // المركزية buildCampExportBanner (نفسها المستخدمة بكل شاشات التصدير)
         // بدل منطق محلي كان أضعف (ما يرجع لمدير الفرع الأب لو المخيم فرعي
         // بلا مندوب خاص فيه، عكس الدالة المركزية).
         const bannerCamp = camps.find((c) => c.id === round.camp_id);
-        const orgMembers = await fetchOrgMembers(orgId);
         const bannerLines = buildCampExportBanner(bannerCamp, orgMembers);
 
         await exportXLSXMultiSheetWithBanners(
@@ -370,6 +375,13 @@ export default function DistributionReceiveScreen() {
                   {exporting ? <ActivityIndicator color={colors.green} size="small" /> : <Text style={styles.exportBtnText}>📤 تصدير</Text>}
                 </Pressable>
               }
+            />
+
+            <CampDelegatePanel
+              camp={camps.find((c) => c.id === round?.camp_id)}
+              orgMembers={orgMembers}
+              showBanner={showBanner}
+              onToggleBanner={setShowBanner}
             />
 
             {!!offlineInfo && (

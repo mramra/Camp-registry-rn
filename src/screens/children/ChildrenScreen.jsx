@@ -14,6 +14,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
+import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import colors from '../../theme/colors';
 
 const AGE_GROUPS = [
@@ -33,6 +34,7 @@ export default function ChildrenScreen() {
   const [camps, setCamps] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
+  const [showBanner, setShowBanner] = useState(true);
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [ageFilter, setAgeFilter] = useState('');
@@ -192,7 +194,7 @@ export default function ChildrenScreen() {
                   sheetName="الأطفال"
                   fileName="سجل_الأطفال"
                   getBanner={() => {
-                    if (!filterCamp) return null;
+                    if (!filterCamp || !showBanner) return null;
                     const camp = camps.find((c) => c.id === filterCamp);
                     return buildCampExportBanner(camp, orgMembers);
                   }}
@@ -215,6 +217,13 @@ export default function ChildrenScreen() {
                 onPress={() => setCampPickerVisible(true)}
               />
             </View>
+
+            <CampDelegatePanel
+              camp={camps.find((c) => c.id === filterCamp)}
+              orgMembers={orgMembers}
+              showBanner={showBanner}
+              onToggleBanner={setShowBanner}
+            />
 
             <View style={styles.ageGrid}>
               <Pressable

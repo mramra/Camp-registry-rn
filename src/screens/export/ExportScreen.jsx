@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, SafeAreaView, ActivityIndicator, Switch } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
 import { supabase, fetchCamps, fetchOrgMembers, createFamily } from '../../lib/supabase';
 import NetInfo from '@react-native-community/netinfo';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
@@ -11,6 +11,7 @@ import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX } from '.
 import { calcAge, isAgeInRange, buildCampExportBanner } from '../../lib/helpers';
 import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
+import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import SelectField from '../../components/ui/SelectField';
 import FormSection from '../../components/ui/FormSection';
 import { showToast } from '../../utils/toast';
@@ -384,13 +385,6 @@ export default function ExportScreen() {
 
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
 
-  const autoDelegate = useMemo(() => {
-    if (!cxCamp) return null;
-    return orgMembers.find((m) => m.camp_id === cxCamp && m.role === 'camp_delegate')
-      || orgMembers.find((m) => m.id === camps.find((c) => c.id === cxCamp)?.manager_id)
-      || null;
-  }, [cxCamp, orgMembers, camps]);
-
   const cxFilteredFams = useMemo(() => {
     return allFamilies
       .filter((f) => {
@@ -545,10 +539,12 @@ export default function ExportScreen() {
               options={campOptions}
               onSelect={setFilterCamp}
             />
-            <View style={styles.bannerRow}>
-              <Switch value={showBanner} onValueChange={setShowBanner} trackColor={{ true: colors.accent }} />
-              <Text style={styles.bannerLabel}>إظهار بيانات المخيم بأعلى الكشف</Text>
-            </View>
+            <CampDelegatePanel
+              camp={getCampInfo(filterCamp)}
+              orgMembers={orgMembers}
+              showBanner={showBanner}
+              onToggleBanner={setShowBanner}
+            />
           </>
         )}
 
@@ -602,11 +598,12 @@ export default function ExportScreen() {
               options={cxCampOptions}
               onSelect={(v) => { setCxCamp(v); setCxSelected(new Set()); }}
             />
-            {!!cxCamp && (
-              <Text style={[styles.delegateNote, autoDelegate ? styles.delegateOk : styles.delegateWarn]}>
-                {autoDelegate ? `✅ المندوب: ${autoDelegate.full_name} — ${autoDelegate.phone || '—'}` : '⚠️ لا يوجد مندوب لهذا المخيم'}
-              </Text>
-            )}
+            <CampDelegatePanel
+              camp={getCampInfo(cxCamp)}
+              orgMembers={orgMembers}
+              showBanner={showBanner}
+              onToggleBanner={setShowBanner}
+            />
 
             {cxMode === 'members' && (
               <View style={styles.ageRow}>
@@ -734,13 +731,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 32 },
 
-  bannerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 12 },
   offlineBanner: {
     backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
     borderRadius: 12, padding: 10, marginBottom: 12,
   },
   offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-  bannerLabel: { color: colors.white, fontSize: 12, fontWeight: 'bold' },
 
   btnPrimary: { backgroundColor: colors.accent, paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginBottom: 8 },
   btnPrimaryText: { color: colors.bg, fontWeight: '900', fontSize: 13 },
@@ -786,10 +781,6 @@ const styles = StyleSheet.create({
   tabBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   tabBtnText: { color: colors.muted, fontWeight: 'bold', fontSize: 10, textAlign: 'center' },
   tabBtnTextActive: { color: colors.bg },
-
-  delegateNote: { fontSize: 11, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10, textAlign: 'right' },
-  delegateOk: { color: colors.green, backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' },
-  delegateWarn: { color: colors.muted, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border },
 
   ageRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 12 },
   ageLabel: { color: colors.muted, fontSize: 12, fontWeight: 'bold' },

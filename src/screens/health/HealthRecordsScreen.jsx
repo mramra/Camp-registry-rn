@@ -15,6 +15,7 @@ import FilterChip from '../../components/ui/FilterChip';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
+import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import colors from '../../theme/colors';
 
 const HEALTH_TYPES = [
@@ -42,6 +43,7 @@ export default function HealthRecordsScreen() {
   const [camps, setCamps] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
+  const [showBanner, setShowBanner] = useState(true);
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [healthType, setHealthType] = useState('all');
@@ -227,7 +229,7 @@ export default function HealthRecordsScreen() {
                   sheetName="الصحة"
                   fileName="سجل_الصحة"
                   getBanner={() => {
-                    if (!filterCamp) return null;
+                    if (!filterCamp || !showBanner) return null;
                     const camp = camps.find((c) => c.id === filterCamp);
                     return buildCampExportBanner(camp, orgMembers);
                   }}
@@ -250,6 +252,13 @@ export default function HealthRecordsScreen() {
                 onPress={() => setCampPickerVisible(true)}
               />
             </View>
+
+            <CampDelegatePanel
+              camp={camps.find((c) => c.id === filterCamp)}
+              orgMembers={orgMembers}
+              showBanner={showBanner}
+              onToggleBanner={setShowBanner}
+            />
 
             <View style={styles.categoryGrid}>
               {HEALTH_TYPES.map((t) => (

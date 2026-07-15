@@ -39,6 +39,16 @@ export default function ExportButton({ getRows, getBanner, sheetName, fileName, 
 }
 
 const styles = StyleSheet.create({
-  btn: { paddingHorizontal: 8, paddingVertical: 4 },
+  btn: {
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   text: { color: colors.accent, fontWeight: 'bold', fontSize: 12 },
 });

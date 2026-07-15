@@ -10,7 +10,7 @@ export default function PageHeader({ icon, title, subtitle, action }) {
   return (
     <View style={styles.row}>
       <View style={styles.titleBlock}>
-        <Text style={styles.title}>
+        <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
           {icon ? `${icon} ` : ''}{title}
         </Text>
         {!!subtitle && <View style={styles.subtitle}>{subtitle}</View>}
@@ -22,12 +22,21 @@ export default function PageHeader({ icon, title, subtitle, action }) {
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    position: 'relative',
+    minHeight: 40,
+    justifyContent: 'center',
     marginBottom: 12,
   },
-  titleBlock: { flex: 1 },
+  titleBlock: { position: 'absolute', left: 56, right: 56, top: 0, alignItems: 'center' },
   title: { color: colors.white, fontWeight: '900', fontSize: 18, textAlign: 'center' },
   subtitle: { marginTop: 4, alignItems: 'center' },
-  action: { flexDirection: 'row', gap: 8 },
+  action: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
 });

@@ -158,16 +158,57 @@ export default function AnalysisScreen() {
 
     const byCamp = camps
       .map((c) => {
-        const campFamIds = new Set(fams.filter((f) => f.camp_id === c.id).map((f) => f.id));
+        const campFams = fams.filter((f) => f.camp_id === c.id);
+        const campFamIds = new Set(campFams.map((f) => f.id));
         const famCount = campFamIds.size;
         const memberCount = mems.filter((m) => campFamIds.has(m.family_id)).length;
         const personsCount = famCount + memberCount; // رب الأسرة + كل الأفراد
+
+        const campPersons = allPersons.filter((p) => campFamIds.has(p.famId));
+        const workingAge = campPersons.filter((p) => {
+          const a = calcAge(p.personDob);
+          return a !== null && a >= 18 && a < 60;
+        }).length;
+        const dependents = campPersons.filter((p) => {
+          const a = calcAge(p.personDob);
+          return a !== null && (a < 18 || a >= 60);
+        }).length;
+        // نسبة الإعالة: كل معيل (بالغ 18-59) يعيل كم شخص (أطفال+كبار سن)
+        const dependencyRatio = workingAge > 0 ? dependents / workingAge : 0;
+
+        const femaleHeadCount = campFams.filter((f) => f.head_gender === 'أنثى').length;
+        const femaleHeadPct = famCount > 0 ? (femaleHeadCount / famCount) * 100 : 0;
+
+        // أسرة "فيها احتياج صحي" = أي فرد فيها (رب أسرة أو فرد) عنده إعاقة
+        // أو إصابة أو مرض مزمن أو احتياج صحي مسجَّل -- عدّاد أسر لا أفراد
+        // (أسرة فيها 3 حالات صحية تُحسب أسرة وحدة، عشان النسبة تعكس مدى
+        // انتشار الحاجة بين الأسر لا تراكمها).
+        const familiesWithHealthNeeds = campFams.filter((f) => {
+          const headHasNeed =
+            hasHealthData(f.head_disabilities) || hasHealthData(f.head_injuries) ||
+            hasHealthData(f.head_chronic_diseases) || hasHealthData(f.head_needs);
+          if (headHasNeed) return true;
+          const famMembers = mems.filter((m) => m.family_id === f.id);
+          return famMembers.some(
+            (m) => hasHealthData(m.disabilities) || hasHealthData(m.injuries) ||
+                   hasHealthData(m.chronic_diseases) || hasHealthData(m.needs)
+          );
+        }).length;
+        const healthNeedsPct = famCount > 0 ? (familiesWithHealthNeeds / famCount) * 100 : 0;
+
+        const headAges = campFams.map((f) => calcAge(f.head_dob)).filter((a) => a !== null);
+        const avgHeadAge = headAges.length > 0 ? headAges.reduce((s, a) => s + a, 0) / headAges.length : 0;
+
         return {
           id: c.id,
           name: c.name,
           count: famCount,
           personsCount,
           avgFamilySize: famCount > 0 ? (personsCount / famCount) : 0,
+          dependencyRatio,
+          femaleHeadPct,
+          healthNeedsPct,
+          avgHeadAge,
         };
       })
       .filter((c) => c.count > 0)
@@ -226,10 +267,23 @@ export default function AnalysisScreen() {
 
     const incomplete = fams.filter((f) => REQUIRED_FIELDS.some((k) => !f[k]?.toString().trim())).length;
 
+    const orgWorkingAge = allPersons.filter((p) => {
+      const a = calcAge(p.personDob);
+      return a !== null && a >= 18 && a < 60;
+    }).length;
+    const orgDependents = allPersons.filter((p) => {
+      const a = calcAge(p.personDob);
+      return a !== null && (a < 18 || a >= 60);
+    }).length;
+    const orgDependencyRatio = orgWorkingAge > 0 ? orgDependents / orgWorkingAge : 0;
+    const orgFemaleHeadPct = fams.length > 0 ? (fams.filter((f) => f.head_gender === 'أنثى').length / fams.length) * 100 : 0;
+
     return {
       total: fams.length,
       totalPersons: fams.length + mems.length,
       avgFamilySize: fams.length > 0 ? (fams.length + mems.length) / fams.length : 0,
+      dependencyRatio: orgDependencyRatio,
+      femaleHeadPct: orgFemaleHeadPct,
       byCamp,
       ageData,
       males: males.length,
@@ -333,6 +387,8 @@ export default function AnalysisScreen() {
               ['⚠️', stats.incomplete, 'بيانات ناقصة', colors.red, null],
               ['🏕️', stats.byCamp.length, 'مخيم نشط', colors.accent, null],
               ['📐', stats.avgFamilySize.toFixed(1), 'معدل حجم الأسرة', colors.purple, null],
+              ['⚖️', stats.dependencyRatio.toFixed(1), 'نسبة الإعالة', colors.orange, null],
+              ['👩‍🏠', `${stats.femaleHeadPct.toFixed(0)}%`, 'أسر بمعيلة', colors.pink, null],
             ].map(([icon, val, label, color, onPress], i) => (
               <Pressable key={i} style={styles.statBox} onPress={onPress || undefined} disabled={!onPress}>
                 <Text style={styles.statIcon}>{icon}</Text>
@@ -361,16 +417,46 @@ export default function AnalysisScreen() {
 
         {tab === 'camps' && (
           <View style={styles.panel}>
-            <Text style={styles.panelTitle}>🏕️ توزيع المخيمات</Text>
+            <Text style={styles.panelTitle}>🏕️ توزيع المخيمات ومؤشراتها</Text>
             {stats.byCamp.map((c) => (
-              <StatBar
+              <Pressable
                 key={c.id}
-                label={`${c.name}  ·  📐 معدل ${c.avgFamilySize.toFixed(1)} فرد/أسرة`}
-                count={c.count}
-                total={stats.total}
-                color={colors.accent}
+                style={styles.campCard}
                 onPress={() => openDrillDownFamilies(c.name, scopedFams.filter((f) => f.camp_id === c.id))}
-              />
+              >
+                <View style={styles.campCardHeader}>
+                  <Text style={styles.campCardName}>{c.name}</Text>
+                  <Text style={styles.campCardCount}>{c.count} أسرة</Text>
+                </View>
+                <View style={styles.campMetricsRow}>
+                  <View style={styles.campMetric}>
+                    <Text style={styles.campMetricValue}>{c.avgFamilySize.toFixed(1)}</Text>
+                    <Text style={styles.campMetricLabel}>📐 فرد/أسرة</Text>
+                  </View>
+                  <View style={styles.campMetric}>
+                    <Text style={styles.campMetricValue}>{c.dependencyRatio.toFixed(1)}</Text>
+                    <Text style={styles.campMetricLabel}>⚖️ نسبة إعالة</Text>
+                  </View>
+                  <View style={styles.campMetric}>
+                    <Text style={styles.campMetricValue}>{c.femaleHeadPct.toFixed(0)}%</Text>
+                    <Text style={styles.campMetricLabel}>👩‍🏠 معيلة</Text>
+                  </View>
+                </View>
+                <View style={styles.campMetricsRow}>
+                  <View style={styles.campMetric}>
+                    <Text style={styles.campMetricValue}>{c.healthNeedsPct.toFixed(0)}%</Text>
+                    <Text style={styles.campMetricLabel}>🩺 احتياج صحي</Text>
+                  </View>
+                  <View style={styles.campMetric}>
+                    <Text style={styles.campMetricValue}>{c.avgHeadAge > 0 ? c.avgHeadAge.toFixed(0) : '—'}</Text>
+                    <Text style={styles.campMetricLabel}>🎂 متوسط عمر رب الأسرة</Text>
+                  </View>
+                  <View style={styles.campMetric}>
+                    <Text style={styles.campMetricValue}>{c.personsCount}</Text>
+                    <Text style={styles.campMetricLabel}>👤 إجمالي الأفراد</Text>
+                  </View>
+                </View>
+              </Pressable>
             ))}
           </View>
         )}
@@ -449,6 +535,14 @@ const styles = StyleSheet.create({
 
   panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14 },
   panelTitle: { color: colors.accent, fontWeight: 'bold', fontSize: 13, marginBottom: 12, textAlign: 'right' },
+  campCard: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 10 },
+  campCardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  campCardName: { color: colors.white, fontWeight: '900', fontSize: 14 },
+  campCardCount: { color: colors.accent, fontWeight: 'bold', fontSize: 12 },
+  campMetricsRow: { flexDirection: 'row', gap: 6, marginBottom: 6 },
+  campMetric: { flex: 1, backgroundColor: colors.surface, borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
+  campMetricValue: { color: colors.white, fontWeight: '900', fontSize: 13 },
+  campMetricLabel: { color: colors.muted, fontSize: 8, marginTop: 2, textAlign: 'center' },
   subPanelTitle: { color: colors.muted, fontWeight: 'bold', fontSize: 11, marginTop: 8, marginBottom: 6, textAlign: 'right' },
   barBlock: { marginBottom: 12 },
   barLabelRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 4 },

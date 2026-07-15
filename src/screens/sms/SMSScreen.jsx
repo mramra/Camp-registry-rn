@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
@@ -65,6 +65,7 @@ const MESSAGE_TEMPLATES = [
 
 export default function SMSScreen() {
   const { orgId } = useAuth();
+  const route = useRoute();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
 
   const [families, setFamilies] = useState([]);
@@ -79,6 +80,7 @@ export default function SMSScreen() {
   const [recipientsModalVisible, setRecipientsModalVisible] = useState(false);
   const [directSending, setDirectSending] = useState(false);
   const [directProgress, setDirectProgress] = useState(null); // { done, total }
+  const presetAppliedRef = useRef(false);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
@@ -91,14 +93,23 @@ export default function SMSScreen() {
       setFamilies(scoped);
       setCamps(getVisibleCamps(campsData));
       setMembers(await fetchFamilyMembers(scoped.map((f) => f.id)));
-      // ما فيه تحديد افتراضي -- الشاشة تبدأ دايماً بلا أي اسم محدَّد،
+
+      // تحديد مسبق قادم من شاشة تانية (زي بطاقة أعياد الميلاد بالرئيسية) --
+      // يُطبَّق مرة وحدة بس (مو بكل إعادة تركيز على الشاشة) عشان ما يمسح
+      // اختيار المستخدم اليدوي لو رجع لنفس الشاشة بعدين.
+      if (!presetAppliedRef.current && route.params?.preselectFamilyIds?.length) {
+        presetAppliedRef.current = true;
+        setSelected(new Set(route.params.preselectFamilyIds));
+        if (route.params.presetMessage) setMessage(route.params.presetMessage);
+      }
+      // ما فيه تحديد افتراضي غير هذا -- الشاشة تبدأ دايماً بلا أي اسم محدَّد،
       // المستخدم يختار بنفسه من نافذة المستلمين.
     } catch (e) {
       showError('تعذّر تحميل قائمة الأسر');
     } finally {
       setLoading(false);
     }
-  }, [orgId, getAllowedCampIds, getVisibleCamps]);
+  }, [orgId, getAllowedCampIds, getVisibleCamps, route.params]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));

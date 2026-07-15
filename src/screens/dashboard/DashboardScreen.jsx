@@ -26,9 +26,13 @@ import colors from '../../theme/colors';
  * ترحيب بالاسم، 4 بطاقات إحصائية بنفس الألوان، توزيع المخيمات (أشرطة)،
  * الفئات العمرية (أشرطة)، إجراءات سريعة بشبكة 2×3.
  */
+// رسالة تهنئة جاهزة عند فتح شاشة الرسائل من بطاقة أعياد الميلاد
+const BIRTHDAY_MESSAGE = 'كل عام وأنتم بألف خير 🎉 عيد ميلاد سعيد يا {اسم}، نتمنى لك سنة مليئة بالخير والصحة والسعادة.';
+
 export default function DashboardScreen() {
   const navigation = useNavigation();
   const { profile, isOwner } = useAuth();
+  const canSendBirthdayMsgs = isOwner || profile?.role === 'super_admin' || profile?.role === 'camp_delegate';
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [pendingDevicesCount, setPendingDevicesCount] = useState(0);
   const { getAllowedCampIds, filterLocal } = useDataScope();
@@ -169,6 +173,22 @@ export default function DashboardScreen() {
   // بحث ذكي بجزء من الاسم أو رقم الهوية — أرباب الأسر والأفراد معاً.
   // يبدأ الفحص من حرفين فما فوق عشان ما يشتغل بلا داعي بأول حرف.
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
+
+  // رؤساء الأسر اللي عيد ميلادهم اليوم (يوم وشهر مطابقين لتاريخ اليوم،
+  // بغض النظر عن السنة) -- بس لمن يقدر يرسل رسائل (مالك المنصة/مدير
+  // الإيواء/المندوب)، حسب الطلب.
+  const todaysBirthdays = useMemo(() => {
+    if (!canSendBirthdayMsgs) return [];
+    const now = new Date();
+    const todayDay = now.getDate();
+    const todayMonth = now.getMonth() + 1;
+    return families.filter((f) => {
+      if (!f.head_dob) return false;
+      const d = new Date(f.head_dob);
+      if (isNaN(d)) return false;
+      return d.getDate() === todayDay && d.getMonth() + 1 === todayMonth;
+    });
+  }, [families, canSendBirthdayMsgs]);
   const membersByFamily = useMemo(() => {
     const map = {};
     members.forEach((m) => { (map[m.family_id] ??= []).push(m); });
@@ -291,6 +311,25 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        {todaysBirthdays.length > 0 && (
+          <Pressable
+            style={styles.birthdayBox}
+            onPress={() =>
+              navigation.push('SMS', {
+                preselectFamilyIds: todaysBirthdays.map((f) => f.id),
+                presetMessage: BIRTHDAY_MESSAGE,
+              })
+            }
+          >
+            <Text style={styles.birthdayTitle}>
+              🎂 {todaysBirthdays.length === 1
+                ? `اليوم عيد ميلاد ${todaysBirthdays[0].head_name}`
+                : `${todaysBirthdays.length} من رباب الأسر عيد ميلادهم اليوم`}
+            </Text>
+            <Text style={styles.birthdayHint}>اضغط لإرسال رسالة تهنئة ←</Text>
+          </Pressable>
+        )}
+
         {/* إحصائيات رئيسية 2×2 */}
         <View style={styles.statsGrid}>
           {statCards.map((s) => (
@@ -390,6 +429,12 @@ const styles = StyleSheet.create({
   },
   pendingAlertText: { color: colors.white, fontWeight: 'bold', fontSize: 12 },
   pendingAlertArrow: { color: colors.red, fontSize: 15 },
+  birthdayBox: {
+    backgroundColor: 'rgba(236,72,153,0.12)', borderWidth: 1, borderColor: 'rgba(236,72,153,0.4)',
+    borderRadius: 14, padding: 14, marginBottom: 16,
+  },
+  birthdayTitle: { color: colors.pink, fontWeight: '900', fontSize: 13, textAlign: 'right' },
+  birthdayHint: { color: colors.muted, fontSize: 11, marginTop: 4, textAlign: 'right' },
 
   searchInput: {
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,

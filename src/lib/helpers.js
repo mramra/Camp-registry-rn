@@ -379,6 +379,31 @@ export function getCampDelegateInfo(camp, orgMembers) {
 }
 
 /**
+ * الدالة المركزية الوحيدة لبناء بانر ملفات Excel بكل شاشات التصدير --
+ * تُستخدم بدل أي نسخة محلية مكتوبة يدوياً بكل شاشة لحالها (كانت السبب
+ * الحقيقي لبق "ناقص إحداثيات المخيم" اللي ظهر بسجل الحالات الصحية: نسخ
+ * مبسّطة نُسيت منها الإحداثيات لما اتكتبت لاحقاً بشاشات مختلفة).
+ * السطر الأول: اسم المخيم (خط كبير). السطر الثاني: المندوب + جواله + الإحداثيات.
+ * ترجع null لو ما فيه مخيم (يعني بلا بانر إطلاقاً -- الاستدعاء يتحقق بنفسه).
+ */
+export function buildCampExportBanner(camp, orgMembers) {
+  if (!camp) return null;
+  const delegate = getCampDelegateInfo(camp, orgMembers);
+  const rawName = camp.name || '—';
+  const displayName = rawName.trim().startsWith('مخيم') ? rawName : `مخيم ${rawName}`;
+  const coords = camp.latitude && camp.longitude ? `${camp.latitude}, ${camp.longitude}` : 'بلا إحداثيات';
+  const infoLine = [
+    `👤 المندوب: ${delegate?.name || 'غير معيَّن'}`,
+    `📱 ${delegate?.phone || '—'}`,
+    `📍 ${coords}`,
+  ].join('   ');
+  return [
+    { text: `🏕️ ${displayName}`, size: 18 },
+    { text: infoLine, size: 11 },
+  ];
+}
+
+/**
  * قيم الحالات الصحية تختلف شكلها فعلياً حسب الجدول (تأكدنا من db.js الأصلي):
  * - family_members.disabilities/injuries/chronic_diseases: مصفوفة Postgres حقيقية
  *   (JS array فعلي عبر REST مباشرة)

@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { calcAge, naturalCompare, normalizeHealthValue, getCampDelegateInfo } from '../../lib/helpers';
+import { calcAge, naturalCompare, normalizeHealthValue, buildCampExportBanner } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -246,14 +246,7 @@ export default function WomenScreen() {
                   getBanner={() => {
                     if (!filterCamp) return null;
                     const camp = camps.find((c) => c.id === filterCamp);
-                    if (!camp) return null;
-                    const delegate = getCampDelegateInfo(camp, orgMembers);
-                    const rawName = camp.name || '—';
-                    const displayName = rawName.trim().startsWith('مخيم') ? rawName : `مخيم ${rawName}`;
-                    return [
-                      { text: `🏕️ ${displayName}`, size: 18 },
-                      { text: `👤 المندوب: ${delegate?.name || 'غير معيَّن'}   📱 ${delegate?.phone || '—'}`, size: 11 },
-                    ];
+                    return buildCampExportBanner(camp, orgMembers);
                   }}
                   sheetName="النساء"
                   fileName="سجل_النساء"

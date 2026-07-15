@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX } from '../../lib/excelIO';
-import { calcAge, isAgeInRange, getCampDelegateInfo } from '../../lib/helpers';
+import { calcAge, isAgeInRange, buildCampExportBanner } from '../../lib/helpers';
 import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
 import SelectField from '../../components/ui/SelectField';
@@ -176,26 +176,16 @@ export default function ExportScreen() {
 
   const getCampInfo = (campId) => {
     if (!campId) return null;
-    const camp = camps.find((c) => c.id === campId);
-    if (!camp) return null;
-    const delegate = getCampDelegateInfo(camp, orgMembers);
-    const coords = camp.latitude && camp.longitude ? `${camp.latitude}, ${camp.longitude}` : null;
-    return { name: camp.name, delegateName: delegate?.name, delegatePhone: delegate?.phone, coords };
+    return camps.find((c) => c.id === campId) || null;
   };
 
-  // بانر حقيقي (صفين مدمجين بأعلى الملف) بدل عمود متكرر بكل صف -- اسم
-  // المخيم بخط أكبر، وبيانات المندوب تحته بخط أصغر. لو الاسم لا يبدأ
-  // بكلمة "مخيم" أصلاً نضيفها (بعض الأسماء زي "مخيم هند" مكتوبة بالفعل).
-  const buildBannerLines = (campInfo, enabled = showBanner) => {
-    if (!enabled || !campInfo) return null;
-    const rawName = campInfo.name || '—';
-    const displayName = rawName.trim().startsWith('مخيم') ? rawName : `مخيم ${rawName}`;
-    const parts = [`👤 المندوب: ${campInfo.delegateName || 'غير معيَّن'}`, `📱 ${campInfo.delegatePhone || '—'}`];
-    if (campInfo.coords) parts.push(`📍 ${campInfo.coords}`);
-    return [
-      { text: `🏕️ ${displayName}`, size: 18 },
-      { text: parts.join('   '), size: 11 },
-    ];
+  // بانر حقيقي (صفين مدمجين بأعلى الملف) -- يستخدم الدالة المركزية
+  // buildCampExportBanner (بملف helpers.js) بدل منطق محلي مكرر، عشان
+  // البانر يطلع نفسه بالضبط بكل شاشات التصدير (اسم مخيم + مندوب + جوال +
+  // إحداثيات) بلا أي فرق أو نسيان حقل بينها.
+  const buildBannerLines = (camp, enabled = showBanner) => {
+    if (!enabled || !camp) return null;
+    return buildCampExportBanner(camp, orgMembers);
   };
 
   // بدل إعادة الطلب من السيرفر كل مرة، نفلتر من allFamilies المحمّلة أصلاً

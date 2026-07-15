@@ -18,6 +18,7 @@ import { showError, showSuccess } from '../../utils/toast';
 import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
+import { buildCampExportBanner } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -290,24 +291,13 @@ export default function DistributionReceiveScreen() {
       const fileName = `تقرير_استلام_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`;
 
       if (round?.camp_id) {
-        // الجولة عندها مخيم بانر محدّد وقت الإنشاء -- نبني بانر بأعلى الملف:
-        // السطر الأول اسم المخيم، والثاني مندوب المخيم (role='camp_delegate')
-        // + جواله + إحداثيات المخيم. البانر معلوماتي فقط -- لا يقيّد عرض
-        // الأسر (تبقى من كل المخيمات).
+        // الجولة عندها مخيم بانر محدّد وقت الإنشاء -- بانر مبني بالدالة
+        // المركزية buildCampExportBanner (نفسها المستخدمة بكل شاشات التصدير)
+        // بدل منطق محلي كان أضعف (ما يرجع لمدير الفرع الأب لو المخيم فرعي
+        // بلا مندوب خاص فيه، عكس الدالة المركزية).
         const bannerCamp = camps.find((c) => c.id === round.camp_id);
         const orgMembers = await fetchOrgMembers(orgId);
-        const delegate = orgMembers.find((m) => m.role === 'camp_delegate' && m.camp_id === bannerCamp?.id);
-        const coords = bannerCamp?.latitude && bannerCamp?.longitude
-          ? `${bannerCamp.latitude}, ${bannerCamp.longitude}`
-          : 'بلا إحداثيات';
-        const rawName = bannerCamp?.name || '—';
-        // نضيف كلمة "مخيم" قبل الاسم لو مو موجودة أصلاً بالاسم (بعض المخيمات
-        // مسمّاة "مخيم هند" أصلاً، فما نكرّرها "مخيم مخيم هند").
-        const campDisplayName = rawName.trim().startsWith('مخيم') ? rawName : `مخيم ${rawName}`;
-        const bannerLines = [
-          { text: `🏕️ ${campDisplayName}`, size: 18 },
-          { text: `👤 المندوب: ${delegate?.full_name || 'غير معيَّن'}   📱 ${delegate?.phone || '—'}   📍 ${coords}`, size: 11 },
-        ];
+        const bannerLines = buildCampExportBanner(bannerCamp, orgMembers);
 
         await exportXLSXMultiSheetWithBanners(
           [{ name: 'استلموا', banner: bannerLines, rows }],

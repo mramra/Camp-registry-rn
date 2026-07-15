@@ -14,7 +14,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useRoute, useNavigation } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
@@ -71,6 +71,7 @@ const MESSAGE_TEMPLATES = [
 export default function SMSScreen() {
   const { orgId } = useAuth();
   const route = useRoute();
+  const navigation = useNavigation();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
 
   const [families, setFamilies] = useState([]);
@@ -120,6 +121,25 @@ export default function SMSScreen() {
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+
+  // حارس خروج أثناء الإرسال المباشر -- يمنع مغادرة الشاشة بالخطأ (رجوع
+  // أو اختيار صفحة تانية من القائمة الجانبية) لما فيه إرسال جارٍ فعلياً،
+  // ويعرض تحذير واضح بعدد الرسائل الباقية + خيار الخروج الفعلي لو أصرّ.
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', (e) => {
+      if (!directSending) return;
+      e.preventDefault();
+      Alert.alert(
+        '⏳ الإرسال لسه شغّال',
+        `تم إرسال ${directProgress?.done || 0} من ${directProgress?.total || 0} رسالة.\n\nالخروج الآن ممكن يوقف إرسال باقي الرسائل. يفضّل الانتظار لحد ما تخلص.`,
+        [
+          { text: 'كمّل الانتظار', style: 'cancel', onPress: () => {} },
+          { text: 'اخرج بأي حال', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+        ]
+      );
+    });
+    return unsub;
+  }, [navigation, directSending, directProgress]);
 
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
   const memsByFam = useMemo(() => {
@@ -263,14 +283,17 @@ export default function SMSScreen() {
       const f = sel[i];
       const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
       try {
-        // مهلة 15 ثانية إجبارية -- بدونها، لو المكتبة الأصلية علّقت بانتظار
+        // مهلة 25 ثانية إجبارية -- بدونها، لو المكتبة الأصلية علّقت بانتظار
         // تقرير تسليم ما يوصل أبداً (سلوك معروف بالمكتبة على أجهزة حقيقية)،
         // الإرسال كله يتوقف عند "0 من X" للأبد بدون أي رسالة خطأ.
         const res = await Promise.race([
           SmsManager.sendLongSms(f.phone1, msg, { requestStatusReport: false }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 25000)),
         ]);
-        if (res?.sent === 'sent' || res?.sent === 'sent_no_confirmation') ok++;
+        // 'pending' يعني الرسالة اتسلّمت لراديو الجهاز وقيد المعالجة --
+        // مو فشل فعلي. كان يُحسَب فشلاً غلط قبل هذا التصحيح، وهذا كان
+        // السبب الأغلب وراء ظهور 'فشل' رغم وصول الرسالة فعلياً بالنهاية.
+        if (res?.sent === 'sent' || res?.sent === 'sent_no_confirmation' || res?.sent === 'pending') ok++;
         else fail++;
       } catch {
         fail++;

@@ -23,6 +23,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
+import AgeRangeFilter from '../../components/ui/AgeRangeFilter';
 import colors from '../../theme/colors';
 
 
@@ -292,8 +293,8 @@ export default function FamiliesListScreen() {
             {!!f.head_id && <Text style={styles.headId}>{f.head_id}</Text>}
           </View>
           <View style={styles.memberBadge}>
-            <Text style={styles.memberCount}>{memberCount}</Text>
             <Text style={styles.memberIcon}>👥</Text>
+            <Text style={styles.memberCount}>{memberCount}</Text>
           </View>
         </View>
 
@@ -430,28 +431,14 @@ export default function FamiliesListScreen() {
             </View>
 
             {/* فلتر العمر */}
-            <View style={styles.ageRow}>
-              <Text style={styles.ageLabel}>🎂 العمر من</Text>
-              <TextInput
-                value={ageMin}
-                onChangeText={setAgeMin}
-                keyboardType="number-pad"
-                placeholder="—"
-                placeholderTextColor={colors.muted}
-                style={styles.ageInput}
-              />
-              <Text style={styles.ageLabel}>إلى</Text>
-              <TextInput
-                value={ageMax}
-                onChangeText={setAgeMax}
-                keyboardType="number-pad"
-                placeholder="—"
-                placeholderTextColor={colors.muted}
-                style={styles.ageInput}
-              />
-              <Text style={styles.ageLabel}>سنة</Text>
-              {hasFilter && <Text style={styles.resultCount}>{filtered.length} نتيجة</Text>}
-            </View>
+            <AgeRangeFilter
+              label="🎂 العمر:"
+              min={ageMin}
+              max={ageMax}
+              onChangeMin={setAgeMin}
+              onChangeMax={setAgeMax}
+              resultCount={hasFilter ? `${filtered.length} نتيجة` : ''}
+            />
           </View>
         }
         ListEmptyComponent={
@@ -545,21 +532,6 @@ const styles = StyleSheet.create({
   },
   resetText: { color: colors.muted, fontSize: 11, fontWeight: 'bold' },
 
-  ageRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
-  ageLabel: { color: colors.muted, fontSize: 11 },
-  ageInput: {
-    width: 52,
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingVertical: 6,
-    color: colors.white,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  resultCount: { color: colors.muted, fontSize: 11, marginStart: 'auto' },
-
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -570,11 +542,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   cardPressed: { opacity: 0.85 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  cardTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   headName: { color: colors.white, fontWeight: 'bold', fontSize: 14, textAlign: 'right' },
   headId: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
-  memberBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  memberCount: { color: colors.accent, fontWeight: '900', fontSize: 14 },
+  memberBadge: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 4,
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4,
+  },
+  memberCount: { color: colors.accent, fontWeight: '900', fontSize: 13 },
   memberIcon: { fontSize: 13 },
   badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   okMark: { fontSize: 11 },

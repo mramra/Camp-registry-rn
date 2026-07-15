@@ -7,6 +7,7 @@ import { fetchDistRounds, fetchCamps, createDistRound, updateDistRound, deleteDi
 import { formatDate } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
+import PrimaryButton from '../../components/ui/PrimaryButton';
 import EmptyState from '../../components/ui/EmptyState';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FormInput from '../../components/ui/FormInput';
@@ -203,14 +204,9 @@ export default function DistributionsScreen() {
               icon="📦"
               title="التوزيعات"
               subtitle={<Text style={styles.headerSubtitle}>{filtered.length} من {rounds.length} جولة</Text>}
-              action={
-                canWrite && (
-                  <Pressable style={styles.addBtn} onPress={openAddForm}>
-                    <Text style={styles.addBtnText}>➕ جولة جديدة</Text>
-                  </Pressable>
-                )
-              }
             />
+
+            {canWrite && <PrimaryButton label="➕ جولة جديدة" onPress={openAddForm} />}
 
             <TextInput
               value={search}
@@ -253,8 +249,6 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
-  addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
-  addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
 
   searchInput: {
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,

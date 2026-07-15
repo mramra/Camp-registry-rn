@@ -24,6 +24,7 @@ import FilterChip from '../../components/ui/FilterChip';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import AgeRangeFilter from '../../components/ui/AgeRangeFilter';
+import PrimaryButton from '../../components/ui/PrimaryButton';
 import colors from '../../theme/colors';
 
 
@@ -335,19 +336,9 @@ export default function FamiliesListScreen() {
                   {filtered.length}/{families.length} أسرة
                 </Text>
               }
-              action={
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  {canWrite && (
-                    <Pressable
-                      style={styles.addBtn}
-                      onPress={() => navigation.push('FamilyForm')}
-                    >
-                      <Text style={styles.addBtnText}>➕ إضافة</Text>
-                    </Pressable>
-                  )}
-                </View>
-              }
             />
+
+            {canWrite && <PrimaryButton label="➕ إضافة أسرة" onPress={() => navigation.push('FamilyForm')} />}
 
             {!!offlineInfo && (
               <View style={styles.offlineBanner}>
@@ -497,8 +488,6 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 10, marginBottom: 12,
   },
   offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-  addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
-  addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
 
   searchInput: {
     backgroundColor: colors.surface2,

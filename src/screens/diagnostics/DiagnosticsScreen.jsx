@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, SafeAreaView } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../../lib/supabase';
 import PageHeader from '../../components/ui/PageHeader';
+import PrimaryButton from '../../components/ui/PrimaryButton';
 import FormSection from '../../components/ui/FormSection';
 import colors from '../../theme/colors';
 
@@ -65,12 +66,9 @@ export default function DiagnosticsScreen() {
           icon="🩺"
           title="تشخيص النظام"
           subtitle={<Text style={styles.headerSubtitle}>حالة الاتصال بـ Supabase</Text>}
-          action={
-            <Pressable style={styles.refreshBtn} onPress={runAll} disabled={running}>
-              <Text style={styles.refreshBtnText}>{running ? '⏳' : '🔄'} إعادة الفحص</Text>
-            </Pressable>
-          }
         />
+
+        <PrimaryButton label="🔄 إعادة الفحص" onPress={runAll} loading={running} />
 
         <FormSection title="">
           {TEST_ROWS.map(([key, label]) => {
@@ -111,8 +109,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
-  refreshBtn: { backgroundColor: colors.accent, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
-  refreshBtnText: { color: '#000', fontWeight: '900', fontSize: 11 },
 
   testRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface2, borderRadius: 10, padding: 12, marginBottom: 8 },
   testLabel: { color: colors.white, fontWeight: 'bold', fontSize: 12 },

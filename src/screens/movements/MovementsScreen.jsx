@@ -18,6 +18,7 @@ import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDate, formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
+import PrimaryButton from '../../components/ui/PrimaryButton';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
@@ -169,14 +170,10 @@ export default function MovementsScreen() {
               icon="🚶"
               title="حركات الأسر"
               subtitle={<Text style={styles.headerSubtitle}>{movements.length} حركة</Text>}
-              action={
-                canWrite && !offlineInfo && (
-                  <Pressable style={styles.addBtn} onPress={() => setFormVisible(true)}>
-                    <Text style={styles.addBtnText}>➕ نقل أسرة</Text>
-                  </Pressable>
-                )
-              }
             />
+            {canWrite && !offlineInfo && (
+              <PrimaryButton label="➕ نقل أسرة" onPress={() => setFormVisible(true)} />
+            )}
             {!!offlineInfo && (
               <View style={styles.offlineBanner}>
                 <Text style={styles.offlineBannerText}>
@@ -239,8 +236,6 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
-  addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
-  addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
 
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   statCard: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, alignItems: 'center' },

@@ -21,6 +21,7 @@ import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
+import PrimaryButton from '../../components/ui/PrimaryButton';
 import EmptyState from '../../components/ui/EmptyState';
 import colors from '../../theme/colors';
 
@@ -283,14 +284,10 @@ export default function CampsListScreen() {
               icon="🏕️"
               title="المخيمات"
               subtitle={<Text style={styles.headerSubtitle}>{parents.length} من أصل {camps.length} مخيم</Text>}
-              action={
-                (isOwner || isSuperAdmin) && !offlineInfo && (
-                  <Pressable style={styles.addBtn} onPress={() => navigation.push('CampForm')}>
-                    <Text style={styles.addBtnText}>➕ إضافة</Text>
-                  </Pressable>
-                )
-              }
             />
+            {(isOwner || isSuperAdmin) && !offlineInfo && (
+              <PrimaryButton label="➕ إضافة مخيم" onPress={() => navigation.push('CampForm')} />
+            )}
             {!!offlineInfo && (
               <View style={styles.offlineBanner}>
                 <Text style={styles.offlineBannerText}>
@@ -323,8 +320,6 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 10, marginBottom: 12,
   },
   offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-  addBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
-  addBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
   searchInput: {
     backgroundColor: colors.surface2,
     borderWidth: 1,

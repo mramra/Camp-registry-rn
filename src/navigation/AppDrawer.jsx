@@ -70,6 +70,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         { icon: '👨‍👩‍👧‍👦', label: 'كل الأسر', screen: 'FamiliesList', pageKey: 'families' },
         { icon: '🚶', label: 'حركات الأسر', screen: 'Movements', pageKey: 'movements' },
         { icon: '📦', label: 'التوزيعات', screen: 'Distributions', pageKey: 'distributions' },
+        { icon: '💬', label: 'الرسائل', screen: 'SMS', pageKey: 'sms' },
         { icon: '📝', label: 'آخر التعديلات على الأسر', screen: 'ActivityLog', pageKey: 'activity_log' },
         ...(isOwner ? [{ icon: '🚪', label: 'الأسر الخارجة', screen: 'ExitedFamilies' }] : []),
       ],
@@ -95,16 +96,6 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       ],
     },
     {
-      key: 'comms',
-      title: '💬 التواصل والحساب',
-      items: [
-        { icon: '💬', label: 'الرسائل', screen: 'SMS', pageKey: 'sms' },
-        { icon: '⚙️', label: 'الإعدادات', screen: 'Settings', pageKey: 'settings' },
-        { icon: '💎', label: 'الاشتراك والباقات', screen: 'Subscription', pageKey: 'subscription' },
-        { icon: '❓', label: 'المساعدة والدعم', screen: 'Help', pageKey: 'help' },
-      ],
-    },
-    {
       key: 'camps',
       title: '🏕️ الإدارة والوصول',
       items: [
@@ -114,21 +105,27 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         ...(isOwner ? [{ icon: '🔐', label: 'إدارة الصلاحيات', screen: 'PermissionsAdmin' }] : []),
       ],
     },
-    ...(isOwner || profile?.can_review_approvals
-      ? [
-          {
-            key: 'admin',
-            title: '⚙️ الإدارة والنظام',
-            items: [
+    {
+      key: 'admin',
+      title: '⚙️ الإدارة والنظام',
+      items: [
+        // عناصر إدارية حسّاسة -- لمالك المنصة أو من عنده صلاحية مراجعة الطلبات فقط
+        ...(isOwner || profile?.can_review_approvals
+          ? [
               { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests', count: pendingCount, pageKey: 'pending_requests' },
               { icon: '📝', label: 'سجل التغييرات', screen: 'Audit', pageKey: 'audit' },
               { icon: '🩺', label: 'تشخيص النظام', screen: 'Diagnostics', pageKey: 'diagnostics' },
               { icon: '🗄️', label: 'إدارة البيانات', screen: 'Data', pageKey: 'data' },
               ...(isOwner ? [{ icon: '🛡️', label: 'الفحص الأمني', screen: 'SecurityAudit' }] : []),
-            ],
-          },
-        ]
-      : []),
+            ]
+          : []),
+        // عناصر حساب عامة -- متاحة لكل مستخدم بغض النظر عن دوره (كانت
+        // بقسم منفصل 'التواصل والحساب'، أُلغي ودُمجت هنا)
+        { icon: '⚙️', label: 'الإعدادات', screen: 'Settings', pageKey: 'settings' },
+        { icon: '💎', label: 'الاشتراك والباقات', screen: 'Subscription', pageKey: 'subscription' },
+        { icon: '❓', label: 'المساعدة والدعم', screen: 'Help', pageKey: 'help' },
+      ],
+    },
   ]
     // فلترة كل عنصر حسب صلاحيات الصفحات الفعلية (canAccessPageNow) --
     // عناصر بدون pageKey (محصورة أصلاً بشرط isOwner بالتعريف فوق) تبقى

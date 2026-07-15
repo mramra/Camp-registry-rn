@@ -213,11 +213,6 @@ export default function AlertsScreen() {
           icon="🔔"
           title="التنبيهات"
           subtitle={<Text style={styles.headerSubtitle}>{alerts.length} تنبيه</Text>}
-          action={
-            <Pressable style={styles.refreshBtn} onPress={onRefresh}>
-              <Text style={styles.refreshIcon}>🔄</Text>
-            </Pressable>
-          }
         />
 
         {alerts.map((a, i) => {
@@ -251,8 +246,6 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
-  refreshBtn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  refreshIcon: { fontSize: 15 },
 
   card: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 8 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },

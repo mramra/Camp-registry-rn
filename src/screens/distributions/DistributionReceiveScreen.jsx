@@ -20,6 +20,7 @@ import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { buildCampExportBanner } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
+import PrimaryButton from '../../components/ui/PrimaryButton';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -370,12 +371,9 @@ export default function DistributionReceiveScreen() {
               icon="✅"
               title={round?.name || 'جولة توزيع'}
               subtitle={<Text style={styles.headerSubtitle}>{receivedIds.size} استلم من أصل {families.length}</Text>}
-              action={
-                <Pressable style={[styles.exportBtn, exporting && styles.disabled]} onPress={handleExport} disabled={exporting}>
-                  {exporting ? <ActivityIndicator color={colors.green} size="small" /> : <Text style={styles.exportBtnText}>📤 تصدير</Text>}
-                </Pressable>
-              }
             />
+
+            <PrimaryButton label="📤 تصدير الكشف" onPress={handleExport} loading={exporting} />
 
             <CampDelegatePanel
               camp={camps.find((c) => c.id === round?.camp_id)}
@@ -479,8 +477,6 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 10, marginBottom: 12,
   },
   offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-  exportBtn: { backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  exportBtnText: { color: colors.green, fontWeight: 'bold', fontSize: 12 },
   searchInput: {
     backgroundColor: colors.surface2,
     borderWidth: 1,

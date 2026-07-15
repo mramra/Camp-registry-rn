@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
@@ -203,11 +203,6 @@ export default function CampCompareScreen() {
               icon="🏕️"
               title="مقارنة المخيمات"
               subtitle={<Text style={styles.headerSubtitle}>{data.length} مخيم</Text>}
-              action={
-                <Pressable style={styles.refreshBtn} onPress={onRefresh}>
-                  <Text style={styles.refreshIcon}>🔄</Text>
-                </Pressable>
-              }
             />
 
             {!!offlineInfo && (
@@ -272,8 +267,6 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 10, marginBottom: 12,
   },
   offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-  refreshBtn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  refreshIcon: { fontSize: 15 },
 
   totalsGrid: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   totalBox: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, alignItems: 'center' },

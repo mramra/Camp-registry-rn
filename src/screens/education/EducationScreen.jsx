@@ -188,7 +188,7 @@ export default function EducationScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <PageHeader
           icon="🎓"
-          title="الحالة الدراسية"
+          title="السجل الدراسي"
           subtitle={`${filtered.length} نتيجة${delayedCount ? ` — ⚠️ ${delayedCount} متأخر دراسياً` : ''}`}
         />
 

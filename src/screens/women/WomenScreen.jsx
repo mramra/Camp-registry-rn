@@ -227,7 +227,7 @@ export default function WomenScreen() {
           <View>
             <PageHeader
               icon="👩"
-              title="النساء"
+              title="سجل النساء"
               action={
                 <ExportButton
                   getRows={() =>

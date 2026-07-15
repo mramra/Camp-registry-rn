@@ -100,7 +100,7 @@ const RootNavigator = () => {
               options={{ title: '🏕️ نبض المخيم' }}
             />
             {/* الأسر — منقولة بالكامل */}
-            <Stack.Screen name="FamiliesList" component={FamiliesListScreen} options={{ title: 'قائمة الأسر' }} />
+            <Stack.Screen name="FamiliesList" component={FamiliesListScreen} options={{ title: 'كل الأسر' }} />
             <Stack.Screen name="ExitedFamilies" component={ExitedFamiliesScreen} options={{ title: 'الأسر الخارجة' }} />
             <Stack.Screen name="FamilyDetail" component={FamilyDetailScreen} options={{ title: 'تفاصيل الأسرة' }} />
             <Stack.Screen name="FamilyForm" component={FamilyFormScreen} options={{ title: 'بيانات الأسرة' }} />
@@ -125,9 +125,9 @@ const RootNavigator = () => {
 
             {/* السجلات — الرجال والتعديلات بس (أطفال/نساء/صحة اعتمدنا شاشات التحليل بدلها) */}
             <Stack.Screen name="Children" component={ChildrenScreen} options={{ title: 'سجل الأطفال' }} />
-            <Stack.Screen name="Women" component={WomenScreen} options={{ title: 'النساء' }} />
+            <Stack.Screen name="Women" component={WomenScreen} options={{ title: 'سجل النساء' }} />
             <Stack.Screen name="HealthRecords" component={HealthRecordsScreen} options={{ title: 'سجل الحالات الصحية' }} />
-            <Stack.Screen name="Men" component={MenScreen} options={{ title: 'الرجال' }} />
+            <Stack.Screen name="Men" component={MenScreen} options={{ title: 'سجل الرجال' }} />
             <Stack.Screen name="ActivityLog" component={ActivityLogScreen} options={{ title: 'آخر التعديلات على الأسر' }} />
 
             {/* الرسائل — منقولة بالكامل */}
@@ -138,14 +138,14 @@ const RootNavigator = () => {
             <Stack.Screen name="Alerts" component={AlertsScreen} options={{ title: 'التنبيهات' }} />
             <Stack.Screen name="Audit" component={AuditScreen} options={{ title: 'سجل التغييرات' }} />
             <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'إدارة الأجهزة' }} />
-            <Stack.Screen name="Analysis" component={AnalysisScreen} options={{ title: 'التقارير والتحليلات' }} />
+            <Stack.Screen name="Analysis" component={AnalysisScreen} options={{ title: 'لوحة الإحصائيات' }} />
             <Stack.Screen name="CampCompare" component={CampCompareScreen} options={{ title: 'مقارنة المخيمات' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'تشخيص النظام' }} />
             <Stack.Screen name="SecurityAudit" component={SecurityAuditScreen} options={{ title: 'الفحص الأمني' }} />
             <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'الإعدادات' }} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'الاشتراك والباقات' }} />
             <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'المساعدة والدعم' }} />
-            <Stack.Screen name="Education" component={EducationScreen} options={{ title: 'الحالة الدراسية' }} />
+            <Stack.Screen name="Education" component={EducationScreen} options={{ title: 'السجل الدراسي' }} />
             <Stack.Screen name="Export" component={ExportScreen} options={{ title: 'استيراد وتصدير' }} />
             <Stack.Screen name="Data" component={DataScreen} options={{ title: 'إدارة البيانات' }} />
           </>

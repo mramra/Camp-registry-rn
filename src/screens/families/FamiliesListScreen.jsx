@@ -328,7 +328,7 @@ export default function FamiliesListScreen() {
           <View>
             <PageHeader
               icon="👨‍👩‍👧‍👦"
-              title="قائمة الأسر"
+              title="كل الأسر"
               subtitle={
                 <Text style={styles.headerSubtitle}>
                   {filtered.length}/{families.length} أسرة

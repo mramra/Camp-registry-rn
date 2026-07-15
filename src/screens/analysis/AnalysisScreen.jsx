@@ -353,7 +353,7 @@ export default function AnalysisScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
       >
-        <PageHeader icon="📈" title="التقارير والتحليلات" />
+        <PageHeader icon="📈" title="لوحة الإحصائيات" />
 
         {!!offlineInfo && (
           <View style={styles.offlineBanner}>

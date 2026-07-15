@@ -201,7 +201,7 @@ export default function MenScreen() {
           <View>
             <PageHeader
               icon="👨"
-              title="الرجال"
+              title="سجل الرجال"
               action={
                 <ExportButton
                   getRows={() =>

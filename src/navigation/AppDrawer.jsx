@@ -67,7 +67,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       key: 'families',
       title: '👨‍👩‍👧 الأسر',
       items: [
-        { icon: '👨‍👩‍👧‍👦', label: 'قائمة الأسر', screen: 'FamiliesList', pageKey: 'families' },
+        { icon: '👨‍👩‍👧‍👦', label: 'كل الأسر', screen: 'FamiliesList', pageKey: 'families' },
         { icon: '🚶', label: 'حركات الأسر', screen: 'Movements', pageKey: 'movements' },
         { icon: '📦', label: 'التوزيعات', screen: 'Distributions', pageKey: 'distributions' },
         { icon: '📝', label: 'آخر التعديلات على الأسر', screen: 'ActivityLog', pageKey: 'activity_log' },
@@ -76,7 +76,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
     },
     {
       key: 'camps',
-      title: '🏕️ المخيمات والمستخدمون',
+      title: '🏕️ الإدارة والوصول',
       items: [
         { icon: '🏕️', label: 'المخيمات', screen: 'CampsList', pageKey: 'camps' },
         { icon: '👥', label: 'المستخدمون', screen: 'UsersList', pageKey: 'users' },
@@ -89,17 +89,17 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       title: '⚕️ السجلات الاجتماعية والصحية',
       items: [
         { icon: '🧒', label: 'سجل الأطفال', screen: 'Children', pageKey: 'children' },
-        { icon: '👩', label: 'النساء', screen: 'Women', pageKey: 'women' },
-        { icon: '👨', label: 'الرجال', screen: 'Men', pageKey: 'men' },
+        { icon: '👩', label: 'سجل النساء', screen: 'Women', pageKey: 'women' },
+        { icon: '👨', label: 'سجل الرجال', screen: 'Men', pageKey: 'men' },
         { icon: '🩺', label: 'سجل الحالات الصحية', screen: 'HealthRecords', pageKey: 'health_records' },
-        { icon: '🎓', label: 'الحالة الدراسية', screen: 'Education', pageKey: 'education_status' },
+        { icon: '🎓', label: 'السجل الدراسي', screen: 'Education', pageKey: 'education_status' },
       ],
     },
     {
       key: 'analysis',
       title: '📊 التحليل والتقارير',
       items: [
-        { icon: '📈', label: 'التقارير والتحليلات', screen: 'Analysis', pageKey: 'analysis' },
+        { icon: '📈', label: 'لوحة الإحصائيات', screen: 'Analysis', pageKey: 'analysis' },
         { icon: '🏕️', label: 'مقارنة المخيمات', screen: 'CampCompare', pageKey: 'camp_compare' },
         { icon: '💾', label: 'استيراد وتصدير', screen: 'Export', pageKey: 'export' },
       ],
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
   },
-  sectionTitle: { color: colors.white, fontSize: 15, fontWeight: '900', textAlign: 'right' },
+  sectionTitle: { color: colors.accent, fontSize: 15, fontWeight: '900', textAlign: 'right' },
   chevron: { color: colors.muted, fontSize: 10 },
   item: {
     flexDirection: 'row-reverse',

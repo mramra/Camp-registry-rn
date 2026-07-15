@@ -40,6 +40,11 @@ const shortName = (fullName) => {
   return [parts[0], parts[parts.length - 1]].join(' ');
 };
 
+// الاسم المستخدَم بتعويض {اسم}: لو فيه اسم صاحب عيد ميلاد محدَّد لهذي الأسرة
+// (جاي من بطاقة أعياد الميلاد بالرئيسية -- ممكن يكون فرد مو رب الأسرة)
+// يُستخدم هو، وإلا يرجع لاسم رب الأسرة العادي.
+const resolveGreetingName = (f, birthdayNames) => shortName(birthdayNames?.[f.id] || f.head_name);
+
 // عدد أجزاء الرسالة الفعلي: العربي (وأي حرف خارج GSM-7) يستخدم ترميز
 // UCS-2 إجبارياً -- يحمل 70 حرف بالرسالة الواحدة بس (مو 160 زي الإنجليزي)،
 // و67 حرف بالجزء لو الرسالة طويلة ومتعددة الأجزاء. بدون هذا التصحيح كان
@@ -80,6 +85,7 @@ export default function SMSScreen() {
   const [recipientsModalVisible, setRecipientsModalVisible] = useState(false);
   const [directSending, setDirectSending] = useState(false);
   const [directProgress, setDirectProgress] = useState(null); // { done, total }
+  const [birthdayNames, setBirthdayNames] = useState({}); // { familyId: personName }
   const presetAppliedRef = useRef(false);
 
   const loadData = useCallback(async () => {
@@ -101,6 +107,7 @@ export default function SMSScreen() {
         presetAppliedRef.current = true;
         setSelected(new Set(route.params.preselectFamilyIds));
         if (route.params.presetMessage) setMessage(route.params.presetMessage);
+        if (route.params.birthdayNames) setBirthdayNames(route.params.birthdayNames);
       }
       // ما فيه تحديد افتراضي غير هذا -- الشاشة تبدأ دايماً بلا أي اسم محدَّد،
       // المستخدم يختار بنفسه من نافذة المستلمين.
@@ -169,7 +176,7 @@ export default function SMSScreen() {
 
     if (sel.length === 1) {
       const f = sel[0];
-      const msg = text.replace(/\{اسم\}/g, shortName(f.head_name)) + '\n' + getSig(f.camp_id, campMap);
+      const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
       await Linking.openURL(`sms:${f.phone1}?body=${encodeURIComponent(msg)}`);
       showSuccess('📨 جارٍ فتح تطبيق الرسائل...');
       return;
@@ -197,7 +204,7 @@ export default function SMSScreen() {
     const text = message.trim();
     if (!text) return showError('يرجى كتابة نص الرسالة');
     const f = selectedFamilies[0];
-    const msg = text.replace(/\{اسم\}/g, shortName(f.head_name)) + '\n' + getSig(f.camp_id, campMap);
+    const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
     const phone = f.phone1.replace(/^0/, '970'); // تحويل الصفر الأول لمفتاح فلسطين الدولي
     await Linking.openURL(`whatsapp://send?phone=${phone}&text=${encodeURIComponent(msg)}`);
     showSuccess('📲 جارٍ فتح واتساب...');
@@ -254,7 +261,7 @@ export default function SMSScreen() {
 
     for (let i = 0; i < sel.length; i++) {
       const f = sel[i];
-      const msg = text.replace(/\{اسم\}/g, shortName(f.head_name)) + '\n' + getSig(f.camp_id, campMap);
+      const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
       try {
         // مهلة 15 ثانية إجبارية -- بدونها، لو المكتبة الأصلية علّقت بانتظار
         // تقرير تسليم ما يوصل أبداً (سلوك معروف بالمكتبة على أجهزة حقيقية)،
@@ -293,9 +300,14 @@ export default function SMSScreen() {
       >
         <Text style={styles.tentBadge}>⛺{f.tent || '—'}</Text>
         <View style={{ flex: 1, alignItems: 'flex-end' }}>
-          <Text style={[styles.name, isSelected && styles.nameSelected]} numberOfLines={1}>{f.head_name}</Text>
+          <Text style={[styles.name, isSelected && styles.nameSelected]} numberOfLines={1}>
+            {birthdayNames[f.id] ? `🎂 ${f.head_name}` : f.head_name}
+          </Text>
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>{f.phone1 || '—'} · {campMap[f.camp_id] || '—'}</Text>
+            {!!birthdayNames[f.id] && birthdayNames[f.id] !== f.head_name && (
+              <Text style={styles.warnText}>🎂 عيد ميلاد: {birthdayNames[f.id]}</Text>
+            )}
             {issues.length > 0 && <Text style={styles.warnText}>⚠️ {issues.length} ناقص</Text>}
             {!hasPhone && <Text style={styles.warnText}>📵 لا جوال</Text>}
           </View>

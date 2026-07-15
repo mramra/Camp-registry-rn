@@ -174,21 +174,38 @@ export default function DashboardScreen() {
   // يبدأ الفحص من حرفين فما فوق عشان ما يشتغل بلا داعي بأول حرف.
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
 
-  // رؤساء الأسر اللي عيد ميلادهم اليوم (يوم وشهر مطابقين لتاريخ اليوم،
-  // بغض النظر عن السنة) -- بس لمن يقدر يرسل رسائل (مالك المنصة/مدير
-  // الإيواء/المندوب)، حسب الطلب.
+  // أعياد ميلاد اليوم (رب الأسرة + كل أفراد الأسرة) -- تطابق يوم/شهر بس
+  // (بغض النظر عن السنة) -- بس لمن يقدر يرسل رسائل (مالك المنصة/مدير
+  // الإيواء/المندوب)، حسب الطلب. الرسالة تروح لجوال رب الأسرة دايماً (الفرد
+  // نفسه ما عنده رقم مسجَّل)، بس التهنئة تذكر اسم صاحب العيد الفعلي (لو
+  // فرد، اسمه هو -- مو اسم رب الأسرة).
   const todaysBirthdays = useMemo(() => {
     if (!canSendBirthdayMsgs) return [];
     const now = new Date();
     const todayDay = now.getDate();
     const todayMonth = now.getMonth() + 1;
-    return families.filter((f) => {
-      if (!f.head_dob) return false;
-      const d = new Date(f.head_dob);
-      if (isNaN(d)) return false;
-      return d.getDate() === todayDay && d.getMonth() + 1 === todayMonth;
+    const isTodayBirthday = (dob) => {
+      if (!dob) return false;
+      const d = new Date(dob);
+      return !isNaN(d) && d.getDate() === todayDay && d.getMonth() + 1 === todayMonth;
+    };
+
+    const results = [];
+    const seenFamilyIds = new Set(); // أسرة وحدة تظهر مرة وحدة بالبطاقة حتى لو فيها أكثر من عيد ميلاد اليوم
+    families.forEach((f) => {
+      if (isTodayBirthday(f.head_dob) && !seenFamilyIds.has(f.id)) {
+        seenFamilyIds.add(f.id);
+        results.push({ familyId: f.id, personName: f.head_name, isHead: true });
+      }
     });
-  }, [families, canSendBirthdayMsgs]);
+    members.forEach((m) => {
+      if (isTodayBirthday(m.dob) && !seenFamilyIds.has(m.family_id)) {
+        seenFamilyIds.add(m.family_id);
+        results.push({ familyId: m.family_id, personName: m.name, isHead: false });
+      }
+    });
+    return results;
+  }, [families, members, canSendBirthdayMsgs]);
   const membersByFamily = useMemo(() => {
     const map = {};
     members.forEach((m) => { (map[m.family_id] ??= []).push(m); });
@@ -316,15 +333,18 @@ export default function DashboardScreen() {
             style={styles.birthdayBox}
             onPress={() =>
               navigation.push('SMS', {
-                preselectFamilyIds: todaysBirthdays.map((f) => f.id),
+                preselectFamilyIds: todaysBirthdays.map((b) => b.familyId),
+                // اسم الشخص الفعلي صاحب العيد بكل أسرة (رب أسرة أو فرد) --
+                // يستخدم بدل اسم رب الأسرة تلقائياً بتعويض {اسم} بشاشة الرسائل.
+                birthdayNames: Object.fromEntries(todaysBirthdays.map((b) => [b.familyId, b.personName])),
                 presetMessage: BIRTHDAY_MESSAGE,
               })
             }
           >
             <Text style={styles.birthdayTitle}>
               🎂 {todaysBirthdays.length === 1
-                ? `اليوم عيد ميلاد ${todaysBirthdays[0].head_name}`
-                : `${todaysBirthdays.length} من رباب الأسر عيد ميلادهم اليوم`}
+                ? `اليوم عيد ميلاد ${todaysBirthdays[0].personName}${todaysBirthdays[0].isHead ? '' : ' (فرد بالأسرة)'}`
+                : `${todaysBirthdays.length} عيد ميلاد اليوم (رباب أسر وأفراد)`}
             </Text>
             <Text style={styles.birthdayHint}>اضغط لإرسال رسالة تهنئة ←</Text>
           </Pressable>

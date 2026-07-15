@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX } from '../../lib/excelIO';
-import { calcAge, isAgeInRange, buildCampExportBanner } from '../../lib/helpers';
+import { calcAge, isAgeInRange, buildCampExportBanner, getCampDelegateInfo, normalizeHealthValue } from '../../lib/helpers';
 import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
@@ -497,6 +497,99 @@ export default function ExportScreen() {
     }
   };
 
+  // ── الكشف الشامل (حسب القالب المرفوع) ──
+  // يبني بانر معلومات مركز الإيواء + جدول تفصيلي لكل أسرة، بنفس ترتيب
+  // أعمدة القالب المرفوع تقريباً. الأعمدة غير المتوفرة بقاعدة البيانات
+  // حالياً (دخل رب الأسرة، تفاصيل السكن، حالة النزوح) تظهر فارغة عمداً --
+  // تحتاج إضافة حقول جديدة لنموذج الأسرة أولاً لتُملأ مستقبلاً.
+  const healthCount = (raw) => {
+    const n = normalizeHealthValue(raw);
+    return n ? n.split('، ').filter(Boolean).length : 0;
+  };
+
+  const ageBuckets = (members) => {
+    const b = { c06: 0, c612: 0, c1218: 0, adult: 0, elderly: 0 };
+    members.forEach((age) => {
+      if (age === null) return;
+      if (age <= 6) b.c06++;
+      else if (age <= 12) b.c612++;
+      else if (age <= 18) b.c1218++;
+      else b.adult++;
+      if (age >= 60) b.elderly++;
+    });
+    return b;
+  };
+
+  const exportComprehensive = async () => {
+    if (!canExport) return showToast('لا تملك صلاحية التصدير', 'error');
+    const campInfo = getCampInfo(filterCamp);
+    if (!campInfo) return showToast('اختر مخيماً محدَّداً أولاً (الكشف الشامل لمخيم واحد فقط)', 'error');
+    setLoading(true);
+    try {
+      const fams = allFamilies.filter((f) => f.camp_id === filterCamp);
+      if (!fams.length) return showToast('لا توجد أسر بهذا المخيم', 'error');
+
+      const totalIndividuals = fams.reduce((sum, f) => sum + (f.family_members?.length || 0) + 1, 0);
+      const delegate = getCampDelegateInfo(campInfo, orgMembers);
+      const statusAr = { active: 'نشط', closed: 'مغلق', suspended: 'موقوف' }[campInfo.status] || campInfo.status || '—';
+      const coords = campInfo.latitude && campInfo.longitude ? `${campInfo.latitude}, ${campInfo.longitude}` : '—';
+
+      const banner = [
+        { text: `🏕️ ${campInfo.name}`, size: 18 },
+        { text: `الحالة: ${statusAr}   |   المندوب: ${delegate?.name || '—'}   |   جوال المندوب: ${delegate?.phone || '—'}`, size: 11 },
+        { text: `العنوان: ${campInfo.address || '—'}   |   GIS: ${coords}`, size: 11 },
+        { text: `عدد الأسر: ${fams.length}   |   عدد الأفراد الكلي: ${totalIndividuals}`, size: 11 },
+      ];
+
+      const sorted = [...fams].sort((a, b) => String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true }));
+      const rows = sorted.map((f, i) => {
+        const members = f.family_members || [];
+        const wife = findWife(members);
+        const ages = ageBuckets(members.map((m) => calcAge(m.dob)));
+        const chronicCount = healthCount(f.head_chronic_diseases) + members.reduce((s, m) => s + healthCount(m.chronic_diseases), 0);
+        const disabilityCount = healthCount(f.head_disabilities) + members.reduce((s, m) => s + healthCount(m.disabilities), 0);
+        const injuryCount = healthCount(f.head_injuries) + members.reduce((s, m) => s + healthCount(m.injuries), 0);
+        return {
+          '#': i + 1,
+          'اسم رب الأسرة': f.head_name || '',
+          'رقم الهوية': f.head_id || '',
+          'رقم التواصل': f.phone1 || '',
+          'اسم الزوجة': wife?.name || '',
+          'رقم هوية الزوجة': wife?.national_id || '',
+          'عدد أفراد الأسرة': members.length + 1,
+          'الحالة الاجتماعية': f.head_marital || '',
+          'مصدر دخل رب الأسرة': '',
+          'عدد الأطفال (0-6)': ages.c06,
+          'عدد الأطفال (6-12)': ages.c612,
+          'عدد الأطفال (12-18)': ages.c1218,
+          'عدد الأطفال فوق 18': ages.adult,
+          'عدد كبار السن': ages.elderly,
+          'السكن الأصلي': f.original_address || '',
+          'محافظة السكن الأصلي': '',
+          'السكن الحالي': f.address || campInfo.name || '',
+          'محافظة السكن الحالي': '',
+          'حالة النزوح': '',
+          'نوع المسكن': '',
+          'حالة المسكن': '',
+          'عدد الأمراض المزمنة': chronicCount,
+          'عدد الإعاقات': disabilityCount,
+          'عدد الإصابات': injuryCount,
+          'ملاحظات': f.notes || '',
+        };
+      });
+
+      await exportXLSXMultiSheetWithBanners(
+        [{ name: campInfo.name.slice(0, 31), banner, rows }],
+        `كشف_شامل_${campInfo.name}`
+      );
+      showToast(`تم تصدير الكشف الشامل لـ${fams.length} أسرة`, 'success');
+    } catch (e) {
+      showToast('خطأ: ' + e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const campOptions = [{ value: '', label: '🏕️ كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))];
   const cxCampOptions = [{ value: '', label: '🏕️ كل المخيمات (بدون بانر)' }, ...camps.map((c) => ({ value: c.id, label: c.name }))];
 
@@ -517,6 +610,7 @@ export default function ExportScreen() {
           {[
             { key: 'quickFam', icon: '👨‍👩‍👧', label: 'سجل أرباب الأسر' },
             { key: 'quickMem', icon: '👤', label: 'سجل أفراد الأسر' },
+            { key: 'comprehensive', icon: '📊', label: 'كشف شامل' },
             { key: 'customFam', icon: '🎯', label: 'أرباب الأسر مخصص' },
             { key: 'customMem', icon: '🎯', label: 'أفراد الأسر مخصص' },
             { key: 'import', icon: '📤', label: 'استيراد Excel' },
@@ -531,7 +625,7 @@ export default function ExportScreen() {
           ))}
         </View>
 
-        {(mainTab === 'quickFam' || mainTab === 'quickMem') && (
+        {(mainTab === 'quickFam' || mainTab === 'quickMem' || mainTab === 'comprehensive') && (
           <>
             <SelectField
               value={campOptions.find((o) => o.value === filterCamp)?.label}
@@ -546,6 +640,25 @@ export default function ExportScreen() {
               onToggleBanner={setShowBanner}
             />
           </>
+        )}
+
+        {mainTab === 'comprehensive' && (
+          <FormSection title="📊 كشف شامل حسب القالب">
+            {canExport ? (
+              <>
+                <Text style={styles.compNote}>
+                  يبني كشفاً شاملاً لمخيم واحد محدَّد (بانر معلومات المركز + جدول تفصيلي بكل أسرة)
+                  حسب القالب المرفوع. ⚠️ بعض الأعمدة (مصدر الدخل، تفاصيل السكن، حالة النزوح) غير
+                  موجودة بقاعدة البيانات حالياً وستظهر فارغة لحد ما تُضاف لنموذج الأسرة مستقبلاً.
+                </Text>
+                <Pressable style={styles.btnPrimary} onPress={exportComprehensive} disabled={loading}>
+                  <Text style={styles.btnPrimaryText}>📊 توليد الكشف الشامل</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Text style={styles.lockedText}>🔒 لا تملك صلاحية التصدير</Text>
+            )}
+          </FormSection>
         )}
 
         {mainTab === 'quickFam' && (
@@ -747,6 +860,7 @@ const styles = StyleSheet.create({
   btnOutline: { backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', paddingVertical: 11, borderRadius: 12, alignItems: 'center', marginBottom: 8 },
   btnOutlineText: { color: colors.accent, fontWeight: 'bold', fontSize: 12 },
   lockedText: { color: colors.red, fontSize: 12, textAlign: 'center', paddingVertical: 12 },
+  compNote: { color: colors.muted, fontSize: 11, lineHeight: 18, textAlign: 'right', marginBottom: 10 },
 
   textInput: {
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,

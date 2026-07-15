@@ -6,6 +6,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { AuthProvider } from './src/context/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { showToast } from './src/utils/toast';
+import { ensureNotificationPermission } from './src/lib/notifications';
 
 // فحص صريح عن تحديثات — بدل الاعتماد على السلوك الافتراضي الصامت
 // (يحمّل التحديث بالخلفية لكن ما يطبّقه إلا بعد إعادة فتح ثانية).
@@ -50,6 +51,7 @@ export default function App() {
   useEffect(() => {
     // 1) عند أول فتح (Cold start)
     checkAndApplyUpdate();
+    ensureNotificationPermission();
 
     // 2) كل مرة يرجع فيها التطبيق من الخلفية للمقدمة -- بدون حاجة لـ force-stop،
     // يكفي تصغّر التطبيق (Home / تبديل تطبيقات) وترجعله.

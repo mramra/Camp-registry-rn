@@ -21,6 +21,7 @@ import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
 import { checkFamilyIssues, naturalCompare } from '../../lib/helpers';
 import { showError, showSuccess, showInfo } from '../../utils/toast';
+import { notifyNow } from '../../lib/notifications';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -306,8 +307,13 @@ export default function SMSScreen() {
 
     setDirectSending(false);
     setDirectProgress(null);
-    if (fail === 0) showSuccess(`✅ اترسلت ${ok} رسالة بنجاح`);
-    else showError(`✅ نجح ${ok} — ❌ فشل ${fail} (تأكد من الرصيد أو تغطية الشبكة)`);
+    if (fail === 0) {
+      showSuccess(`✅ اترسلت ${ok} رسالة بنجاح`);
+      notifyNow('✅ اكتمل إرسال الرسائل', `اترسلت ${ok} رسالة بنجاح`);
+    } else {
+      showError(`✅ نجح ${ok} — ❌ فشل ${fail} (تأكد من الرصيد أو تغطية الشبكة)`);
+      notifyNow('⚠️ انتهى الإرسال بوجود أخطاء', `نجح ${ok} — فشل ${fail}. تأكد من الرصيد أو تغطية الشبكة`);
+    }
   };
 
   const renderRecipient = ({ item: f }) => {

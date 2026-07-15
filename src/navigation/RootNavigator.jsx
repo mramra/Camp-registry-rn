@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ActivityIndicator, View, Pressable, Text } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
+import { fetchPendingRequestsCount, fetchPendingDevicesCount } from '../lib/supabase';
+import { notifyNow } from '../lib/notifications';
 import LoginScreen from '../screens/login/LoginScreen';
 import FamilyPortalScreen from '../screens/familyportal/FamilyPortalScreen';
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
@@ -57,9 +59,42 @@ const navTheme = {
 };
 
 const RootNavigator = () => {
-  const { isAuthenticated, loading, isPreviewMode, previewAs, setPreviewAs, realProfile } = useAuth();
+  const { isAuthenticated, loading, isPreviewMode, previewAs, setPreviewAs, realProfile, orgId, isOwner, profile } = useAuth();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [navRef, setNavRef] = useState(null);
+  const prevCounts = useRef({ pending: null, devices: null });
+
+  // فحص دوري خفيف (كل 3 دقائق، طالما التطبيق مفتوح) لعدد الطلبات
+  // المعلّقة وطلبات الأجهزة الجديدة -- عند أي زيادة عن آخر فحص، إشعار
+  // محلي فوري. هذا يعمل طالما JS للتطبيق شغّال (مقدمة أو خلفية قريبة)،
+  // وليس بديلاً عن Push Notification حقيقي من سيرفر (يستمر حتى لو
+  // أُغلق التطبيق بالكامل) -- ذلك يحتاج بنية تحتية منفصلة على الخادم.
+  useEffect(() => {
+    if (!isAuthenticated || !orgId || !(isOwner || profile?.can_review_approvals)) return;
+
+    const check = async () => {
+      try {
+        const [pending, devices] = await Promise.all([
+          fetchPendingRequestsCount(orgId),
+          fetchPendingDevicesCount(orgId),
+        ]);
+        const prev = prevCounts.current;
+        if (prev.pending !== null && pending > prev.pending) {
+          notifyNow('📋 طلب جديد بانتظار المراجعة', `عدد الطلبات المعلّقة الآن: ${pending}`);
+        }
+        if (prev.devices !== null && devices > prev.devices) {
+          notifyNow('📱 جهاز جديد بانتظار الموافقة', `عدد الأجهزة المعلّقة الآن: ${devices}`);
+        }
+        prevCounts.current = { pending, devices };
+      } catch {
+        // فشل الفحص الدوري غير حرج -- يُعاد المحاولة تلقائياً بالدورة الجاية
+      }
+    };
+
+    check();
+    const interval = setInterval(check, 3 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, orgId, isOwner, profile?.can_review_approvals]);
 
   if (loading) {
     return (

@@ -157,7 +157,19 @@ export default function AnalysisScreen() {
     ];
 
     const byCamp = camps
-      .map((c) => ({ id: c.id, name: c.name, count: fams.filter((f) => f.camp_id === c.id).length }))
+      .map((c) => {
+        const campFamIds = new Set(fams.filter((f) => f.camp_id === c.id).map((f) => f.id));
+        const famCount = campFamIds.size;
+        const memberCount = mems.filter((m) => campFamIds.has(m.family_id)).length;
+        const personsCount = famCount + memberCount; // رب الأسرة + كل الأفراد
+        return {
+          id: c.id,
+          name: c.name,
+          count: famCount,
+          personsCount,
+          avgFamilySize: famCount > 0 ? (personsCount / famCount) : 0,
+        };
+      })
       .filter((c) => c.count > 0)
       .sort((a, b) => b.count - a.count);
 
@@ -217,6 +229,7 @@ export default function AnalysisScreen() {
     return {
       total: fams.length,
       totalPersons: fams.length + mems.length,
+      avgFamilySize: fams.length > 0 ? (fams.length + mems.length) / fams.length : 0,
       byCamp,
       ageData,
       males: males.length,
@@ -319,6 +332,7 @@ export default function AnalysisScreen() {
               ['🕊️', stats.orphans, 'يتيم', colors.muted, null],
               ['⚠️', stats.incomplete, 'بيانات ناقصة', colors.red, null],
               ['🏕️', stats.byCamp.length, 'مخيم نشط', colors.accent, null],
+              ['📐', stats.avgFamilySize.toFixed(1), 'معدل حجم الأسرة', colors.purple, null],
             ].map(([icon, val, label, color, onPress], i) => (
               <Pressable key={i} style={styles.statBox} onPress={onPress || undefined} disabled={!onPress}>
                 <Text style={styles.statIcon}>{icon}</Text>
@@ -351,7 +365,7 @@ export default function AnalysisScreen() {
             {stats.byCamp.map((c) => (
               <StatBar
                 key={c.id}
-                label={c.name}
+                label={`${c.name}  ·  📐 معدل ${c.avgFamilySize.toFixed(1)} فرد/أسرة`}
                 count={c.count}
                 total={stats.total}
                 color={colors.accent}

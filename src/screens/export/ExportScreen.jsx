@@ -281,7 +281,13 @@ export default function ExportScreen() {
         'رقم الجوال': f.phone1 || '—', 'المخيم': f.camps?.name || '—',
         'النواقص': [!f.head_name && 'الاسم', !f.head_id && 'الهوية', !f.phone1 && 'الجوال', !f.camp_id && 'المخيم'].filter(Boolean).join(' + '),
       }));
-      await exportXLSX(rows, 'الأسر الناقصة', 'الأسر_الناقصة');
+      const campInfo = getCampInfo(filterCamp);
+      const banner = buildBannerLines(campInfo);
+      if (banner) {
+        await exportXLSXMultiSheetWithBanners([{ name: 'الأسر الناقصة', banner, rows }], 'الأسر_الناقصة');
+      } else {
+        await exportXLSX(rows, 'الأسر الناقصة', 'الأسر_الناقصة');
+      }
       showToast(`${missing.length} أسرة ناقصة`, 'success');
     } catch (e) {
       showToast('خطأ: ' + e.message, 'error');

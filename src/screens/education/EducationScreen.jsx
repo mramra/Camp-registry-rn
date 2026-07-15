@@ -6,11 +6,11 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
-import { exportXLSX } from '../../lib/excelIO';
+import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import {
-  calcAge, getStageGroup, getGradeDelay, getExpectedGrade, STAGE_ICONS,
+  calcAge, getStageGroup, getGradeDelay, getExpectedGrade, STAGE_ICONS, buildCampExportBanner,
 } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
 import SelectField from '../../components/ui/SelectField';
@@ -170,7 +170,13 @@ export default function EducationScreen() {
         'متأخر دراسياً': p.delay > 0 ? `نعم (${p.delay} صف)` : 'لا',
       };
     });
-    await exportXLSX(rows, 'الحالة الدراسية', stageFilter ? `طلاب_${stageFilter}` : 'طلاب_الكل');
+    const fileName = stageFilter ? `طلاب_${stageFilter}` : 'طلاب_الكل';
+    const banner = campFilter ? buildCampExportBanner(camps.find((c) => c.id === campFilter), orgMembers) : null;
+    if (banner) {
+      await exportXLSXMultiSheetWithBanners([{ name: 'الحالة الدراسية', banner, rows }], fileName);
+    } else {
+      await exportXLSX(rows, 'الحالة الدراسية', fileName);
+    }
   };
 
   const campOptions = [{ value: '', label: '⛺ كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))];

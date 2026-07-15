@@ -1,21 +1,23 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { View, Text, TextInput, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
-import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
+import { showError } from '../../utils/toast';
 import { formatDateTime } from '../../lib/utils';
 import {
   calcAge, getStageGroup, getGradeDelay, getExpectedGrade, STAGE_ICONS, buildCampExportBanner,
 } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
-import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
-import SelectField from '../../components/ui/SelectField';
 import EmptyState from '../../components/ui/EmptyState';
+import FilterChip from '../../components/ui/FilterChip';
+import BottomSheetModal from '../../components/ui/BottomSheetModal';
+import ExportButton from '../../components/ui/ExportButton';
+import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import colors from '../../theme/colors';
 
 const ADULT_STAGES = ['دبلوم', 'بكالوريوس', 'ماجستير', 'دكتوراه'];
@@ -31,7 +33,9 @@ export default function EducationScreen() {
   const [camps, setCamps] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [campFilter, setCampFilter] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [filterCamp, setFilterCamp] = useState('');
+  const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [showBanner, setShowBanner] = useState(true);
   const [stageFilter, setStageFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -39,16 +43,30 @@ export default function EducationScreen() {
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
-    setLoading(true);
+
+    const cached = await getCachedData('education_report', profile?.id);
+    const hadCache = !!cached?.data;
+    if (hadCache) {
+      setFamilies(cached.data.families || []);
+      setCamps(cached.data.camps || []);
+      setMembers(cached.data.members || []);
+      setOrgMembers(cached.data.orgMembers || []);
+      setOfflineInfo({ savedAt: cached.savedAt });
+      setLoading(false);
+    }
+
     try {
       const net = await withTimeout(NetInfo.fetch(), 4000, 'تعذّر تحديد حالة الاتصال');
-      if (!net.isConnected) throw new Error('لا يوجد اتصال بالإنترنت');
+      if (!net.isConnected) {
+        if (!hadCache) showError('لا يوجد اتصال ولا توجد بيانات محفوظة');
+        return;
+      }
 
       const [famRes, campRes, , orgRes] = await withTimeout(
         Promise.all([
           supabase
             .from('families')
-            .select('id, camp_id, head_name, head_id, head_dob, head_qualification')
+            .select('id, camp_id, head_name, head_id, head_dob, head_qualification, tent')
             .eq('org_id', orgId)
             .eq('_deleted', false),
           supabase.from('camps').select('*').eq('org_id', orgId),
@@ -89,22 +107,17 @@ export default function EducationScreen() {
         families: scopedFamilies, camps: visibleCamps, members: finalMembers, orgMembers: finalOrgMembers,
       });
     } catch (err) {
-      const cached = await getCachedData('education_report', profile?.id);
-      if (cached?.data) {
-        setFamilies(cached.data.families || []);
-        setCamps(cached.data.camps || []);
-        setMembers(cached.data.members || []);
-        setOrgMembers(cached.data.orgMembers || []);
-        setOfflineInfo({ savedAt: cached.savedAt });
-      } else {
-        console.error('[EducationScreen loadData]', err.message);
-      }
+      if (!hadCache) showError('تعذّر تحميل السجل ولا توجد نسخة محفوظة');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [orgId, getAllowedCampIds, filterLocal, getVisibleCamps, profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+
+  const onRefresh = () => { setRefreshing(true); loadData(); };
 
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
   const famMap = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families]);
@@ -138,8 +151,8 @@ export default function EducationScreen() {
   }, [families, members]);
 
   const scoped = useMemo(
-    () => (campFilter ? people.filter((p) => famMap[p.family_id]?.camp_id === campFilter) : people),
-    [people, campFilter, famMap]
+    () => (filterCamp ? people.filter((p) => famMap[p.family_id]?.camp_id === filterCamp) : people),
+    [people, filterCamp, famMap]
   );
 
   const stageCounts = useMemo(() => {
@@ -156,174 +169,205 @@ export default function EducationScreen() {
     return byStage.filter((p) => (p.name || '').toLowerCase().includes(q) || (p.national_id || '').includes(q));
   }, [byStage, search]);
 
-  const handleExport = async () => {
-    if (!filtered.length) return;
-    const sorted = [...filtered].sort((a, b) => (b.dob || '').localeCompare(a.dob || ''));
-    const rows = sorted.map((p) => {
-      const f = famMap[p.family_id] || {};
-      return {
-        'اسم الطالب': p.name || '',
-        'رقم الهوية': p.national_id || '',
-        'تاريخ الميلاد': p.dob || '',
-        'العمر': p.age ?? '',
-        'اسم رب الأسرة': f.head_name || '',
-        'رقم هوية رب الأسرة': f.head_id || '',
-        'المرحلة / المؤهل': p.specificGrade || p.stage || '',
-        'متأخر دراسياً': p.delay > 0 ? `نعم (${p.delay} صف)` : 'لا',
-      };
-    });
-    const fileName = stageFilter ? `طلاب_${stageFilter}` : 'طلاب_الكل';
-    const banner = campFilter && showBanner ? buildCampExportBanner(camps.find((c) => c.id === campFilter), orgMembers) : null;
-    if (banner) {
-      await exportXLSXMultiSheetWithBanners([{ name: 'الحالة الدراسية', banner, rows }], fileName);
-    } else {
-      await exportXLSX(rows, 'الحالة الدراسية', fileName);
-    }
-  };
+  const styles = getStyles();
 
-  const campOptions = [{ value: '', label: '⛺ كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))];
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const renderPerson = ({ item: p }) => {
+    const f = famMap[p.family_id] || {};
+    const stageMeta = STAGE_ICONS.find((s) => s.key === p.stage);
+    const isAdult = ADULT_STAGES.includes(p.stage);
+    return (
+      <Pressable style={styles.card} onPress={() => p.family_id && navigation.push('FamilyDetail', { familyId: p.family_id })}>
+        <Text style={styles.cardName}>{p.name || '—'} <Text style={styles.ageTag}>({p.age})</Text></Text>
+        <Text style={styles.cardMeta}>{campMap[f.camp_id] || '—'} • 👨‍👩‍👧 {f.head_name || '—'}</Text>
+        {!!p.national_id && <Text style={styles.cardSubMeta}>🪪 {p.national_id}</Text>}
+        <View style={styles.badgeRow}>
+          <View style={[styles.badge, isAdult ? styles.badgeGreen : styles.badgeBlue]}>
+            <Text style={styles.badgeText}>{stageMeta?.icon} {p.specificGrade || p.stage}</Text>
+          </View>
+          {p.delay > 0 && (
+            <View style={[styles.badge, styles.badgeRed]}>
+              <Text style={styles.badgeText}>⚠️ متأخر {p.delay} صف</Text>
+            </View>
+          )}
+        </View>
+      </Pressable>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <PageHeader
-          icon="🎓"
-          title="السجل الدراسي"
-          subtitle={`${filtered.length} نتيجة${delayedCount ? ` — ⚠️ ${delayedCount} متأخر دراسياً` : ''}`}
-        />
+      <FlatList
+        data={filtered.slice(0, 100)}
+        keyExtractor={(item) => item.id}
+        renderItem={renderPerson}
+        contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+        ListHeaderComponent={
+          <View>
+            <PageHeader
+              icon="🎓"
+              title="السجل الدراسي"
+              subtitle={
+                <Text style={styles.headerSubtitle}>
+                  {filtered.length} نتيجة{delayedCount ? ` — ⚠️ ${delayedCount} متأخر دراسياً` : ''}
+                </Text>
+              }
+            />
 
-        {!!offlineInfo && (
-          <View style={styles.offlineBanner}>
-            <Text style={styles.offlineBannerText}>
-              📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
-            </Text>
-          </View>
-        )}
+            {!!offlineInfo && (
+              <View style={styles.offlineBanner}>
+                <Text style={styles.offlineBannerText}>
+                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
+                </Text>
+              </View>
+            )}
 
-        <SelectField
-          value={campOptions.find((o) => o.value === campFilter)?.label}
-          placeholder="⛺ كل المخيمات"
-          options={campOptions}
-          onSelect={setCampFilter}
-        />
+            <View style={styles.chipsRow}>
+              <FilterChip
+                label={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
+                selected={!!filterCamp}
+                onPress={() => setCampPickerVisible(true)}
+              />
+              {canExport && (
+                <ExportButton
+                  label="📊 تصدير الكشف"
+                  getRows={() => {
+                    const sorted = [...filtered].sort((a, b) => (b.dob || '').localeCompare(a.dob || ''));
+                    return sorted.map((p) => {
+                      const f = famMap[p.family_id] || {};
+                      return {
+                        'اسم الطالب': p.name || '',
+                        'رقم الهوية': p.national_id || '',
+                        'تاريخ الميلاد': p.dob || '',
+                        'العمر': p.age ?? '',
+                        'اسم رب الأسرة': f.head_name || '',
+                        'رقم هوية رب الأسرة': f.head_id || '',
+                        'المرحلة / المؤهل': p.specificGrade || p.stage || '',
+                        'متأخر دراسياً': p.delay > 0 ? `نعم (${p.delay} صف)` : 'لا',
+                      };
+                    });
+                  }}
+                  sheetName="الحالة الدراسية"
+                  fileName={stageFilter ? `طلاب_${stageFilter}` : 'طلاب_الكل'}
+                  getBanner={() => {
+                    if (!filterCamp || !showBanner) return null;
+                    const camp = camps.find((c) => c.id === filterCamp);
+                    return buildCampExportBanner(camp, orgMembers);
+                  }}
+                />
+              )}
+            </View>
 
-        <CampDelegatePanel
-          camp={camps.find((c) => c.id === campFilter)}
-          orgMembers={orgMembers}
-          showBanner={showBanner}
-          onToggleBanner={setShowBanner}
-        />
+            <CampDelegatePanel
+              camp={camps.find((c) => c.id === filterCamp)}
+              orgMembers={orgMembers}
+              showBanner={showBanner}
+              onToggleBanner={setShowBanner}
+            />
 
-        <View style={styles.stageGrid}>
-          {STAGE_ICONS.map((s) => (
-            <Pressable
-              key={s.key}
-              onPress={() => setStageFilter((f) => (f === s.key ? '' : s.key))}
-              style={[styles.stageCell, stageFilter === s.key && styles.stageCellActive]}
-            >
-              <Text style={styles.stageIcon}>{s.icon}</Text>
-              <Text style={styles.stageCount}>{stageCounts[s.key] || 0}</Text>
-              <Text style={styles.stageLabel}>{s.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="🔍 بحث بالاسم أو رقم الهوية..."
-          placeholderTextColor={colors.muted}
-          style={styles.searchInput}
-        />
-
-        {canExport && (
-          <Pressable style={styles.exportBtn} onPress={handleExport}>
-            <Text style={styles.exportBtnText}>📥 تصدير الطلاب</Text>
-          </Pressable>
-        )}
-
-        {loading ? (
-          <ActivityIndicator color={colors.accent} style={{ marginTop: 32 }} />
-        ) : filtered.length === 0 ? (
-          <EmptyState icon="🎓" title="لا توجد نتائج" />
-        ) : (
-          <View style={{ gap: 8, marginTop: 8 }}>
-            {filtered.slice(0, 100).map((p) => {
-              const f = famMap[p.family_id] || {};
-              const stageMeta = STAGE_ICONS.find((s) => s.key === p.stage);
-              const isAdult = ADULT_STAGES.includes(p.stage);
-              return (
+            <View style={styles.ageGrid}>
+              {STAGE_ICONS.map((s) => (
                 <Pressable
-                  key={p.id}
-                  style={styles.personCard}
-                  onPress={() => p.family_id && navigation.push('FamilyDetail', { familyId: p.family_id })}
+                  key={s.key}
+                  onPress={() => setStageFilter((f) => (f === s.key ? '' : s.key))}
+                  style={[styles.ageBox, stageFilter === s.key && styles.ageBoxActive]}
                 >
-                  <Text style={styles.personName}>{p.name || '—'}</Text>
-                  <Text style={styles.personMeta}>
-                    {p.age} سنة · {campMap[f.camp_id] || '—'} · 👨‍👩‍👧 {f.head_name || '—'}
-                  </Text>
-                  {!!p.national_id && <Text style={styles.personId}>🪪 {p.national_id}</Text>}
-                  <View style={styles.badgeRow}>
-                    <View style={[styles.badge, isAdult ? styles.badgeGreen : styles.badgeBlue]}>
-                      <Text style={styles.badgeText}>{stageMeta?.icon} {p.specificGrade || p.stage}</Text>
-                    </View>
-                    {p.delay > 0 && (
-                      <View style={[styles.badge, styles.badgeRed]}>
-                        <Text style={styles.badgeText}>⚠️ متأخر {p.delay} صف</Text>
-                      </View>
-                    )}
-                  </View>
+                  <Text style={styles.ageIcon}>{s.icon}</Text>
+                  <Text style={[styles.ageCount, stageFilter === s.key && styles.ageCountActive]}>{stageCounts[s.key] || 0}</Text>
+                  <Text style={styles.ageLabel}>{s.label}</Text>
                 </Pressable>
-              );
-            })}
+              ))}
+            </View>
+
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="🔍 بحث بالاسم أو رقم الهوية..."
+              placeholderTextColor={colors.muted}
+              style={styles.searchInput}
+            />
+
+            <Text style={styles.countText}>
+              {filterCamp ? `مجموع الطلاب بـ${campMap[filterCamp]}: ` : 'مجموع الطلاب: '}
+              <Text style={styles.countValue}>{filtered.length}</Text>
+            </Text>
+
             {filtered.length > 100 && (
               <Text style={styles.moreText}>عرض 100 من {filtered.length} — استخدم البحث لتضييق النتائج</Text>
             )}
           </View>
-        )}
-      </ScrollView>
+        }
+        ListEmptyComponent={<EmptyState icon="🎓" title="لا توجد نتائج" />}
+      />
+
+      <BottomSheetModal visible={campPickerVisible} onClose={() => setCampPickerVisible(false)} title="اختر المخيم">
+        <Pressable style={styles.campOption} onPress={() => { setFilterCamp(''); setCampPickerVisible(false); }}>
+          <Text style={styles.campOptionText}>كل المخيمات</Text>
+        </Pressable>
+        {camps.map((c) => (
+          <Pressable key={c.id} style={styles.campOption} onPress={() => { setFilterCamp(c.id); setCampPickerVisible(false); }}>
+            <Text style={styles.campOptionText}>{c.name}</Text>
+          </Pressable>
+        ))}
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: 16, paddingBottom: 32 },
-  offlineBanner: {
-    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
-    borderRadius: 12, padding: 10, marginBottom: 12,
-  },
-  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
+const getStyles = () =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.bg },
+    loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    listContent: { padding: 16, paddingBottom: 32 },
+    headerSubtitle: { color: colors.muted, fontSize: 11, textAlign: 'center' },
+    offlineBanner: {
+      backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
+      borderRadius: 12, padding: 10, marginBottom: 12,
+    },
+    offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
 
-  stageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  stageCell: {
-    width: '23%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 12, paddingVertical: 10, alignItems: 'center',
-  },
-  stageCellActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
-  stageIcon: { fontSize: 18, marginBottom: 2 },
-  stageCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
-  stageLabel: { color: colors.muted, fontSize: 9, marginTop: 1 },
+    ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+    ageBox: {
+      flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 12, paddingVertical: 10, alignItems: 'center',
+    },
+    ageBoxActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
+    ageIcon: { fontSize: 18, marginBottom: 2 },
+    ageCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
+    ageCountActive: { color: colors.accent },
+    ageLabel: { color: colors.muted, fontSize: 9, marginTop: 1 },
 
-  searchInput: {
-    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 10, color: colors.white, fontSize: 13, marginBottom: 12, textAlign: 'right',
-  },
-  exportBtn: {
-    backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)',
-    borderRadius: 12, paddingVertical: 10, alignItems: 'center', marginBottom: 12,
-  },
-  exportBtnText: { color: colors.green, fontWeight: 'bold', fontSize: 13 },
+    searchInput: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+      paddingHorizontal: 16, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 8,
+    },
+    countText: { color: colors.muted, fontSize: 11, marginBottom: 10, textAlign: 'right' },
+    countValue: { color: colors.accent, fontWeight: '900', fontSize: 13 },
 
-  personCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12 },
-  personName: { color: colors.white, fontWeight: '900', fontSize: 13, textAlign: 'right' },
-  personMeta: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
-  personId: { color: colors.muted, fontSize: 10, marginTop: 2, textAlign: 'right' },
-  badgeRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeBlue: { backgroundColor: 'rgba(59,130,246,0.15)' },
-  badgeGreen: { backgroundColor: 'rgba(16,185,129,0.15)' },
-  badgeRed: { backgroundColor: 'rgba(239,68,68,0.15)' },
-  badgeText: { color: colors.white, fontSize: 10, fontWeight: 'bold' },
-  moreText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
-});
+    card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, marginBottom: 8 },
+    cardName: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right' },
+    ageTag: { color: colors.accent, fontWeight: '900' },
+    cardMeta: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
+    cardSubMeta: { color: colors.muted, fontSize: 10, marginTop: 2, textAlign: 'right' },
+    badgeRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+    badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+    badgeBlue: { backgroundColor: 'rgba(59,130,246,0.15)' },
+    badgeGreen: { backgroundColor: 'rgba(16,185,129,0.15)' },
+    badgeRed: { backgroundColor: 'rgba(239,68,68,0.15)' },
+    badgeText: { color: colors.white, fontSize: 10, fontWeight: 'bold' },
+    moreText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
+
+    campOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    campOptionText: { color: colors.white, fontSize: 13, textAlign: 'right' },
+  });

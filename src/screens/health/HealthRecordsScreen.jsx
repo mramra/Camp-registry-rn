@@ -210,32 +210,7 @@ export default function HealthRecordsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <View>
-            <PageHeader
-              icon="🩺"
-              title="سجل الحالات الصحية"
-              action={
-                <ExportButton
-                  getRows={() =>
-                    healthData.map((r, i) => ({
-                      '#': i + 1,
-                      'الخيمة': r.tent,
-                      'الاسم': r.name,
-                      'الصلة': r.role,
-                      'النوع': r.healthType,
-                      'الحالة': r.val,
-                      'المخيم': r.camp,
-                    }))
-                  }
-                  sheetName="الصحة"
-                  fileName="سجل_الصحة"
-                  getBanner={() => {
-                    if (!filterCamp || !showBanner) return null;
-                    const camp = camps.find((c) => c.id === filterCamp);
-                    return buildCampExportBanner(camp, orgMembers);
-                  }}
-                />
-              }
-            />
+            <PageHeader icon="🩺" title="سجل الحالات الصحية" />
 
             {!!offlineInfo && (
               <View style={styles.offlineBanner}>
@@ -250,6 +225,27 @@ export default function HealthRecordsScreen() {
                 label={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
+              />
+              <ExportButton
+                label="📊 تصدير الكشف"
+                getRows={() =>
+                  healthData.map((r, i) => ({
+                    '#': i + 1,
+                    'الخيمة': r.tent,
+                    'الاسم': r.name,
+                    'الصلة': r.role,
+                    'النوع': r.healthType,
+                    'الحالة': r.val,
+                    'المخيم': r.camp,
+                  }))
+                }
+                sheetName="الصحة"
+                fileName="سجل_الصحة"
+                getBanner={() => {
+                  if (!filterCamp || !showBanner) return null;
+                  const camp = camps.find((c) => c.id === filterCamp);
+                  return buildCampExportBanner(camp, orgMembers);
+                }}
               />
             </View>
 
@@ -312,7 +308,7 @@ const getStyles = () =>
       borderRadius: 12, padding: 10, marginBottom: 12,
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
     categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
     categoryCell: {
       flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,

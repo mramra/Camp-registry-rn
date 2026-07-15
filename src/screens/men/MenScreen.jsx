@@ -199,33 +199,7 @@ export default function MenScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <View>
-            <PageHeader
-              icon="👨"
-              title="سجل الرجال"
-              action={
-                <ExportButton
-                  getRows={() =>
-                    menData.map((w, i) => ({
-                      '#': i + 1,
-                      'الخيمة': w.tent,
-                      'الاسم': w.name,
-                      'العمر': w.age ?? '',
-                      'الصلة': w.type,
-                      'الحالة الاجتماعية': w.marital,
-                      'أمراض مزمنة': w.chronic,
-                      'المخيم': w.camp,
-                    }))
-                  }
-                  sheetName="الرجال"
-                  fileName="سجل_الرجال"
-                  getBanner={() => {
-                    if (!filterCamp || !showBanner) return null;
-                    const camp = camps.find((c) => c.id === filterCamp);
-                    return buildCampExportBanner(camp, orgMembers);
-                  }}
-                />
-              }
-            />
+            <PageHeader icon="👨" title="سجل الرجال" />
 
             {!!offlineInfo && (
               <View style={styles.offlineBanner}>
@@ -240,6 +214,28 @@ export default function MenScreen() {
                 label={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
+              />
+              <ExportButton
+                label="📊 تصدير الكشف"
+                getRows={() =>
+                  menData.map((w, i) => ({
+                    '#': i + 1,
+                    'الخيمة': w.tent,
+                    'الاسم': w.name,
+                    'العمر': w.age ?? '',
+                    'الصلة': w.type,
+                    'الحالة الاجتماعية': w.marital,
+                    'أمراض مزمنة': w.chronic,
+                    'المخيم': w.camp,
+                  }))
+                }
+                sheetName="الرجال"
+                fileName="سجل_الرجال"
+                getBanner={() => {
+                  if (!filterCamp || !showBanner) return null;
+                  const camp = camps.find((c) => c.id === filterCamp);
+                  return buildCampExportBanner(camp, orgMembers);
+                }}
               />
             </View>
 
@@ -363,7 +359,7 @@ const getStyles = () =>
       borderRadius: 12, padding: 10, marginBottom: 12,
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
     ageRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 10 },
     ageLabel: { color: colors.muted, fontSize: 12, marginStart: 4 },
     ageInput: {

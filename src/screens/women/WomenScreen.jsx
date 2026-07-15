@@ -225,36 +225,7 @@ export default function WomenScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <View>
-            <PageHeader
-              icon="👩"
-              title="سجل النساء"
-              action={
-                <ExportButton
-                  getRows={() =>
-                    womenData.map((w, i) => ({
-                      '#': i + 1,
-                      'الخيمة': w.tent,
-                      'الاسم': w.name,
-                      'العمر': w.age ?? '',
-                      'الصلة': w.type,
-                      'الحالة الاجتماعية': w.marital,
-                      'الوضع': w.status,
-                      'مرضعة؟': w.isNursing ? 'نعم' : 'لا',
-                      'عدد أفراد الأسرة': w.familySize,
-                      'أمراض مزمنة': w.chronic,
-                      'المخيم': w.camp,
-                    }))
-                  }
-                  getBanner={() => {
-                    if (!filterCamp || !showBanner) return null;
-                    const camp = camps.find((c) => c.id === filterCamp);
-                    return buildCampExportBanner(camp, orgMembers);
-                  }}
-                  sheetName="النساء"
-                  fileName="سجل_النساء"
-                />
-              }
-            />
+            <PageHeader icon="👩" title="سجل النساء" />
 
             {!!offlineInfo && (
               <View style={styles.offlineBanner}>
@@ -269,6 +240,31 @@ export default function WomenScreen() {
                 label={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
+              />
+              <ExportButton
+                label="📊 تصدير الكشف"
+                getRows={() =>
+                  womenData.map((w, i) => ({
+                    '#': i + 1,
+                    'الخيمة': w.tent,
+                    'الاسم': w.name,
+                    'العمر': w.age ?? '',
+                    'الصلة': w.type,
+                    'الحالة الاجتماعية': w.marital,
+                    'الوضع': w.status,
+                    'مرضعة؟': w.isNursing ? 'نعم' : 'لا',
+                    'عدد أفراد الأسرة': w.familySize,
+                    'أمراض مزمنة': w.chronic,
+                    'المخيم': w.camp,
+                  }))
+                }
+                getBanner={() => {
+                  if (!filterCamp || !showBanner) return null;
+                  const camp = camps.find((c) => c.id === filterCamp);
+                  return buildCampExportBanner(camp, orgMembers);
+                }}
+                sheetName="النساء"
+                fileName="سجل_النساء"
               />
             </View>
 
@@ -397,7 +393,7 @@ const getStyles = () =>
       borderRadius: 12, padding: 10, marginBottom: 12,
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
     ageRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 10 },
     ageLabel: { color: colors.muted, fontSize: 12, marginStart: 4 },
     ageInput: {

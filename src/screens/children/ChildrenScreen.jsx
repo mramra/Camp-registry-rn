@@ -154,35 +154,7 @@ export default function ChildrenScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <View>
-            <PageHeader
-              icon="🧒"
-              title="سجل الأطفال"
-              action={
-                <ExportButton
-                  getRows={() =>
-                    childrenData.map((k, i) => ({
-                      '#': i + 1,
-                      'الخيمة': k.tent,
-                      'الاسم': k.name,
-                      'رقم الهوية': k.national_id || '',
-                      'العمر': k.age,
-                      'الصلة': k.relation || '',
-                      'الجنس': k.gender || '',
-                      'يتيم؟': k.orphan_status ? 'نعم' : 'لا',
-                      'رب الأسرة': k.famName,
-                      'المخيم': k.camp,
-                    }))
-                  }
-                  sheetName="الأطفال"
-                  fileName="سجل_الأطفال"
-                  getBanner={() => {
-                    if (!filterCamp || !showBanner) return null;
-                    const camp = camps.find((c) => c.id === filterCamp);
-                    return buildCampExportBanner(camp, orgMembers);
-                  }}
-                />
-              }
-            />
+            <PageHeader icon="🧒" title="سجل الأطفال" />
 
             {!!offlineInfo && (
               <View style={styles.offlineBanner}>
@@ -197,6 +169,30 @@ export default function ChildrenScreen() {
                 label={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
+              />
+              <ExportButton
+                label="📊 تصدير الكشف"
+                getRows={() =>
+                  childrenData.map((k, i) => ({
+                    '#': i + 1,
+                    'الخيمة': k.tent,
+                    'الاسم': k.name,
+                    'رقم الهوية': k.national_id || '',
+                    'العمر': k.age,
+                    'الصلة': k.relation || '',
+                    'الجنس': k.gender || '',
+                    'يتيم؟': k.orphan_status ? 'نعم' : 'لا',
+                    'رب الأسرة': k.famName,
+                    'المخيم': k.camp,
+                  }))
+                }
+                sheetName="الأطفال"
+                fileName="سجل_الأطفال"
+                getBanner={() => {
+                  if (!filterCamp || !showBanner) return null;
+                  const camp = camps.find((c) => c.id === filterCamp);
+                  return buildCampExportBanner(camp, orgMembers);
+                }}
               />
             </View>
 
@@ -293,7 +289,7 @@ const getStyles = () =>
       borderRadius: 12, padding: 10, marginBottom: 12,
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
 
     ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
     ageBox: {

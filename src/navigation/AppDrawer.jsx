@@ -113,10 +113,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         ...(isOwner || profile?.can_review_approvals
           ? [
               { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests', count: pendingCount, pageKey: 'pending_requests' },
-              { icon: '📝', label: 'سجل التغييرات', screen: 'Audit', pageKey: 'audit' },
-              { icon: '🩺', label: 'تشخيص النظام', screen: 'Diagnostics', pageKey: 'diagnostics' },
-              { icon: '🗄️', label: 'إدارة البيانات', screen: 'Data', pageKey: 'data' },
-              ...(isOwner ? [{ icon: '🛡️', label: 'الفحص الأمني', screen: 'SecurityAudit' }] : []),
+              { icon: '🗄️', label: 'إدارة البيانات والتشخيص', screen: 'Data', pageKey: 'data' },
             ]
           : []),
         // عناصر حساب عامة -- متاحة لكل مستخدم بغض النظر عن دوره (كانت

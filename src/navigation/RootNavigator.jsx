@@ -28,11 +28,9 @@ import ActivityLogScreen from '../screens/activity/ActivityLogScreen';
 import SMSScreen from '../screens/sms/SMSScreen';
 import PendingRequestsScreen from '../screens/pending/PendingRequestsScreen';
 import AlertsScreen from '../screens/alerts/AlertsScreen';
-import AuditScreen from '../screens/audit/AuditScreen';
 import DevicesScreen from '../screens/devices/DevicesScreen';
 import AnalysisScreen from '../screens/analysis/AnalysisScreen';
 import CampCompareScreen from '../screens/campcompare/CampCompareScreen';
-import DiagnosticsScreen from '../screens/diagnostics/DiagnosticsScreen';
 import SecurityAuditScreen from '../screens/diagnostics/SecurityAuditScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import SubscriptionScreen from '../screens/subscription/SubscriptionScreen';
@@ -171,18 +169,16 @@ const RootNavigator = () => {
             {/* الطلبات المعلّقة — منقولة بالكامل */}
             <Stack.Screen name="PendingRequests" component={PendingRequestsScreen} options={{ title: 'الطلبات المعلّقة' }} />
             <Stack.Screen name="Alerts" component={AlertsScreen} options={{ title: 'التنبيهات' }} />
-            <Stack.Screen name="Audit" component={AuditScreen} options={{ title: 'سجل التغييرات' }} />
             <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'إدارة الأجهزة' }} />
             <Stack.Screen name="Analysis" component={AnalysisScreen} options={{ title: 'لوحة الإحصائيات' }} />
             <Stack.Screen name="CampCompare" component={CampCompareScreen} options={{ title: 'مقارنة المخيمات' }} />
-            <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'تشخيص النظام' }} />
             <Stack.Screen name="SecurityAudit" component={SecurityAuditScreen} options={{ title: 'الفحص الأمني' }} />
             <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'الإعدادات' }} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'الاشتراك والباقات' }} />
             <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'المساعدة والدعم' }} />
             <Stack.Screen name="Education" component={EducationScreen} options={{ title: 'السجل الدراسي' }} />
             <Stack.Screen name="Export" component={ExportScreen} options={{ title: 'استيراد وتصدير' }} />
-            <Stack.Screen name="Data" component={DataScreen} options={{ title: 'إدارة البيانات' }} />
+            <Stack.Screen name="Data" component={DataScreen} options={{ title: 'إدارة البيانات والتشخيص' }} />
           </>
         )}
       </Stack.Navigator>

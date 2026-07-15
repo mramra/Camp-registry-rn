@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import * as Updates from 'expo-updates';
 import { supabase } from '../../lib/supabase';
@@ -18,7 +19,8 @@ const ROLE_AR = {
 };
 
 export default function SettingsScreen() {
-  const { profile, logout } = useAuth();
+  const { profile, logout, isOwner } = useAuth();
+  const navigation = useNavigation();
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [saving, setSaving] = useState(false);
@@ -118,6 +120,17 @@ export default function SettingsScreen() {
           </Pressable>
         </FormSection>
 
+        {isOwner && (
+          <FormSection title="🛡️ الأمان">
+            <Text style={styles.updateNote}>
+              فحص حقيقي يتأكد إن كل دور/مندوب يرى بيانات مخيمه فقط ولا يوجد تسريب بين المخيمات.
+            </Text>
+            <Pressable style={styles.securityBtn} onPress={() => navigation.push('SecurityAudit')}>
+              <Text style={styles.securityBtnText}>🛡️ فتح الفحص الأمني</Text>
+            </Pressable>
+          </FormSection>
+        )}
+
         <FormSection title="🔄 التحديثات">
           <Text style={styles.updateNote}>
             التطبيق يفحص التحديثات تلقائياً عند فتحه. لو تشك إن تحديث معيّن ما وصلك، اضغط الزر تحت للتأكد مباشرة.
@@ -169,4 +182,6 @@ const styles = StyleSheet.create({
   updateNote: { color: colors.muted, fontSize: 11, lineHeight: 17, marginBottom: 10, textAlign: 'right' },
   checkUpdateBtn: { backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   checkUpdateBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 13 },
+  securityBtn: { backgroundColor: 'rgba(139,92,246,0.1)', borderWidth: 1, borderColor: 'rgba(139,92,246,0.3)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  securityBtnText: { color: colors.purple, fontWeight: 'bold', fontSize: 13 },
 });

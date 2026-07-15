@@ -3,10 +3,12 @@ import { View, Text, Pressable, ScrollView, StyleSheet, SafeAreaView, ActivityIn
 import * as XLSX from 'xlsx';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { hasPermission } from '../../lib/permissions';
 import PageHeader from '../../components/ui/PageHeader';
+import PrimaryButton from '../../components/ui/PrimaryButton';
 import FormSection from '../../components/ui/FormSection';
 import { showToast } from '../../utils/toast';
 import colors from '../../theme/colors';
@@ -28,6 +30,8 @@ export default function DataScreen() {
 
   const [stats, setStats] = useState({});
   const [backing, setBacking] = useState(false);
+  const [tests, setTests] = useState({});
+  const [running, setRunning] = useState(false);
 
   const loadStats = useCallback(() => {
     if (!orgId) return;
@@ -45,9 +49,37 @@ export default function DataScreen() {
     });
   }, [orgId]);
 
-  useEffect(() => { loadStats(); }, [loadStats]);
+  // فحوصات صحة النظام (اتصال/جلسة/REST) -- منقولة من شاشة "تشخيص النظام"
+  // المنفصلة سابقاً (أُلغيت لأنها كانت تكرر نفس إحصائيات الجداول تحديداً)
+  const runSystemChecks = useCallback(async () => {
+    setRunning(true);
+    const results = {};
+
+    const netState = await NetInfo.fetch();
+    results.internet = { ok: !!netState.isConnected, detail: netState.isConnected ? 'متصل' : 'غير متصل' };
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    results.session = { ok: !!session, detail: session?.user?.email || 'بلا جلسة' };
+
+    const t0 = Date.now();
+    const { error: pingErr } = await supabase.from('families').select('id').limit(1);
+    results.rest = { ok: !pingErr, detail: pingErr ? pingErr.message : `يعمل (${Date.now() - t0}ms)` };
+
+    setTests(results);
+    setRunning(false);
+    loadStats();
+  }, [loadStats]);
+
+  useEffect(() => { runSystemChecks(); }, [runSystemChecks]);
 
   const totalRecords = Object.values(stats).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0);
+  const TEST_ROWS = [
+    ['internet', 'الاتصال بالإنترنت'],
+    ['session', 'جلسة Supabase'],
+    ['rest', 'Supabase REST'],
+  ];
 
   const runFullBackup = async () => {
     if (!canExport) return showToast('لا تملك صلاحية النسخ الاحتياطي', 'error');
@@ -86,7 +118,24 @@ export default function DataScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <PageHeader icon="🗄️" title="إدارة البيانات" subtitle={`${totalRecords} سجل إجمالاً`} />
+        <PageHeader icon="🗄️" title="إدارة البيانات والتشخيص" subtitle={`${totalRecords} سجل إجمالاً`} />
+
+        <PrimaryButton label="🔄 إعادة فحص النظام" onPress={runSystemChecks} loading={running} />
+
+        <FormSection title="🩺 حالة الاتصال بالنظام">
+          {TEST_ROWS.map(([key, label]) => {
+            const t = tests[key];
+            if (!t) return null;
+            return (
+              <View key={key} style={styles.testRow}>
+                <Text style={styles.testLabel}>{label}</Text>
+                <Text style={[styles.testValue, { color: t.ok ? colors.green : colors.red }]}>
+                  {t.ok ? '✅' : '❌'} {t.detail}
+                </Text>
+              </View>
+            );
+          })}
+        </FormSection>
 
         <FormSection title="📊 إحصائيات الجداول">
           {TABLES.map((t) => (
@@ -120,6 +169,13 @@ export default function DataScreen() {
             <Text style={styles.lockedText}>🔒 لا تملك صلاحية النسخ الاحتياطي</Text>
           )}
         </FormSection>
+
+        <FormSection title="">
+          <Text style={styles.infoText}>
+            ℹ️ هذا التطبيق يعمل مباشرة مع Supabase بدون تخزين محلي — كل قراءة وكتابة تذهب فوراً
+            للسيرفر. لا حاجة لمزامنة أو "رفع بيانات محلية"، لأنه لا يوجد نسخة محلية أصلاً.
+          </Text>
+        </FormSection>
       </ScrollView>
     </SafeAreaView>
   );
@@ -128,6 +184,10 @@ export default function DataScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 32 },
+
+  testRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface2, borderRadius: 10, padding: 12, marginBottom: 8 },
+  testLabel: { color: colors.white, fontWeight: 'bold', fontSize: 12 },
+  testValue: { fontWeight: 'bold', fontSize: 12 },
 
   statRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
   statLabel: { color: colors.white, fontSize: 12, fontWeight: 'bold' },
@@ -139,4 +199,5 @@ const styles = StyleSheet.create({
   comingSoonBox: { backgroundColor: colors.surface2, borderRadius: 12, padding: 12, marginTop: 10 },
   comingSoonText: { color: colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 17 },
   lockedText: { color: colors.red, fontSize: 12, textAlign: 'center', paddingVertical: 12 },
+  infoText: { color: colors.muted, fontSize: 11, lineHeight: 18, textAlign: 'right' },
 });

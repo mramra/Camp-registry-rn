@@ -114,7 +114,7 @@ export default function ChildrenScreen() {
       .filter((k) => !ageMin || k.age >= Number(ageMin))
       .filter((k) => !ageMax || k.age <= Number(ageMax))
       .filter((k) => !orphansOnly || !!k.orphan_status)
-      .filter((k) => !infantsOnly || k.age < 2)
+      .filter((k) => !infantsOnly || k.age <= 2)
       .filter((k) => !search.trim() || (k.name || '').includes(search) || (k.famName || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [members, famMap, campMap, filterCamp, ageFilter, ageMin, ageMax, orphansOnly, infantsOnly, search]);
@@ -133,7 +133,7 @@ export default function ChildrenScreen() {
       .filter((m) => {
         const age = calcAge(m.dob);
         const f = famMap[m.family_id] || {};
-        return age !== null && age < 2 && (!filterCamp || f.camp_id === filterCamp);
+        return age !== null && age <= 2 && (!filterCamp || f.camp_id === filterCamp);
       }).length;
   }, [members, famMap, filterCamp]);
 

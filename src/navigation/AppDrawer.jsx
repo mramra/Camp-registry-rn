@@ -75,16 +75,6 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       ],
     },
     {
-      key: 'camps',
-      title: '🏕️ الإدارة والوصول',
-      items: [
-        { icon: '🏕️', label: 'المخيمات', screen: 'CampsList', pageKey: 'camps' },
-        { icon: '👥', label: 'المستخدمون', screen: 'UsersList', pageKey: 'users' },
-        { icon: '📱', label: 'الأجهزة', screen: 'Devices', count: devicesPendingCount, pageKey: 'devices' },
-        ...(isOwner ? [{ icon: '🔐', label: 'إدارة الصلاحيات', screen: 'PermissionsAdmin' }] : []),
-      ],
-    },
-    {
       key: 'registers',
       title: '⚕️ السجلات الاجتماعية والصحية',
       items: [
@@ -112,6 +102,16 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         { icon: '⚙️', label: 'الإعدادات', screen: 'Settings', pageKey: 'settings' },
         { icon: '💎', label: 'الاشتراك والباقات', screen: 'Subscription', pageKey: 'subscription' },
         { icon: '❓', label: 'المساعدة والدعم', screen: 'Help', pageKey: 'help' },
+      ],
+    },
+    {
+      key: 'camps',
+      title: '🏕️ الإدارة والوصول',
+      items: [
+        { icon: '🏕️', label: 'المخيمات', screen: 'CampsList', pageKey: 'camps' },
+        { icon: '👥', label: 'المستخدمون', screen: 'UsersList', pageKey: 'users' },
+        { icon: '📱', label: 'الأجهزة', screen: 'Devices', count: devicesPendingCount, pageKey: 'devices' },
+        ...(isOwner ? [{ icon: '🔐', label: 'إدارة الصلاحيات', screen: 'PermissionsAdmin' }] : []),
       ],
     },
     ...(isOwner || profile?.can_review_approvals

@@ -17,13 +17,6 @@ import ExportButton from '../../components/ui/ExportButton';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import colors from '../../theme/colors';
 
-const AGE_GROUPS = [
-  { key: '0-2', min: 0, max: 2 },
-  { key: '3-6', min: 3, max: 6 },
-  { key: '7-12', min: 7, max: 12 },
-  { key: '13-17', min: 13, max: 17 },
-];
-
 export default function ChildrenScreen() {
   const navigation = useNavigation();
   const { orgId, profile } = useAuth();
@@ -37,7 +30,6 @@ export default function ChildrenScreen() {
   const [showBanner, setShowBanner] = useState(true);
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
-  const [ageFilter, setAgeFilter] = useState('');
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
   const [orphansOnly, setOrphansOnly] = useState(false);
@@ -106,18 +98,13 @@ export default function ChildrenScreen() {
       })
       .filter((k) => k.age !== null && k.age < 18)
       .filter((k) => !filterCamp || k.camp_id === filterCamp)
-      .filter((k) => {
-        if (!ageFilter) return true;
-        const g = AGE_GROUPS.find((g) => g.key === ageFilter);
-        return k.age >= g.min && k.age <= g.max;
-      })
       .filter((k) => !ageMin || k.age >= Number(ageMin))
       .filter((k) => !ageMax || k.age <= Number(ageMax))
       .filter((k) => !orphansOnly || !!k.orphan_status)
-      .filter((k) => !infantsOnly || k.age <= 2)
+      .filter((k) => !infantsOnly || k.age < 2)
       .filter((k) => !search.trim() || (k.name || '').includes(search) || (k.famName || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
-  }, [members, famMap, campMap, filterCamp, ageFilter, ageMin, ageMax, orphansOnly, infantsOnly, search]);
+  }, [members, famMap, campMap, filterCamp, ageMin, ageMax, orphansOnly, infantsOnly, search]);
 
   const orphansCount = useMemo(() => {
     return members
@@ -133,14 +120,9 @@ export default function ChildrenScreen() {
       .filter((m) => {
         const age = calcAge(m.dob);
         const f = famMap[m.family_id] || {};
-        return age !== null && age <= 2 && (!filterCamp || f.camp_id === filterCamp);
+        return age !== null && age < 2 && (!filterCamp || f.camp_id === filterCamp);
       }).length;
   }, [members, famMap, filterCamp]);
-
-  const ageGroupCounts = useMemo(() => {
-    const all = members.map((m) => calcAge(m.dob)).filter((a) => a !== null && a < 18);
-    return AGE_GROUPS.map((g) => ({ ...g, count: all.filter((a) => a >= g.min && a <= g.max).length }));
-  }, [members]);
 
   const styles = getStyles();
 
@@ -242,17 +224,6 @@ export default function ChildrenScreen() {
                 <Text style={[styles.ageCount, infantsOnly && styles.ageCountActive]}>{infantsCount}</Text>
                 <Text style={styles.ageLabel}>رضع</Text>
               </Pressable>
-              {ageGroupCounts.map((g) => (
-                <Pressable
-                  key={g.key}
-                  style={[styles.ageBox, ageFilter === g.key && styles.ageBoxActive]}
-                  onPress={() => setAgeFilter(ageFilter === g.key ? '' : g.key)}
-                >
-                  <Text style={styles.ageIcon}>🎂</Text>
-                  <Text style={[styles.ageCount, ageFilter === g.key && styles.ageCountActive]}>{g.count}</Text>
-                  <Text style={styles.ageLabel}>{g.key}</Text>
-                </Pressable>
-              ))}
             </View>
 
             <View style={styles.ageRow}>

@@ -84,6 +84,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         { icon: '👨', label: 'سجل الرجال', screen: 'Men', pageKey: 'men' },
         { icon: '🩺', label: 'سجل الحالات الصحية', screen: 'HealthRecords', pageKey: 'health_records' },
         { icon: '🎓', label: 'السجل الدراسي', screen: 'Education', pageKey: 'education_status' },
+        { icon: '💾', label: 'استيراد وتصدير', screen: 'Export', pageKey: 'export' },
       ],
     },
     {
@@ -92,7 +93,6 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       items: [
         { icon: '📈', label: 'لوحة الإحصائيات', screen: 'Analysis', pageKey: 'analysis' },
         { icon: '🏕️', label: 'مقارنة المخيمات', screen: 'CampCompare', pageKey: 'camp_compare' },
-        { icon: '💾', label: 'استيراد وتصدير', screen: 'Export', pageKey: 'export' },
       ],
     },
     {

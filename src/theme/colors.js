@@ -17,6 +17,12 @@ export const colors = {
   pink:     '#f472b6',
   muted:    '#8b949e',
   white:    '#ffffff',
+  // نمط "زجاجي/ذهبي" فاخر (glassmorphism) -- يُستخدم بالمكوّنات
+  // المركزية (FormSection، BottomSheetModal، PrimaryButton) لإعطاء
+  // شكل شبه شفاف بحدّ ذهبي متوهّج بدل الحدّ الرمادي الصلب المعتاد
+  glassSurface: 'rgba(22,27,34,0.88)',
+  glassBorder:  'rgba(245,158,11,0.25)',
+  glowShadow:   '#f59e0b',
 };
 
 export default colors;

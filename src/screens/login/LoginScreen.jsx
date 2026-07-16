@@ -94,6 +94,7 @@ export default function LoginScreen({ navigation }) {
               أي معنى بصري لأنه وراءها لون واحد فاضي بس (نفس مبدأ أي
               تصميم Glassmorphism: لازم محتوى فعلي وراء الزجاج) */}
           <View style={styles.scene} pointerEvents="none">
+            <View style={styles.sunGlowOuter} />
             <View style={styles.sunGlow} />
             <View style={[styles.star, { top: 40, left: 50 }]} />
             <View style={[styles.star, { top: 70, left: 280 }]} />
@@ -215,9 +216,13 @@ const styles = StyleSheet.create({
   center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
 
   scene: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  sunGlowOuter: {
+    position: 'absolute', top: -140, alignSelf: 'center', width: 460, height: 460,
+    borderRadius: 460, backgroundColor: 'rgba(217,119,6,0.28)',
+  },
   sunGlow: {
-    position: 'absolute', top: -70, alignSelf: 'center', width: 300, height: 300,
-    borderRadius: 300, backgroundColor: 'rgba(245,158,11,0.22)',
+    position: 'absolute', top: -60, alignSelf: 'center', width: 280, height: 280,
+    borderRadius: 280, backgroundColor: 'rgba(245,158,11,0.5)',
   },
   star: { position: 'absolute', width: 2, height: 2, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)' },
   tentsRow: {

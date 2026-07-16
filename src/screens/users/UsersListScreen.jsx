@@ -21,6 +21,7 @@ import { formatDateTime, randomPassword } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import PrimaryButton from '../../components/ui/PrimaryButton';
+import { naturalCompare } from '../../lib/helpers';
 import EmptyState from '../../components/ui/EmptyState';
 import Badge from '../../components/ui/Badge';
 import colors from '../../theme/colors';
@@ -124,7 +125,7 @@ export default function UsersListScreen() {
       [...arr].sort((a, b) => {
         const ra = ROLE_ORDER.indexOf(a.role), rb = ROLE_ORDER.indexOf(b.role);
         if (ra !== rb) return ra - rb;
-        return (a.full_name || '').localeCompare(b.full_name || '', 'ar');
+        return naturalCompare(a.full_name, b.full_name);
       });
 
     const flat = [];

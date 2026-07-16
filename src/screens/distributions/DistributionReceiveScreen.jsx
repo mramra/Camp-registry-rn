@@ -18,7 +18,7 @@ import { showError, showSuccess } from '../../utils/toast';
 import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
-import { buildCampExportBanner } from '../../lib/helpers';
+import { buildCampExportBanner, naturalCompare } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
@@ -178,9 +178,9 @@ export default function DistributionReceiveScreen() {
     list = [...list].sort((a, b) => {
       switch (sortMode) {
         case 'alpha':
-          return (a.head_name || '').localeCompare(b.head_name || '', 'ar');
+          return naturalCompare(a.head_name, b.head_name);
         case 'tent_asc':
-          return String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true });
+          return naturalCompare(a.tent, b.tent);
         default: {
           const am = (membersByFamily[a.id]?.length || 0) + 1;
           const bm = (membersByFamily[b.id]?.length || 0) + 1;
@@ -280,14 +280,14 @@ export default function DistributionReceiveScreen() {
     [...list].sort((a, b) => {
       const ca = campMap[a.camp_id] || '';
       const cb = campMap[b.camp_id] || '';
-      if (ca !== cb) return ca.localeCompare(cb, 'ar');
+      if (ca !== cb) return naturalCompare(ca, cb);
 
       const ta = a.tent ? String(a.tent).trim() : '';
       const tb = b.tent ? String(b.tent).trim() : '';
-      if (!ta && !tb) return (a.head_name || '').localeCompare(b.head_name || '', 'ar');
+      if (!ta && !tb) return naturalCompare(a.head_name, b.head_name);
       if (!ta) return 1; // بدون رقم خيمة → بالآخر
       if (!tb) return -1;
-      return ta.localeCompare(tb, 'ar', { numeric: true });
+      return naturalCompare(ta, tb);
     });
 
   const handleExport = async () => {

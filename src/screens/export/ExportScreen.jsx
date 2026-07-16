@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
-import { supabase, fetchCamps, fetchOrgMembers, createFamily } from '../../lib/supabase';
+import { supabase, fetchCamps, fetchOrgMembers, createFamily, saveFamilyMembers } from '../../lib/supabase';
 import NetInfo from '@react-native-community/netinfo';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX, exportCampTemplateReport } from '../../lib/excelIO';
-import { calcAge, isAgeInRange, buildCampExportBanner, getCampDelegateInfo, normalizeHealthValue } from '../../lib/helpers';
+import { calcAge, isAgeInRange, buildCampExportBanner, getCampDelegateInfo, normalizeHealthValue, naturalCompare } from '../../lib/helpers';
 import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
@@ -98,6 +98,7 @@ export default function ExportScreen() {
   const [mainTab, setMainTab] = useState('quickFam'); // quickFam | quickMem | customFam | customMem | import
   const [importPreview, setImportPreview] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [importCamp, setImportCamp] = useState('');
 
   // اختيار الحقول — التصدير السريع
   const [famCols, setFamCols] = useState(() => FAM_COLS.map((c) => ({ ...c, order: 0 })));
@@ -206,7 +207,7 @@ export default function ExportScreen() {
     try {
       const data = await getFullData();
       if (!data.length) return showToast('لا توجد بيانات للتصدير', 'error');
-      const sorted = [...data].sort((a, b) => String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true }));
+      const sorted = [...data].sort((a, b) => naturalCompare(a.tent, b.tent));
       const campInfo = getCampInfo(filterCamp);
       const rows = sorted.map((f) => {
         const wife = findWife(f.family_members);
@@ -299,9 +300,9 @@ export default function ExportScreen() {
 
   const downloadTemplate = async () => {
     const rows = [{
-      'اسم رب الأسرة*': 'محمد أحمد علي', 'رقم الهوية*': '123456789', 'رقم الجوال*': '0599000000',
-      'جوال بديل': '', 'الجنس': 'ذكر', 'الحالة الاجتماعية': 'متزوج', 'تاريخ الميلاد': '1980-01-15',
-      'اسم المخيم*': camps[0]?.name || 'مخيم السلام', 'الخيمة': 'A1', 'المنطقة الأصلية': 'غزة', 'ملاحظات': '',
+      'اسم رب الأسرة رباعي*': 'محمد أحمد علي السالم', 'رقم هوية رب الأسرة*': '123456789', 'رقم التواصل*': '0599000000',
+      'اسم الزوجة رباعي': 'فاطمة سالم أحمد الحسن', 'رقم هوية الزوجة': '987654321', 'الحالة الاجتماعية': 'متزوج',
+      'الجنس': 'ذكر', 'تاريخ الميلاد': '1980-01-15', 'الخيمة': 'A1', 'المنطقة الأصلية': 'غزة', 'ملاحظات': '',
     }];
     await exportXLSX(rows, 'قالب الاستيراد', 'قالب_استيراد_الأسر');
     showToast('تم تحميل القالب', 'success');
@@ -309,33 +310,34 @@ export default function ExportScreen() {
 
   const handleImport = async () => {
     if (!canImport) return showToast('لا تملك صلاحية الاستيراد', 'error');
+    if (!importCamp) return showToast('اختر المخيم أولاً قبل رفع الملف', 'error');
     setLoading(true);
     try {
       const result = await pickAndParseXLSX();
       if (!result || !result.rows.length) return;
       const { data: existing } = await supabase.from('families').select('head_id').eq('org_id', orgId);
       const existingIds = new Set((existing || []).map((f) => f.head_id).filter(Boolean));
-      const campMap = Object.fromEntries(camps.map((c) => [c.name.trim(), c.id]));
       const preview = result.rows
-        .filter((r) => r['اسم رب الأسرة*'] || r['اسم رب الأسرة'])
+        .filter((r) => r['اسم رب الأسرة رباعي*'] || r['اسم رب الأسرة*'] || r['اسم رب الأسرة'])
         .map((r) => {
-          const headId = String(r['رقم الهوية*'] || r['رقم الهوية'] || '').trim();
-          const campName = String(r['اسم المخيم*'] || r['المخيم'] || '').trim();
+          const headId = String(r['رقم هوية رب الأسرة*'] || r['رقم الهوية*'] || r['رقم الهوية'] || '').trim();
+          const wifeName = String(r['اسم الزوجة رباعي'] || r['اسم الزوجة'] || '').trim();
+          const wifeId = String(r['رقم هوية الزوجة'] || r['هوية الزوجة'] || '').trim();
           return {
-            head_name: String(r['اسم رب الأسرة*'] || r['اسم رب الأسرة'] || '').trim(),
+            head_name: String(r['اسم رب الأسرة رباعي*'] || r['اسم رب الأسرة*'] || r['اسم رب الأسرة'] || '').trim(),
             head_id: headId,
-            phone1: String(r['رقم الجوال*'] || r['رقم الجوال'] || '').trim(),
-            phone2: String(r['جوال بديل'] || '').trim() || null,
+            phone1: String(r['رقم التواصل*'] || r['رقم الجوال*'] || r['رقم الجوال'] || '').trim(),
             head_gender: String(r['الجنس'] || 'ذكر').trim(),
             head_marital: String(r['الحالة الاجتماعية'] || '').trim() || null,
             head_dob: String(r['تاريخ الميلاد'] || '').trim() || null,
-            camp_id: campMap[campName] || null,
-            campName,
+            camp_id: importCamp,
             tent: String(r['الخيمة'] || '').trim() || null,
             original_address: String(r['المنطقة الأصلية'] || '').trim() || null,
             notes: String(r['ملاحظات'] || '').trim() || null,
+            wifeName,
+            wifeId,
             dup: existingIds.has(headId),
-            valid: !!(r['اسم رب الأسرة*'] || r['اسم رب الأسرة']) && !!headId,
+            valid: !!(r['اسم رب الأسرة رباعي*'] || r['اسم رب الأسرة*'] || r['اسم رب الأسرة']) && !!headId,
           };
         });
       setImportPreview(preview);
@@ -352,9 +354,21 @@ export default function ExportScreen() {
     let ok = 0, err = 0;
     try {
       for (const row of importPreview.filter((r) => r.valid && !r.dup)) {
-        const { dup, valid, campName, ...fam } = row;
+        const { dup, valid, wifeName, wifeId, ...fam } = row;
         const result = await createFamily({ org_id: orgId, ...fam, category_tags: [] });
-        if (result.success) ok++; else err++;
+        if (result.success) {
+          // زوجة موجودة بالصف → تُنشأ تلقائياً كفرد أسرة فعلي (صلة: زوجة)
+          if (wifeName) {
+            try {
+              await saveFamilyMembers(result.data.id, [{ name: wifeName, relation: 'زوجة', national_id: wifeId || null }]);
+            } catch {
+              // فشل إضافة الزوجة لا يُسقط الأسرة نفسها -- اتسجّلت أصلاً بنجاح
+            }
+          }
+          ok++;
+        } else {
+          err++;
+        }
       }
       const skip = importPreview.filter((r) => r.dup).length;
       showToast(`${ok} استُورد | ${skip} مكرر${err ? ` | ${err} خطأ` : ''}`, 'success');
@@ -392,7 +406,7 @@ export default function ExportScreen() {
         if (cxSearch && !(f.head_name || '').includes(cxSearch) && !(f.tent || '').includes(cxSearch)) return false;
         return true;
       })
-      .sort((a, b) => String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true }));
+      .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [allFamilies, cxCamp, cxSearch]);
 
   const cxFamilySizeMap = useMemo(() => {
@@ -424,7 +438,7 @@ export default function ExportScreen() {
           familySize: cxFamilySizeMap[m.family_id] || 1,
         };
       })
-      .sort((a, b) => String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true }));
+      .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [allMembers, allFamilies, cxCamp, cxSearch, cxMode, cxAgeMin, cxAgeMax, campMap, cxFamilySizeMap]);
 
   const cxList = cxMode === 'families' ? cxFilteredFams : cxFilteredMems;
@@ -545,7 +559,7 @@ export default function ExportScreen() {
         totalIndividuals,
       };
 
-      const sorted = [...fams].sort((a, b) => String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true }));
+      const sorted = [...fams].sort((a, b) => naturalCompare(a.tent, b.tent));
       const dataRows = sorted.map((f) => {
         const members = f.family_members || [];
         const wife = findWife(members);
@@ -788,10 +802,22 @@ export default function ExportScreen() {
         <FormSection title="📤 استيراد Excel">
           {canImport && !offlineInfo ? (
             <>
-              <Pressable style={styles.btnOutline} onPress={downloadTemplate}>
+              <Text style={styles.compNote}>
+                1️⃣ اختر المخيم أولاً (يُطبَّق تلقائياً على كل الأسر المستوردة) — 2️⃣ بعدها حمّل
+                القالب أو ارفع الملف. الأعمدة الضرورية: اسم رب الأسرة، هويته، رقم التواصل. اسم
+                وهوية الزوجة والحالة الاجتماعية اختيارية (لو وُجد اسم الزوجة تُنشأ تلقائياً كفرد
+                بالأسرة بصلة "زوجة").
+              </Text>
+              <SelectField
+                value={campOptions.find((o) => o.value === importCamp)?.label}
+                placeholder="🏕️ اختر المخيم (إجباري)"
+                options={camps.map((c) => ({ value: c.id, label: c.name }))}
+                onSelect={setImportCamp}
+              />
+              <Pressable style={[styles.btnOutline, !importCamp && styles.btnDisabled]} onPress={downloadTemplate} disabled={!importCamp}>
                 <Text style={styles.btnOutlineText}>📋 تحميل قالب الاستيراد</Text>
               </Pressable>
-              <Pressable style={styles.btnPrimary} onPress={handleImport} disabled={loading}>
+              <Pressable style={[styles.btnPrimary, !importCamp && styles.btnDisabled]} onPress={handleImport} disabled={loading || !importCamp}>
                 <Text style={styles.btnPrimaryText}>📂 اختيار ملف Excel</Text>
               </Pressable>
 

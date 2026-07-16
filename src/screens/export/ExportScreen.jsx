@@ -7,7 +7,7 @@ import { formatDateTime } from '../../lib/utils';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
-import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX } from '../../lib/excelIO';
+import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX, exportCampTemplateReport } from '../../lib/excelIO';
 import { calcAge, isAgeInRange, buildCampExportBanner, getCampDelegateInfo, normalizeHealthValue } from '../../lib/helpers';
 import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
@@ -534,54 +534,54 @@ export default function ExportScreen() {
       const statusAr = { active: 'نشط', closed: 'مغلق', suspended: 'موقوف' }[campInfo.status] || campInfo.status || '—';
       const coords = campInfo.latitude && campInfo.longitude ? `${campInfo.latitude}, ${campInfo.longitude}` : '—';
 
-      const banner = [
-        { text: `🏕️ ${campInfo.name}`, size: 18 },
-        { text: `الحالة: ${statusAr}   |   المندوب: ${delegate?.name || '—'}   |   جوال المندوب: ${delegate?.phone || '—'}`, size: 11 },
-        { text: `العنوان: ${campInfo.address || '—'}   |   GIS: ${coords}`, size: 11 },
-        { text: `عدد الأسر: ${fams.length}   |   عدد الأفراد الكلي: ${totalIndividuals}`, size: 11 },
-      ];
+      const info = {
+        campName: campInfo.name || '—',
+        statusAr,
+        delegateName: delegate?.name || '—',
+        delegatePhone: delegate?.phone || '—',
+        address: campInfo.address || '—',
+        coords,
+        familyCount: fams.length,
+        totalIndividuals,
+      };
 
       const sorted = [...fams].sort((a, b) => String(a.tent || '').localeCompare(String(b.tent || ''), 'ar', { numeric: true }));
-      const rows = sorted.map((f, i) => {
+      const dataRows = sorted.map((f) => {
         const members = f.family_members || [];
         const wife = findWife(members);
         const ages = ageBuckets(members.map((m) => calcAge(m.dob)));
         const chronicCount = healthCount(f.head_chronic_diseases) + members.reduce((s, m) => s + healthCount(m.chronic_diseases), 0);
         const disabilityCount = healthCount(f.head_disabilities) + members.reduce((s, m) => s + healthCount(m.disabilities), 0);
         const injuryCount = healthCount(f.head_injuries) + members.reduce((s, m) => s + healthCount(m.injuries), 0);
-        return {
-          '#': i + 1,
-          'اسم رب الأسرة': f.head_name || '',
-          'رقم الهوية': f.head_id || '',
-          'رقم التواصل': f.phone1 || '',
-          'اسم الزوجة': wife?.name || '',
-          'رقم هوية الزوجة': wife?.national_id || '',
-          'عدد أفراد الأسرة': members.length + 1,
-          'الحالة الاجتماعية': f.head_marital || '',
-          'مصدر دخل رب الأسرة': '',
-          'عدد الأطفال (0-6)': ages.c06,
-          'عدد الأطفال (6-12)': ages.c612,
-          'عدد الأطفال (12-18)': ages.c1218,
-          'عدد الأطفال فوق 18': ages.adult,
-          'عدد كبار السن': ages.elderly,
-          'السكن الأصلي': f.original_address || '',
-          'محافظة السكن الأصلي': '',
-          'السكن الحالي': f.address || campInfo.name || '',
-          'محافظة السكن الحالي': '',
-          'حالة النزوح': '',
-          'نوع المسكن': '',
-          'حالة المسكن': '',
-          'عدد الأمراض المزمنة': chronicCount,
-          'عدد الإعاقات': disabilityCount,
-          'عدد الإصابات': injuryCount,
-          'ملاحظات': f.notes || '',
-        };
+        return [
+          f.head_name || '',
+          f.head_id || '',
+          f.phone1 || '',
+          wife?.name || '',
+          wife?.national_id || '',
+          members.length + 1,
+          f.head_marital || '',
+          '', // مصدر دخل رب الأسرة -- غير متوفر بقاعدة البيانات حالياً
+          ages.c06,
+          ages.c612,
+          ages.c1218,
+          ages.adult,
+          ages.elderly,
+          f.original_address || '',
+          '', // محافظة السكن الأصلي -- غير متوفرة
+          f.address || campInfo.name || '',
+          '', // محافظة السكن الحالي -- غير متوفرة
+          '', // حالة النزوح -- غير متوفرة
+          '', // نوع المسكن -- غير متوفر
+          '', // حالة المسكن -- غير متوفرة
+          chronicCount,
+          disabilityCount,
+          injuryCount,
+          f.notes || '',
+        ];
       });
 
-      await exportXLSXMultiSheetWithBanners(
-        [{ name: campInfo.name.slice(0, 31), banner, rows }],
-        `كشف_شامل_${campInfo.name}`
-      );
+      await exportCampTemplateReport(info, dataRows, `كشف_شامل_${campInfo.name}`);
       showToast(`تم تصدير الكشف الشامل لـ${fams.length} أسرة`, 'success');
     } catch (e) {
       showToast('خطأ: ' + e.message, 'error');
@@ -647,9 +647,10 @@ export default function ExportScreen() {
             {canExport ? (
               <>
                 <Text style={styles.compNote}>
-                  يبني كشفاً شاملاً لمخيم واحد محدَّد (بانر معلومات المركز + جدول تفصيلي بكل أسرة)
-                  حسب القالب المرفوع. ⚠️ بعض الأعمدة (مصدر الدخل، تفاصيل السكن، حالة النزوح) غير
-                  موجودة بقاعدة البيانات حالياً وستظهر فارغة لحد ما تُضاف لنموذج الأسرة مستقبلاً.
+                  يبني كشفاً بنفس تخطيط القالب المرفوع حرفياً (بانر مركز الإيواء متعدد الأعمدة +
+                  رؤوس فئات مدمجة + رؤوس أعمدة تفصيلية) لمخيم واحد محدَّد. ⚠️ بعض الأعمدة (مصدر
+                  الدخل، المحافظة، حالة النزوح، نوع وحالة المسكن) غير موجودة بقاعدة البيانات
+                  حالياً وتظهر فارغة — بنفس مكانها بالضبط بالجدول — لحد ما تُضاف لنموذج الأسرة.
                 </Text>
                 <Pressable style={styles.btnPrimary} onPress={exportComprehensive} disabled={loading}>
                   <Text style={styles.btnPrimaryText}>📊 توليد الكشف الشامل</Text>

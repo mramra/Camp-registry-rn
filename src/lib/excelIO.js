@@ -247,6 +247,142 @@ function buildFinalName(fileName) {
 }
 
 /**
+ * يصدّر "كشف شامل" بنفس التخطيط الحرفي لقالب Excel مرفوع من محمود --
+ * بانر معلومات مركز إيواء بعرض متعدد الأعمدة (اسم/حالة/مندوب/جوال/عنوان/
+ * GIS/عدد أسر/عدد أفراد)، صف رؤوس فئات مدمجة (معلومات أساسية/فئات
+ * عمرية/سكن/صحة)، صف رؤوس أعمدة تفصيلية، ثم بيانات الأسر.
+ * هذا مبني كدالة مستقلة (لا يستخدم buildStyledSheetWithBanner العادية)
+ * لأن التخطيط هنا متعدد الأعمدة والدمج، وليس بانر نص بسيط بعرض الجدول.
+ *
+ * @param {Object} info - { campName, statusAr, delegateName, delegatePhone, address, coords, familyCount, totalIndividuals }
+ * @param {Array<Array>} dataRows - كل صف = مصفوفة 24 قيمة بترتيب أعمدة القالب (B إلى Y، بدون رقم الصف #)
+ * @param {string} fileName
+ */
+export async function exportCampTemplateReport(info, dataRows, fileName) {
+  if (!dataRows || dataRows.length === 0) {
+    throw new Error('لا توجد بيانات للتصدير');
+  }
+
+  const blank = (n) => Array(n).fill('');
+
+  const aoa = [
+    ['معلومات مركز الإيواء', ...blank(23)],
+    [
+      'اسم مركز الإيواء', '', info.campName, '', '',
+      'حالة المركز', '', info.statusAr, '', '', '',
+      'مندوب المخيم', '', info.delegateName, '', '', '',
+      'رقم جوال المندوب', '', '', info.delegatePhone, '', '', '',
+    ],
+    [
+      'عنوان مركز الإيواء', '', info.address, '', '',
+      'موقع GIS الخاص بالمركز', '', info.coords, '', '', '',
+      'عدد العائلات بالمركز', '', info.familyCount, '', '', '',
+      'عدد الافراد الكلي في المخيم', '', '', info.totalIndividuals, '', '', '',
+    ],
+    ['#', 'الــمعلومات الأساسية', '', '', '', '', '', '', '', 'الفئات العمرية', '', '', '', '', 'معلومات السكن', '', '', '', '', '', '', 'الحالة الصحية', '', '', ''],
+    [
+      '', 'اسم رب الأسرة رباعي', 'رقم الهوية', 'رقم التواصل', 'اسم الزوجة رباعي', 'رقم هوية الزوجة',
+      'عدد أفراد الأسرة', 'الحالة الاجتماعية', 'مصدر دخل رب الأسرة (قطاع خاص/قطاع حكومي/لا يعمل)',
+      'عدد الأطفال من (0_6) سنوات', 'عدد الأطفال من (6_12) سنوات', 'عدد الأطفال من (12_18) سنوات', 'عدد الأطفال ما فوق 18 سنة', 'عدد كبار السن',
+      'السكن الأصلي', 'المحافظة', 'السكن الحالي', 'المحافظة', 'حالة النزوح (نازح/مقيم)', 'نوع المسكن (خيمة/بيت/حاصل)', 'حالة السكن (هدم كل/ جزئي/غير قابل للسكن)',
+      'عدد الأمراض المزمنة في الأسرة', 'عدد الاعاقات في الأسرة', 'عدد الإصابات في الأسرة', 'ملاحظات',
+    ],
+    ...dataRows.map((row, i) => [i + 1, ...row]),
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 23 } }, // معلومات مركز الإيواء (A1:X1)
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } }, { s: { r: 1, c: 2 }, e: { r: 1, c: 4 } },
+    { s: { r: 1, c: 5 }, e: { r: 1, c: 6 } }, { s: { r: 1, c: 7 }, e: { r: 1, c: 10 } },
+    { s: { r: 1, c: 11 }, e: { r: 1, c: 12 } }, { s: { r: 1, c: 13 }, e: { r: 1, c: 16 } },
+    { s: { r: 1, c: 17 }, e: { r: 1, c: 19 } }, { s: { r: 1, c: 20 }, e: { r: 1, c: 23 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 1 } }, { s: { r: 2, c: 2 }, e: { r: 2, c: 4 } },
+    { s: { r: 2, c: 5 }, e: { r: 2, c: 6 } }, { s: { r: 2, c: 7 }, e: { r: 2, c: 10 } },
+    { s: { r: 2, c: 11 }, e: { r: 2, c: 12 } }, { s: { r: 2, c: 13 }, e: { r: 2, c: 16 } },
+    { s: { r: 2, c: 17 }, e: { r: 2, c: 19 } }, { s: { r: 2, c: 20 }, e: { r: 2, c: 23 } },
+    { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }, // # (A4:A5)
+    { s: { r: 3, c: 1 }, e: { r: 3, c: 8 } }, // المعلومات الأساسية (B4:I4)
+    { s: { r: 3, c: 9 }, e: { r: 3, c: 13 } }, // الفئات العمرية (J4:N4)
+    { s: { r: 3, c: 14 }, e: { r: 3, c: 20 } }, // معلومات السكن (O4:U4)
+    { s: { r: 3, c: 21 }, e: { r: 3, c: 23 } }, // الحالة الصحية (V4:X4)
+  ];
+
+  ws['!cols'] = [
+    { wch: 6 }, { wch: 26 }, { wch: 14 }, { wch: 14 }, { wch: 26 }, { wch: 14 },
+    { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+    { wch: 10 }, { wch: 10 }, { wch: 18 }, { wch: 10 }, { wch: 18 }, { wch: 10 },
+    { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 30 },
+  ];
+
+  const titleStyle = {
+    fill: { fgColor: { rgb: '1F2937' } },
+    font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 14 },
+    alignment: { horizontal: 'center', vertical: 'center' },
+  };
+  const bannerLabelStyle = {
+    fill: { fgColor: { rgb: '374151' } },
+    font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+  };
+  const bannerValueStyle = {
+    fill: { fgColor: { rgb: 'FEF3C7' } },
+    font: { bold: true, color: { rgb: '000000' }, sz: 10 },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+  };
+  const groupHeaderStyle = {
+    fill: { fgColor: { rgb: 'F59E0B' } },
+    font: { bold: true, color: { rgb: '000000' }, sz: 11 },
+    alignment: { horizontal: 'center', vertical: 'center' },
+  };
+  const colHeaderStyle = {
+    fill: { fgColor: { rgb: 'FDE68A' } },
+    font: { bold: true, color: { rgb: '000000' }, sz: 9 },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } },
+  };
+  const dataStyle = (isEven) => ({
+    fill: { fgColor: { rgb: isEven ? 'F3F4F6' : 'FFFFFF' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: { top: { style: 'thin', color: { rgb: 'E5E7EB' } }, bottom: { style: 'thin', color: { rgb: 'E5E7EB' } }, left: { style: 'thin', color: { rgb: 'E5E7EB' } }, right: { style: 'thin', color: { rgb: 'E5E7EB' } } },
+  });
+
+  const totalCols = 24;
+  for (let c = 0; c <= totalCols; c++) {
+    const a0 = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[a0]) ws[a0].s = titleStyle;
+    // صفوف 2-3 (بانر): أعمدة الملصقات (label) مقابل القيمة (value) --
+    // الملصقات بأعمدة ثابتة معروفة، والباقي قيم
+    const labelCols2 = [0, 5, 11, 17];
+    const labelCols3 = [0, 5, 11, 17];
+    [1, 2].forEach((r) => {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) return;
+      const labelCols = r === 1 ? labelCols2 : labelCols3;
+      ws[addr].s = labelCols.includes(c) ? bannerLabelStyle : bannerValueStyle;
+    });
+    const a3 = XLSX.utils.encode_cell({ r: 3, c });
+    if (ws[a3]) ws[a3].s = groupHeaderStyle;
+    const a4 = XLSX.utils.encode_cell({ r: 4, c });
+    if (ws[a4]) ws[a4].s = colHeaderStyle;
+  }
+  for (let r = 5; r < aoa.length; r++) {
+    for (let c = 0; c <= totalCols; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) continue;
+      ws[addr].s = dataStyle((r - 5) % 2 === 0);
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, (info.campName || 'كشف شامل').slice(0, 31));
+  const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+  const finalName = buildFinalName(fileName);
+  return saveAndShare(base64, finalName);
+}
+
+/**
  * يصدّر مصفوفة صفوف (objects) إلى ملف Excel منسَّق، ثم يفتح قائمة الإرسال.
  * @param {Array<Object>} rows - صفوف البيانات (كل عنصر = صف بمفاتيح = أسماء الأعمدة)
  * @param {string} sheetName - اسم الورقة داخل الملف

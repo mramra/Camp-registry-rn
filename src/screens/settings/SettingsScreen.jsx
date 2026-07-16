@@ -6,6 +6,7 @@ import * as Updates from 'expo-updates';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../../utils/toast';
+import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import FormSection from '../../components/ui/FormSection';
 import FormInput from '../../components/ui/FormInput';
@@ -132,6 +133,15 @@ export default function SettingsScreen() {
         )}
 
         <FormSection title="🔄 التحديثات">
+          <View style={styles.versionBox}>
+            <Text style={styles.versionLabel}>رقم النسخة الحالية المثبَّتة على جهازك</Text>
+            <Text style={styles.versionValue}>
+              {Updates.updateId ? Updates.updateId.slice(0, 8) : 'النسخة الأصلية (بلا تحديث فوري بعد)'}
+            </Text>
+            {!!Updates.createdAt && (
+              <Text style={styles.versionDate}>نُشرت: {formatDateTime(Updates.createdAt)}</Text>
+            )}
+          </View>
           <Text style={styles.updateNote}>
             التطبيق يفحص التحديثات تلقائياً عند فتحه. لو تشك إن تحديث معيّن ما وصلك، اضغط الزر تحت للتأكد مباشرة.
           </Text>
@@ -180,6 +190,13 @@ const styles = StyleSheet.create({
   logoutBtnText: { color: colors.red, fontWeight: 'bold', fontSize: 13 },
 
   updateNote: { color: colors.muted, fontSize: 11, lineHeight: 17, marginBottom: 10, textAlign: 'right' },
+  versionBox: {
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 12, padding: 12, marginBottom: 12,
+  },
+  versionLabel: { color: colors.muted, fontSize: 10, textAlign: 'right' },
+  versionValue: { color: colors.white, fontWeight: '900', fontSize: 14, marginTop: 4, textAlign: 'right' },
+  versionDate: { color: colors.muted, fontSize: 10, marginTop: 4, textAlign: 'right' },
   checkUpdateBtn: { backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   checkUpdateBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 13 },
   securityBtn: { backgroundColor: 'rgba(139,92,246,0.1)', borderWidth: 1, borderColor: 'rgba(139,92,246,0.3)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },

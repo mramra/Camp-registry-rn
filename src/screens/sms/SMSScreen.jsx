@@ -315,25 +315,39 @@ export default function SMSScreen() {
     setDirectProgress({ done: 0, total: sel.length });
     let ok = 0;
     let fail = 0;
+    let timedOut = 0; // انتهت مهلة الانتظار لكن الرسالة قد تكون وصلت فعلياً لاحقاً (راديو الجهاز ما زال يعالجها بالخلفية)
+    const failReasons = [];
 
     for (let i = 0; i < sel.length; i++) {
       const f = sel[i];
       const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
       try {
-        // مهلة 25 ثانية إجبارية -- بدونها، لو المكتبة الأصلية علّقت بانتظار
-        // تقرير تسليم ما يوصل أبداً (سلوك معروف بالمكتبة على أجهزة حقيقية)،
-        // الإرسال كله يتوقف عند "0 من X" للأبد بدون أي رسالة خطأ.
+        // مهلة 60 ثانية (بدل 25) -- لما التطبيق شغّال بالخلفية عبر الخدمة
+        // الأمامية، JS thread ممكن ياخذ أولوية أقل من أندرويد حتى مع
+        // وجود إشعار دائم، فوقت استجابة المكتبة الأصلية يطول أكتر من
+        // وضع المقدمة العادي. هامش أكبر يقلّل احتمال 'فشل' وهمي بينما
+        // الرسالة بالحقيقة لسه قيد المعالجة ورح توصل.
         const res = await Promise.race([
           SmsManager.sendLongSms(f.phone1, msg, { requestStatusReport: false }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 25000)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 60000)),
         ]);
         // 'pending' يعني الرسالة اتسلّمت لراديو الجهاز وقيد المعالجة --
         // مو فشل فعلي. كان يُحسَب فشلاً غلط قبل هذا التصحيح، وهذا كان
         // السبب الأغلب وراء ظهور 'فشل' رغم وصول الرسالة فعلياً بالنهاية.
         if (res?.sent === 'sent' || res?.sent === 'sent_no_confirmation' || res?.sent === 'pending') ok++;
-        else fail++;
-      } catch {
-        fail++;
+        else {
+          fail++;
+          failReasons.push(`${f.head_name || f.phone1}: حالة غير متوقّعة (${res?.sent || '—'})`);
+        }
+      } catch (e) {
+        if (e?.message === 'timeout') {
+          // انتهت المهلة قبل رد المكتبة الأصلية -- مو فشل مؤكد، الرسالة
+          // ممكن توصل بعد شوي بدون ما نعرف (fire-and-forget بهالحالة)
+          timedOut++;
+        } else {
+          fail++;
+          failReasons.push(`${f.head_name || f.phone1}: ${e?.message || 'خطأ غير معروف'}`);
+        }
       }
       setDirectProgress({ done: i + 1, total: sel.length });
       if (bgServiceActive) {
@@ -360,12 +374,17 @@ export default function SMSScreen() {
 
     setDirectSending(false);
     setDirectProgress(null);
-    if (fail === 0) {
+    if (fail === 0 && timedOut === 0) {
       showSuccess(`✅ اترسلت ${ok} رسالة بنجاح`);
       notifyNow('✅ اكتمل إرسال الرسائل', `اترسلت ${ok} رسالة بنجاح`);
     } else {
-      showError(`✅ نجح ${ok} — ❌ فشل ${fail} (تأكد من الرصيد أو تغطية الشبكة)`);
-      notifyNow('⚠️ انتهى الإرسال بوجود أخطاء', `نجح ${ok} — فشل ${fail}. تأكد من الرصيد أو تغطية الشبكة`);
+      const reasonsPreview = failReasons.slice(0, 3).join(' | ');
+      const timedOutNote = timedOut ? ` — ⏳ ${timedOut} انتهت مهلتها (ممكن توصل متأخرة، مش فشل مؤكد)` : '';
+      showError(`✅ نجح ${ok}${fail ? ` — ❌ فشل ${fail}` : ''}${timedOutNote}${reasonsPreview ? ` — ${reasonsPreview}` : ''}`);
+      notifyNow(
+        '⚠️ انتهى الإرسال بوجود ملاحظات',
+        `نجح ${ok}${fail ? ` — فشل مؤكد ${fail}` : ''}${timedOut ? ` — ${timedOut} انتهت مهلتها` : ''}`
+      );
     }
   };
 

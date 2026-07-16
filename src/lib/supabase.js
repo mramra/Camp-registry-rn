@@ -934,6 +934,27 @@ export const fetchPendingRequestsCount = async (orgId) => {
 // (SELECT: جهازك أنت، أو أجهزة اللي تقدر تراجع طلباتهم) فيرجع رقم مختلف
 // تلقائياً حسب دور كل مستخدم (مالك المنصة يشوف الكل، مدير الإيواء يشوف
 // أجهزة فريقه بس) بدون أي منطق فلترة إضافي بالكود.
+// عدد رسائل بوابة الأسرة الجديدة غير المقروءة من طرف الموظفين -- campId
+// اختياري (لو مُمرَّر، يقتصر العد على أسر ذلك المخيم فقط، يُستخدم لمندوبي
+// المخيمات؛ بدونه يُحسب على مستوى المنظمة كاملة لمالك المنصة/مدير الإيواء)
+export const fetchUnreadPortalMessagesCount = async (orgId, campId = null) => {
+  try {
+    let q = supabase
+      .from('portal_messages')
+      .select('id, families!inner(camp_id)', { count: 'exact', head: true })
+      .eq('org_id', orgId)
+      .eq('sender_role', 'family')
+      .eq('read_by_staff', false);
+    if (campId) q = q.eq('families.camp_id', campId);
+    const { count, error } = await q;
+    if (error) throw error;
+    return count || 0;
+  } catch (err) {
+    console.error('[fetchUnreadPortalMessagesCount]', err.message);
+    return 0;
+  }
+};
+
 export const fetchPendingDevicesCount = async (orgId) => {
   try {
     const { count, error } = await supabase

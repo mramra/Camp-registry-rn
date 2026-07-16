@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,21 +11,9 @@ import {
   Platform,
 } from 'react-native';
 import { supabase, fetchFamilyAidHistory, recordApprovalRequest, fetchPortalMessages, sendPortalMessage } from '../../lib/supabase';
-import { getFamilyCategories, CATEGORY_LABELS } from '../../lib/helpers';
-import { MARITAL_BY_GENDER } from '../../lib/formOptions';
 import { formatDate } from '../../lib/utils';
-import SelectField from '../../components/ui/SelectField';
+import { MARITAL_BY_GENDER } from '../../lib/formOptions';
 import colors from '../../theme/colors';
-
-const MONTHS = [
-  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-];
-
-function joinDob(day, month, year) {
-  if (!day || !month || !year) return null;
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-}
 
 // نفس معرّف المنظمة الثابت المستخدم بالنسخة الأصلية لبوابة الأسرة العامة
 // (هذه الشاشة تعمل بدون تسجيل دخول، فلا يوجد AuthContext لأخذ org_id منه)
@@ -33,9 +21,7 @@ const ORG_ID = 'ddc8abe7-518f-40a4-8c3b-ee03bb0f47d5';
 
 export default function FamilyPortalScreen({ navigation }) {
   const [nationalId, setNationalId] = useState('');
-  const [dobDay, setDobDay] = useState(null);
-  const [dobMonth, setDobMonth] = useState(null);
-  const [dobYear, setDobYear] = useState(null);
+  const [phone, setPhone] = useState('');
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
   const [aidHistory, setAidHistory] = useState([]);
@@ -48,16 +34,9 @@ export default function FamilyPortalScreen({ navigation }) {
   const [missingSending, setMissingSending] = useState(false);
   const [missingSent, setMissingSent] = useState(false);
 
-  const currentYear = new Date().getFullYear();
-  const years = useMemo(() => {
-    const arr = [];
-    for (let y = currentYear; y >= 1900; y--) arr.push(String(y));
-    return arr;
-  }, [currentYear]);
-  const days = useMemo(() => Array.from({ length: 31 }, (_, i) => String(i + 1)), []);
-
   const handleSearch = async () => {
     if (!nationalId.trim()) return setError('أدخل رقم الهوية');
+    if (!phone.trim()) return setError('أدخل رقم الجوال');
     setLoading(true);
     setError('');
     setFamily(null);
@@ -87,14 +66,11 @@ export default function FamilyPortalScreen({ navigation }) {
         return;
       }
 
-      // التحقق من تاريخ الميلاد إن أُدخل (يوم/شهر/سنة)
-      const enteredDob = joinDob(dobDay, dobMonth, dobYear);
-      if (enteredDob && data.head_dob) {
-        const stored = String(data.head_dob).slice(0, 10);
-        if (enteredDob !== stored) {
-          setError('رقم الهوية وتاريخ الميلاد غير متطابقين');
-          return;
-        }
+      // رقم الجوال هو "كلمة السر" -- تحقق إجباري (مو اختياري زي تاريخ
+      // الميلاد سابقاً)، لازم يطابق رقم الجوال المسجَّل لرب الأسرة بالضبط
+      if (!data.phone1 || data.phone1.trim() !== phone.trim()) {
+        setError('رقم الهوية أو رقم الجوال غير صحيح');
+        return;
       }
 
       setFamily(data);
@@ -112,8 +88,6 @@ export default function FamilyPortalScreen({ navigation }) {
       setLoading(false);
     }
   };
-
-  const categories = family ? getFamilyCategories(family, members) : [];
 
   // حقول محدَّدة وآمنة يقدر رب الأسرة يستكملها بنفسه (بدون المساس بحقول
   // الهوية نفسها -- اسم/رقم هوية رب الأسرة تبقى موثوقة من مصدرها الأصلي
@@ -194,18 +168,17 @@ export default function FamilyPortalScreen({ navigation }) {
               style={styles.input}
             />
 
-            <Text style={styles.label}>تاريخ الميلاد (للتحقق — اختياري)</Text>
-            <View style={styles.dobRow}>
-              <View style={styles.dobThird}>
-                <SelectField value={dobDay ? String(dobDay) : null} options={days} onSelect={(v) => setDobDay(Number(v))} placeholder="اليوم" />
-              </View>
-              <View style={styles.dobThird}>
-                <SelectField value={dobMonth ? MONTHS[dobMonth - 1] : null} options={MONTHS} onSelect={(v) => setDobMonth(MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
-              </View>
-              <View style={styles.dobThird}>
-                <SelectField value={dobYear ? String(dobYear) : null} options={years} onSelect={(v) => setDobYear(Number(v))} placeholder="السنة" />
-              </View>
-            </View>
+            <Text style={styles.label}>رقم جوال رب الأسرة (ككلمة سر) *</Text>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="05xxxxxxxx"
+              placeholderTextColor={colors.muted}
+              keyboardType="phone-pad"
+              secureTextEntry
+              editable={!loading}
+              style={styles.input}
+            />
 
             {!!error && <Text style={styles.errorMsg}>{error}</Text>}
 
@@ -237,19 +210,6 @@ export default function FamilyPortalScreen({ navigation }) {
                     </View>
                   ))}
                 </View>
-
-                {categories.length > 0 && (
-                  <View style={styles.infoCard}>
-                    <Text style={styles.infoCardTitle}>🏷️ الفئات</Text>
-                    <View style={styles.tagsRow}>
-                      {categories.map((c) => (
-                        <View key={c} style={styles.tag}>
-                          <Text style={styles.tagText}>{CATEGORY_LABELS[c] || c}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
 
                 {members.length > 0 && (
                   <View style={styles.infoCard}>
@@ -425,8 +385,7 @@ const styles = StyleSheet.create({
   title: { color: colors.white, fontWeight: '900', fontSize: 20, textAlign: 'center', marginBottom: 4 },
   subtitle: { color: colors.muted, fontSize: 12, textAlign: 'center', marginBottom: 24 },
   label: { color: colors.muted, fontSize: 12, fontWeight: 'bold', marginBottom: 6, textAlign: 'right' },
-  dobRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 16 },
-  dobThird: { flex: 1 },
+
   input: {
     backgroundColor: colors.surface2,
     borderWidth: 1,
@@ -472,9 +431,6 @@ const styles = StyleSheet.create({
   infoLabel: { color: colors.muted, fontSize: 11 },
   infoValue: { color: colors.white, fontSize: 11, fontWeight: 'bold' },
 
-  tagsRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
-  tag: { backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  tagText: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
 
   memberRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border },
   memberName: { color: colors.white, fontSize: 11, fontWeight: 'bold' },

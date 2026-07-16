@@ -3,7 +3,7 @@ import { ActivityIndicator, View, Pressable, Text } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { fetchPendingRequestsCount, fetchPendingDevicesCount } from '../lib/supabase';
+import { fetchPendingRequestsCount, fetchPendingDevicesCount, fetchUnreadPortalMessagesCount } from '../lib/supabase';
 import { notifyNow } from '../lib/notifications';
 import LoginScreen from '../screens/login/LoginScreen';
 import FamilyPortalScreen from '../screens/familyportal/FamilyPortalScreen';
@@ -63,30 +63,46 @@ const RootNavigator = () => {
   const { isAuthenticated, loading, isPreviewMode, previewAs, setPreviewAs, realProfile, orgId, isOwner, profile } = useAuth();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [navRef, setNavRef] = useState(null);
-  const prevCounts = useRef({ pending: null, devices: null });
+  const prevCounts = useRef({ pending: null, devices: null, portalMessages: null });
 
   // فحص دوري خفيف (كل 3 دقائق، طالما التطبيق مفتوح) لعدد الطلبات
-  // المعلّقة وطلبات الأجهزة الجديدة -- عند أي زيادة عن آخر فحص، إشعار
-  // محلي فوري. هذا يعمل طالما JS للتطبيق شغّال (مقدمة أو خلفية قريبة)،
-  // وليس بديلاً عن Push Notification حقيقي من سيرفر (يستمر حتى لو
-  // أُغلق التطبيق بالكامل) -- ذلك يحتاج بنية تحتية منفصلة على الخادم.
+  // المعلّقة وطلبات الأجهزة الجديدة ورسائل بوابة الأسرة الجديدة -- عند
+  // أي زيادة عن آخر فحص، إشعار محلي فوري. هذا يعمل طالما JS للتطبيق
+  // شغّال (مقدمة أو خلفية قريبة)، وليس بديلاً عن Push Notification
+  // حقيقي من سيرفر (يستمر حتى لو أُغلق التطبيق بالكامل) -- ذلك يحتاج
+  // بنية تحتية منفصلة على الخادم.
+  //
+  // رسائل بوابة الأسرة تحديداً: مالك المنصة ومدير الإيواء (super_admin)
+  // يشوفون كل رسائل المنظمة، والمندوب (camp_delegate) يشوف بس رسائل
+  // مخيمه -- حسب طلب صريح يشمل الأدوار الثلاثة كلها، مو بس صلاحية
+  // مراجعة الطلبات العامة.
+  const isSuperAdmin = profile?.role === 'super_admin';
+  const isCampDelegate = profile?.role === 'camp_delegate';
+  const canSeePortalMessages = isOwner || isSuperAdmin || isCampDelegate;
+
   useEffect(() => {
-    if (!isAuthenticated || !orgId || !(isOwner || profile?.can_review_approvals)) return;
+    if (!isAuthenticated || !orgId || !(isOwner || profile?.can_review_approvals || canSeePortalMessages)) return;
 
     const check = async () => {
       try {
-        const [pending, devices] = await Promise.all([
-          fetchPendingRequestsCount(orgId),
-          fetchPendingDevicesCount(orgId),
+        const [pending, devices, portalMessages] = await Promise.all([
+          isOwner || profile?.can_review_approvals ? fetchPendingRequestsCount(orgId) : Promise.resolve(null),
+          isOwner || profile?.can_review_approvals ? fetchPendingDevicesCount(orgId) : Promise.resolve(null),
+          canSeePortalMessages
+            ? fetchUnreadPortalMessagesCount(orgId, isCampDelegate ? profile?.camp_id : null)
+            : Promise.resolve(null),
         ]);
         const prev = prevCounts.current;
-        if (prev.pending !== null && pending > prev.pending) {
+        if (pending !== null && prev.pending !== null && pending > prev.pending) {
           notifyNow('📋 طلب جديد بانتظار المراجعة', `عدد الطلبات المعلّقة الآن: ${pending}`);
         }
-        if (prev.devices !== null && devices > prev.devices) {
+        if (devices !== null && prev.devices !== null && devices > prev.devices) {
           notifyNow('📱 جهاز جديد بانتظار الموافقة', `عدد الأجهزة المعلّقة الآن: ${devices}`);
         }
-        prevCounts.current = { pending, devices };
+        if (portalMessages !== null && prev.portalMessages !== null && portalMessages > prev.portalMessages) {
+          notifyNow('💬 رسالة جديدة من بوابة الأسرة', `عدد الرسائل الجديدة: ${portalMessages}`);
+        }
+        prevCounts.current = { pending, devices, portalMessages };
       } catch {
         // فشل الفحص الدوري غير حرج -- يُعاد المحاولة تلقائياً بالدورة الجاية
       }
@@ -95,7 +111,7 @@ const RootNavigator = () => {
     check();
     const interval = setInterval(check, 3 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, orgId, isOwner, profile?.can_review_approvals]);
+  }, [isAuthenticated, orgId, isOwner, profile?.can_review_approvals, canSeePortalMessages, isCampDelegate, profile?.camp_id]);
 
   if (loading) {
     return (

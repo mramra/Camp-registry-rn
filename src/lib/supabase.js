@@ -68,6 +68,21 @@ export const fetchFamilies = async (orgId, campId = null) => {
   }
 };
 
+export const fetchFamilyAidHistory = async (familyId) => {
+  try {
+    const { data, error } = await supabase
+      .from('camp_dist_families')
+      .select('id, received_at, notes, round_id, dist_rounds(name, type, round_date)')
+      .eq('family_id', familyId)
+      .eq('_deleted', false)
+      .order('received_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch {
+    return [];
+  }
+};
+
 export const fetchFamilyMembers = async (familyIds) => {
   if (!familyIds || familyIds.length === 0) return [];
   try {

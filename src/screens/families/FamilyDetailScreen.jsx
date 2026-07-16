@@ -11,7 +11,7 @@ import {
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
-import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps, fetchFamilies } from '../../lib/supabase';
+import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps, fetchFamilies, fetchFamilyAidHistory } from '../../lib/supabase';
 import { calcAge, checkFamilyIssues, getMemberIcon, arrLabel, getVulnerabilityScore, VULNERABILITY_TIER_LABELS } from '../../lib/helpers';
 import { formatDate, formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
@@ -59,6 +59,7 @@ export default function FamilyDetailScreen() {
   const [exitSaving, setExitSaving] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
   const [duplicates, setDuplicates] = useState([]);
+  const [aidHistory, setAidHistory] = useState([]);
 
   const load = useCallback(async () => {
     if (!familyId) return;
@@ -200,7 +201,8 @@ export default function FamilyDetailScreen() {
     useCallback(() => {
       setLoading(true);
       load();
-    }, [load])
+      if (familyId) fetchFamilyAidHistory(familyId).then(setAidHistory);
+    }, [load, familyId])
   );
 
   const handleExit = () => {
@@ -356,6 +358,29 @@ export default function FamilyDetailScreen() {
               </View>
             ) : null;
           })()}
+        </View>
+
+        <View style={styles.panel}>
+          <Text style={styles.panelTitle}>📦 تاريخ المساعدات ({aidHistory.length})</Text>
+          {aidHistory.length === 0 ? (
+            <Text style={styles.noMembers}>لم تستلم هذه الأسرة أي مساعدة بعد</Text>
+          ) : (
+            aidHistory.map((h) => {
+              const typeIcon = { food: '🍚', shelter: '🏠', hygiene: '🧼', financial: '💵' }[h.dist_rounds?.type] || '📦';
+              return (
+                <View key={h.id} style={styles.aidRow}>
+                  <Text style={styles.aidIcon}>{typeIcon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.aidName}>{h.dist_rounds?.name || 'جولة'}</Text>
+                    <Text style={styles.aidDate}>
+                      {formatDate(h.dist_rounds?.round_date || h.received_at)}
+                      {!!h.notes && ` • ${h.notes}`}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
 
         <View style={styles.panel}>
@@ -516,6 +541,10 @@ const styles = StyleSheet.create({
   infoValue: { color: colors.white, fontWeight: 'bold', fontSize: 12, textAlign: 'right' },
 
   noMembers: { color: colors.muted, fontSize: 12, textAlign: 'center', paddingVertical: 12 },
+  aidRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+  aidIcon: { fontSize: 18 },
+  aidName: { color: colors.white, fontWeight: 'bold', fontSize: 12, textAlign: 'right' },
+  aidDate: { color: colors.muted, fontSize: 10, marginTop: 2, textAlign: 'right' },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',

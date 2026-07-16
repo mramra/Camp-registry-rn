@@ -10,7 +10,8 @@ import {
   fetchLastDistributionDate,
   fetchOrgMembers,
 } from '../../lib/supabase';
-import { isIncomplete } from '../../lib/helpers';
+import { supabase } from '../../lib/supabase';
+import { isIncomplete, getVulnerabilityScore } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import colors from '../../theme/colors';
@@ -173,6 +174,35 @@ export default function AlertsScreen() {
         } catch {
           // تجاهل
         }
+      }
+
+      // ⑧ أسر عالية/حرجة الضعف لم تستلم أي مساعدة إطلاقاً (يربط درجة
+      // الضعف بتاريخ المساعدات -- تنبيه جديد يكشف فجوة حقيقية بالتوزيع)
+      try {
+        const vulnerableFams = myFams.filter((f) => {
+          const t = getVulnerabilityScore(f, mByFam[f.id]).tier;
+          return t === 'high' || t === 'critical';
+        });
+        if (vulnerableFams.length) {
+          const { data: received } = await supabase
+            .from('camp_dist_families')
+            .select('family_id')
+            .in('family_id', vulnerableFams.map((f) => f.id))
+            .eq('_deleted', false);
+          const receivedSet = new Set((received || []).map((r) => r.family_id));
+          const neverReceived = vulnerableFams.filter((f) => !receivedSet.has(f.id));
+          if (neverReceived.length) {
+            list.push({
+              level: 'red',
+              icon: '🆘',
+              title: `${neverReceived.length} أسرة شديدة الضعف لم تستلم أي مساعدة`,
+              desc: neverReceived.slice(0, 3).map((f) => f.head_name).join('، ') + (neverReceived.length > 3 ? ' وآخرون' : ''),
+              screen: 'FamiliesList',
+            });
+          }
+        }
+      } catch {
+        // فشل هذا الفحص التحليلي لا يمنع باقي التنبيهات
       }
 
       if (!list.length) {

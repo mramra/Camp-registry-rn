@@ -68,6 +68,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       title: '👨‍👩‍👧 الأسر',
       items: [
         { icon: '👨‍👩‍👧‍👦', label: 'كل الأسر', screen: 'FamiliesList', pageKey: 'families' },
+        { icon: '🔍', label: 'البحث الذكي', screen: 'SmartSearch', pageKey: 'families' },
         { icon: '🚶', label: 'حركات الأسر', screen: 'Movements', pageKey: 'movements' },
         { icon: '📦', label: 'التوزيعات', screen: 'Distributions', pageKey: 'distributions' },
         { icon: '💬', label: 'الرسائل', screen: 'SMS', pageKey: 'sms' },

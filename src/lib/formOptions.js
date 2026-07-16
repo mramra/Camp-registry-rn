@@ -33,6 +33,11 @@ export const FAMILY_CATEGORIES = [
 
 export const REGIONS = ['شمال غزة', 'غزة', 'الوسطى', 'جنوب غزة', 'رفح'];
 
+export const INCOME_SOURCE_OPTIONS = ['قطاع خاص', 'قطاع حكومي', 'عمل حر', 'مساعدات فقط', 'لا يعمل'];
+export const HOUSING_TYPE_OPTIONS = ['خيمة', 'بيت', 'حاصل', 'شقة مستأجرة', 'مركز إيواء جماعي'];
+export const HOUSING_CONDITION_OPTIONS = ['سليم', 'هدم جزئي', 'هدم كلي', 'غير قابل للسكن'];
+export const DISPLACEMENT_STATUS_OPTIONS = ['نازح', 'مقيم'];
+
 export const GENDER_OPTIONS = ['ذكر', 'أنثى'];
 
 // تسميات عربية لحقول الأسرة — تُستخدم بشاشة سجل التغييرات (منقولة حرفياً من الأصل)
@@ -48,6 +53,12 @@ export const TRACKED_FIELDS = {
   tent: 'الخيمة',
   original_address: 'العنوان الأصلي',
   address_details: 'تفاصيل العنوان',
+  address: 'السكن الحالي',
+  governorate_current: 'محافظة السكن الحالي',
+  displacement_status: 'حالة النزوح',
+  housing_type: 'نوع المسكن',
+  housing_condition: 'حالة المسكن',
+  income_source: 'مصدر الدخل',
   notes: 'ملاحظات',
   status: 'الحالة',
 };

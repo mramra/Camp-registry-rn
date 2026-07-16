@@ -28,6 +28,10 @@ import {
   MARITAL_BY_GENDER,
   FAMILY_CATEGORIES,
   REGIONS,
+  INCOME_SOURCE_OPTIONS,
+  HOUSING_TYPE_OPTIONS,
+  HOUSING_CONDITION_OPTIONS,
+  DISPLACEMENT_STATUS_OPTIONS,
 } from '../../lib/formOptions';
 import { showError, showSuccess } from '../../utils/toast';
 import { emptyHealthFields, healthSummaryCount } from '../../lib/healthOptions';
@@ -97,6 +101,12 @@ export default function FamilyFormScreen() {
   const [tent, setTent] = useState('');
   const [originalAddress, setOriginalAddress] = useState('');
   const [addressDetails, setAddressDetails] = useState('');
+  const [currentAddress, setCurrentAddress] = useState('');
+  const [governorateCurrent, setGovernorateCurrent] = useState('');
+  const [displacementStatus, setDisplacementStatus] = useState('');
+  const [incomeSource, setIncomeSource] = useState('');
+  const [housingType, setHousingType] = useState('');
+  const [housingCondition, setHousingCondition] = useState('');
 
   const [categories, setCategories] = useState([]);
   const [notes, setNotes] = useState('');
@@ -177,6 +187,12 @@ export default function FamilyFormScreen() {
         setTent(data.tent || '');
         setOriginalAddress(data.original_address || '');
         setAddressDetails(data.address_details || '');
+        setCurrentAddress(data.address || '');
+        setGovernorateCurrent(data.governorate_current || '');
+        setDisplacementStatus(data.displacement_status || '');
+        setIncomeSource(data.income_source || '');
+        setHousingType(data.housing_type || '');
+        setHousingCondition(data.housing_condition || '');
         setNotes(data.notes || '');
         setHeadHealth({
           orphan_status: data.head_orphan_status || null,
@@ -339,6 +355,12 @@ export default function FamilyFormScreen() {
         tent: tent.trim() || null,
         original_address: originalAddress || null,
         address_details: addressDetails.trim() || null,
+        address: currentAddress.trim() || null,
+        governorate_current: governorateCurrent || null,
+        displacement_status: displacementStatus || null,
+        income_source: incomeSource || null,
+        housing_type: housingType || null,
+        housing_condition: housingCondition || null,
         category_tags: JSON.stringify(categories),
         notes: notes.trim() || null,
         head_orphan_status: headHealth.orphan_status || null,
@@ -546,6 +568,43 @@ export default function FamilyFormScreen() {
             placeholder="اختر المنطقة"
           />
           <FormInput label="تفاصيل العنوان" value={addressDetails} onChangeText={setAddressDetails} />
+
+          <SelectField
+            label="حالة النزوح"
+            value={displacementStatus}
+            options={DISPLACEMENT_STATUS_OPTIONS}
+            onSelect={setDisplacementStatus}
+            placeholder="نازح / مقيم"
+          />
+          <FormInput label="السكن الحالي (وصف)" value={currentAddress} onChangeText={setCurrentAddress} />
+          <SelectField
+            label="محافظة السكن الحالي"
+            value={governorateCurrent}
+            options={REGIONS}
+            onSelect={setGovernorateCurrent}
+            placeholder="اختر المحافظة"
+          />
+          <SelectField
+            label="نوع المسكن"
+            value={housingType}
+            options={HOUSING_TYPE_OPTIONS}
+            onSelect={setHousingType}
+            placeholder="اختر نوع المسكن"
+          />
+          <SelectField
+            label="حالة المسكن"
+            value={housingCondition}
+            options={HOUSING_CONDITION_OPTIONS}
+            onSelect={setHousingCondition}
+            placeholder="اختر حالة المسكن"
+          />
+          <SelectField
+            label="مصدر دخل رب الأسرة"
+            value={incomeSource}
+            options={INCOME_SOURCE_OPTIONS}
+            onSelect={setIncomeSource}
+            placeholder="اختر مصدر الدخل"
+          />
         </FormSection>
 
         <FormSection title={`👨‍👩‍👧 أفراد الأسرة (${members.length})`}>

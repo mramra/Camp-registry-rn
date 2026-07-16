@@ -12,6 +12,7 @@ import {
   rejectRequest,
 } from '../../lib/supabase';
 import { formatDateTime } from '../../lib/utils';
+import { TRACKED_FIELDS as FIELD_LABEL } from '../../lib/formOptions';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -173,7 +174,16 @@ export default function PendingRequestsScreen() {
           </View>
         )}
 
-        {isPortalRequest && (
+        {isPortalRequest && req.changes?.type === 'missing_data' && (
+          <View style={styles.detailBox}>
+            <Text style={styles.detailText}>📋 استكمال بيانات ناقصة — سيُطبَّق مباشرة عند الموافقة:</Text>
+            {Object.entries(req.changes.fields || {}).map(([k, v]) => (
+              <Text key={k} style={styles.detailText}>• {FIELD_LABEL[k] || k}: {v}</Text>
+            ))}
+          </View>
+        )}
+
+        {isPortalRequest && req.changes?.type !== 'missing_data' && (
           <View style={styles.detailBox}>
             <Text style={styles.detailText}>💬 {req.changes?.request_text || '—'}</Text>
             {!!req.changes?.contact_phone && <Text style={styles.detailText}>📱 للتواصل: {req.changes.contact_phone}</Text>}

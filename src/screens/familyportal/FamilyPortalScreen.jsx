@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { supabase, fetchFamilyAidHistory, recordApprovalRequest } from '../../lib/supabase';
 import { getFamilyCategories, CATEGORY_LABELS } from '../../lib/helpers';
+import { MARITAL_BY_GENDER } from '../../lib/formOptions';
 import { formatDate } from '../../lib/utils';
 import colors from '../../theme/colors';
 
@@ -32,6 +33,9 @@ export default function FamilyPortalScreen({ navigation }) {
   const [requestPhone, setRequestPhone] = useState('');
   const [requestSending, setRequestSending] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
+  const [missingValues, setMissingValues] = useState({});
+  const [missingSending, setMissingSending] = useState(false);
+  const [missingSent, setMissingSent] = useState(false);
 
   const handleSearch = async () => {
     if (!nationalId.trim()) return setError('أدخل رقم الهوية');
@@ -44,6 +48,8 @@ export default function FamilyPortalScreen({ navigation }) {
     setRequestText('');
     setRequestPhone('');
     setRequestSent(false);
+    setMissingValues({});
+    setMissingSent(false);
     try {
       const { data, error: err } = await supabase
         .from('families')
@@ -89,6 +95,42 @@ export default function FamilyPortalScreen({ navigation }) {
   };
 
   const categories = family ? getFamilyCategories(family, members) : [];
+
+  // حقول محدَّدة وآمنة يقدر رب الأسرة يستكملها بنفسه (بدون المساس بحقول
+  // الهوية نفسها -- اسم/رقم هوية رب الأسرة تبقى موثوقة من مصدرها الأصلي
+  // فقط، ما تُستكمل عبر البوابة لتفادي انتحال هوية)
+  const missingFieldDefs = family
+    ? [
+        !family.phone1?.trim() && { key: 'phone1', label: '📱 رقم الجوال', kind: 'phone' },
+        !family.head_dob && { key: 'head_dob', label: '📅 تاريخ الميلاد (YYYY-MM-DD)', kind: 'date' },
+        !family.head_marital?.trim() && { key: 'head_marital', label: '💍 الحالة الاجتماعية', kind: 'marital' },
+      ].filter(Boolean)
+    : [];
+
+  const handleSubmitMissing = async () => {
+    const filled = missingFieldDefs.filter((d) => (missingValues[d.key] || '').trim());
+    if (!filled.length) return setError('عبّي حقل واحد على الأقل قبل الإرسال');
+    setMissingSending(true);
+    setError('');
+    try {
+      const fields = {};
+      filled.forEach((d) => { fields[d.key] = missingValues[d.key].trim(); });
+      await recordApprovalRequest({
+        orgId: ORG_ID,
+        familyId: family.id,
+        action: 'portal_request',
+        changes: { type: 'missing_data', fields },
+        actorName: `${family.head_name} (استكمال بيانات عبر البوابة)`,
+        actorRole: 'family_portal',
+      });
+      setMissingSent(true);
+      setMissingValues({});
+    } catch {
+      setError('تعذّر إرسال البيانات، حاول مرة ثانية');
+    } finally {
+      setMissingSending(false);
+    }
+  };
 
   const handleSubmitRequest = async () => {
     if (!requestText.trim()) return setError('اكتب طلبك أولاً');
@@ -227,6 +269,62 @@ export default function FamilyPortalScreen({ navigation }) {
                     })
                   )}
                 </View>
+                {missingFieldDefs.length > 0 && (
+                  <View style={[styles.infoCard, styles.missingCard]}>
+                    <Text style={styles.infoCardTitle}>🔴 بيانات ناقصة — أكملها الآن</Text>
+
+                    {missingSent ? (
+                      <View style={styles.sentBanner}>
+                        <Text style={styles.sentBannerText}>✅ استُلمت بياناتك — بتظهر بعد موافقة مندوب المخيم</Text>
+                      </View>
+                    ) : (
+                      <>
+                        <Text style={styles.requestHint}>
+                          عبّي الحقول الناقصة تحت. رح توصل لمندوب المخيم للمراجعة السريعة، وبعد
+                          الموافقة تُحفظ مباشرة ببياناتك.
+                        </Text>
+                        {missingFieldDefs.map((d) => (
+                          <View key={d.key} style={{ marginBottom: 4 }}>
+                            <Text style={styles.label}>{d.label}</Text>
+                            {d.kind === 'marital' ? (
+                              <View style={styles.maritalRow}>
+                                {(MARITAL_BY_GENDER[family.head_gender] || MARITAL_BY_GENDER['ذكر']).map((opt) => (
+                                  <Pressable
+                                    key={opt}
+                                    onPress={() => setMissingValues((v) => ({ ...v, [d.key]: opt }))}
+                                    style={[styles.maritalChip, missingValues[d.key] === opt && styles.maritalChipActive]}
+                                  >
+                                    <Text style={[styles.maritalChipText, missingValues[d.key] === opt && styles.maritalChipTextActive]}>
+                                      {opt}
+                                    </Text>
+                                  </Pressable>
+                                ))}
+                              </View>
+                            ) : (
+                              <TextInput
+                                value={missingValues[d.key] || ''}
+                                onChangeText={(v) => setMissingValues((prev) => ({ ...prev, [d.key]: v }))}
+                                placeholder={d.kind === 'date' ? '1990-01-01' : '05xxxxxxxx'}
+                                placeholderTextColor={colors.muted}
+                                keyboardType={d.kind === 'phone' ? 'phone-pad' : 'default'}
+                                editable={!missingSending}
+                                style={styles.input}
+                              />
+                            )}
+                          </View>
+                        ))}
+                        <Pressable
+                          style={[styles.button, missingSending && styles.buttonDisabled]}
+                          onPress={handleSubmitMissing}
+                          disabled={missingSending}
+                        >
+                          <Text style={styles.buttonText}>{missingSending ? '⏳ جاري الإرسال...' : '📤 إرسال البيانات'}</Text>
+                        </Pressable>
+                      </>
+                    )}
+                  </View>
+                )}
+
                 <View style={styles.infoCard}>
                   <Text style={styles.infoCardTitle}>📝 طلب تعديل بيانات</Text>
 
@@ -387,6 +485,16 @@ const styles = StyleSheet.create({
     borderRadius: 10, padding: 10, alignItems: 'center',
   },
   sentBannerText: { color: colors.green, fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
+
+  missingCard: { borderColor: 'rgba(239,68,68,0.35)' },
+  maritalRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  maritalChip: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  maritalChipActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
+  maritalChipText: { color: colors.muted, fontSize: 11 },
+  maritalChipTextActive: { color: colors.accent, fontWeight: 'bold' },
 
   footerText: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: 16 },
   backLink: { color: colors.accent, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },

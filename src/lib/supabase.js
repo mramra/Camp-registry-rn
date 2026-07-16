@@ -685,6 +685,11 @@ export const approveRequest = async (req, reviewer) => {
     if (action === 'delete') {
       await supabase.from('family_members').delete().eq('family_id', family_id);
       await supabase.from('families').delete().eq('id', family_id);
+    } else if (action === 'portal_request' && req.changes?.type === 'missing_data') {
+      // استكمال بيانات ناقصة عبر بوابة الأسرة -- الحقول محدَّدة ومُتحقَّق
+      // منها مسبقاً (phone1/head_dob/head_marital فقط)، تُطبَّق مباشرة
+      // على الأسرة بضغطة الموافقة الواحدة بدل ما المندوب يعيد كتابتها يدوياً
+      await supabase.from('families').update(req.changes.fields).eq('id', family_id);
     } else if (action === 'camp_insert') {
       await supabase.from('camps').insert(new_data);
     } else if (action === 'camp_update') {

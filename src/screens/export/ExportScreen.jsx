@@ -314,35 +314,69 @@ export default function ExportScreen() {
     setLoading(true);
     try {
       const result = await pickAndParseXLSX();
-      if (!result || !result.rows.length) return;
+      if (!result) return; // المستخدم ألغى اختيار الملف -- ما في داعي لرسالة خطأ
+      if (!result.rows.length) {
+        showToast('⚠️ الملف فارغ أو لا يحتوي أي بيانات قابلة للقراءة', 'error');
+        return;
+      }
       const { data: existing } = await supabase.from('families').select('head_id').eq('org_id', orgId);
       const existingIds = new Set((existing || []).map((f) => f.head_id).filter(Boolean));
-      const preview = result.rows
-        .filter((r) => r['اسم رب الأسرة رباعي*'] || r['اسم رب الأسرة*'] || r['اسم رب الأسرة'])
-        .map((r) => {
-          const headId = String(r['رقم هوية رب الأسرة*'] || r['رقم الهوية*'] || r['رقم الهوية'] || '').trim();
-          const wifeName = String(r['اسم الزوجة رباعي'] || r['اسم الزوجة'] || '').trim();
-          const wifeId = String(r['رقم هوية الزوجة'] || r['هوية الزوجة'] || '').trim();
-          return {
-            head_name: String(r['اسم رب الأسرة رباعي*'] || r['اسم رب الأسرة*'] || r['اسم رب الأسرة'] || '').trim(),
-            head_id: headId,
-            phone1: String(r['رقم التواصل*'] || r['رقم الجوال*'] || r['رقم الجوال'] || '').trim(),
-            head_gender: String(r['الجنس'] || 'ذكر').trim(),
-            head_marital: String(r['الحالة الاجتماعية'] || '').trim() || null,
-            head_dob: String(r['تاريخ الميلاد'] || '').trim() || null,
-            camp_id: importCamp,
-            tent: String(r['الخيمة'] || '').trim() || null,
-            original_address: String(r['المنطقة الأصلية'] || '').trim() || null,
-            notes: String(r['ملاحظات'] || '').trim() || null,
-            wifeName,
-            wifeId,
-            dup: existingIds.has(headId),
-            valid: !!(r['اسم رب الأسرة رباعي*'] || r['اسم رب الأسرة*'] || r['اسم رب الأسرة']) && !!headId,
-          };
-        });
+      const seenInFile = new Set(); // لرصد التكرار داخل نفس الملف (مو بس ضد قاعدة البيانات)
+
+      // صفوف الملف اللي فيها بيانات فعلية بأي عمود، لكن ما طابقت أي اسم عمود
+      // متوقّع (مثال: كتب "الاسم" بدل "اسم رب الأسرة رباعي*") -- تحذير عن
+      // احتمال خطأ بأسماء الأعمدة، بدل إسقاطها بصمت بدون تفسير.
+      const nameKeys = ['اسم رب الأسرة رباعي*', 'اسم رب الأسرة*', 'اسم رب الأسرة'];
+      const matchedRows = result.rows.filter((r) => nameKeys.some((k) => r[k]));
+      const unmatchedNonEmpty = result.rows.filter(
+        (r) => !nameKeys.some((k) => r[k]) && Object.values(r).some((v) => String(v || '').trim())
+      ).length;
+
+      const preview = matchedRows.map((r) => {
+        const headName = String(r['اسم رب الأسرة رباعي*'] || r['اسم رب الأسرة*'] || r['اسم رب الأسرة'] || '').trim();
+        const headId = String(r['رقم هوية رب الأسرة*'] || r['رقم الهوية*'] || r['رقم الهوية'] || '').trim();
+        const phone1 = String(r['رقم التواصل*'] || r['رقم الجوال*'] || r['رقم الجوال'] || '').trim();
+        const wifeName = String(r['اسم الزوجة رباعي'] || r['اسم الزوجة'] || '').trim();
+        const wifeId = String(r['رقم هوية الزوجة'] || r['هوية الزوجة'] || '').trim();
+
+        let invalidReason = '';
+        if (!headName) invalidReason = 'اسم رب الأسرة مفقود';
+        else if (!headId) invalidReason = 'رقم الهوية مفقود';
+        else if (!phone1) invalidReason = 'رقم التواصل مفقود';
+
+        const dupInDb = existingIds.has(headId);
+        const dupInFile = !!headId && seenInFile.has(headId);
+        if (headId) seenInFile.add(headId);
+
+        return {
+          head_name: headName,
+          head_id: headId,
+          phone1,
+          head_gender: String(r['الجنس'] || 'ذكر').trim(),
+          head_marital: String(r['الحالة الاجتماعية'] || '').trim() || null,
+          head_dob: String(r['تاريخ الميلاد'] || '').trim() || null,
+          camp_id: importCamp,
+          tent: String(r['الخيمة'] || '').trim() || null,
+          original_address: String(r['المنطقة الأصلية'] || '').trim() || null,
+          notes: String(r['ملاحظات'] || '').trim() || null,
+          wifeName,
+          wifeId,
+          dup: dupInDb || dupInFile,
+          dupReason: dupInFile ? 'مكرر بنفس الملف' : dupInDb ? 'موجود بالنظام مسبقاً' : '',
+          valid: !invalidReason,
+          invalidReason,
+        };
+      });
+
       setImportPreview(preview);
+      if (unmatchedNonEmpty > 0) {
+        showToast(
+          `⚠️ تجاهلت ${unmatchedNonEmpty} صف فيها بيانات لكن أسماء أعمدتها ما طابقت القالب -- تأكد من نسخ أسماء الأعمدة حرفياً من القالب`,
+          'error'
+        );
+      }
     } catch (e) {
-      showToast('خطأ: ' + e.message, 'error');
+      showToast('خطأ بقراءة الملف: ' + e.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -351,30 +385,42 @@ export default function ExportScreen() {
   const confirmImport = async () => {
     if (!importPreview) return;
     setImporting(true);
-    let ok = 0, err = 0;
+    let ok = 0;
+    const failed = []; // { name, reason } -- عشان نعرف بالضبط مين فشلت وليش، مو رقم عام بس
     try {
       for (const row of importPreview.filter((r) => r.valid && !r.dup)) {
-        const { dup, valid, wifeName, wifeId, ...fam } = row;
-        const result = await createFamily({ org_id: orgId, ...fam, category_tags: [] });
-        if (result.success) {
-          // زوجة موجودة بالصف → تُنشأ تلقائياً كفرد أسرة فعلي (صلة: زوجة)
-          if (wifeName) {
-            try {
-              await saveFamilyMembers(result.data.id, [{ name: wifeName, relation: 'زوجة', national_id: wifeId || null }]);
-            } catch {
-              // فشل إضافة الزوجة لا يُسقط الأسرة نفسها -- اتسجّلت أصلاً بنجاح
+        const { dup, valid, wifeName, wifeId, dupReason, invalidReason, ...fam } = row;
+        try {
+          const result = await createFamily({ org_id: orgId, ...fam, category_tags: [] });
+          if (result.success) {
+            if (wifeName) {
+              try {
+                await saveFamilyMembers(result.data.id, [{ name: wifeName, relation: 'زوجة', national_id: wifeId || null }]);
+              } catch {
+                // فشل إضافة الزوجة لا يُسقط الأسرة نفسها -- اتسجّلت أصلاً بنجاح
+              }
             }
+            ok++;
+          } else {
+            failed.push({ name: fam.head_name, reason: result.error || 'خطأ غير معروف' });
           }
-          ok++;
-        } else {
-          err++;
+        } catch (rowErr) {
+          // خطأ غير متوقع بصف واحد (مثال: انقطاع الشبكة أثناء هذا الصف تحديداً)
+          // لا يوقف بقية الصفوف -- يُسجَّل ويُكمل الاستيراد للباقي
+          failed.push({ name: fam.head_name, reason: rowErr.message || 'خطأ اتصال' });
         }
       }
       const skip = importPreview.filter((r) => r.dup).length;
-      showToast(`${ok} استُورد | ${skip} مكرر${err ? ` | ${err} خطأ` : ''}`, 'success');
+      if (failed.length === 0) {
+        showToast(`✅ ${ok} استُورد بنجاح${skip ? ` | 🔁 ${skip} مكرر تم تجاوزه` : ''}`, 'success');
+      } else {
+        // أول 3 أسباب فشل فقط بالرسالة (تفادي رسالة طويلة جداً) -- الباقي محسوب بالعدد
+        const preview = failed.slice(0, 3).map((f) => `${f.name}: ${f.reason}`).join(' | ');
+        showToast(`✅ ${ok} نجح | ❌ ${failed.length} فشل${skip ? ` | 🔁 ${skip} مكرر` : ''} — ${preview}`, 'error');
+      }
       setImportPreview(null);
     } catch (e) {
-      showToast('خطأ: ' + e.message, 'error');
+      showToast('خطأ عام بالاستيراد: ' + e.message, 'error');
     } finally {
       setImporting(false);
     }
@@ -838,7 +884,12 @@ export default function ExportScreen() {
                           { backgroundColor: r.dup ? 'rgba(245,158,11,0.1)' : r.valid ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' },
                         ]}
                       >
-                        <Text style={styles.previewName}>{r.head_name}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.previewName}>{r.head_name || '(بلا اسم)'}</Text>
+                          {!!(r.dupReason || r.invalidReason) && (
+                            <Text style={styles.previewReason}>{r.dupReason || r.invalidReason}</Text>
+                          )}
+                        </View>
                         <Text>{r.dup ? '🔁' : r.valid ? '✅' : '❌'}</Text>
                       </View>
                     ))}
@@ -947,4 +998,5 @@ const styles = StyleSheet.create({
   statRed: { color: colors.red, fontSize: 11 },
   previewRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginBottom: 4 },
   previewName: { color: colors.white, fontSize: 11 },
+  previewReason: { color: colors.muted, fontSize: 9, marginTop: 1, textAlign: 'right' },
 });

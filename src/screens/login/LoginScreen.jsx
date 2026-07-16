@@ -9,6 +9,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import colors from '../../theme/colors';
@@ -40,6 +41,7 @@ export default function LoginScreen({ navigation }) {
   useEffect(() => () => clearInterval(timerRef.current), []);
 
   async function handleSubmit() {
+    Keyboard.dismiss();
     if (Date.now() < lockUntil) {
       const wait = Math.ceil((lockUntil - Date.now()) / 1000);
       setError(`⏳ انتظر ${wait} ثانية قبل المحاولة مجدداً`);

@@ -14,17 +14,12 @@ export default function FormSection({ title, children }) {
 
 const styles = StyleSheet.create({
   panel: {
-    backgroundColor: colors.glassSurface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 14,
+    borderColor: colors.border,
+    borderRadius: 12,
     padding: 14,
     marginBottom: 12,
-    shadowColor: colors.glowShadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
   },
   title: { color: colors.accent, fontWeight: 'bold', fontSize: 13, marginBottom: 12, textAlign: 'right' },
 });

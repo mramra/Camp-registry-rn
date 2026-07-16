@@ -89,71 +89,37 @@ export default function LoginScreen({ navigation }) {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.center} keyboardShouldPersistTaps="handled">
-          {/* مشهد خلفية دافئ (سماء متوهّجة + نجوم + خيام بالظل) --
-              بدون هذا المشهد، تأثير "الزجاج" الشفاف على البطاقة ما إله
-              أي معنى بصري لأنه وراءها لون واحد فاضي بس (نفس مبدأ أي
-              تصميم Glassmorphism: لازم محتوى فعلي وراء الزجاج) */}
-          <View style={styles.scene} pointerEvents="none">
-            <View style={styles.sunGlowOuter} />
-            <View style={styles.sunGlow} />
-            <View style={[styles.star, { top: 40, left: 50 }]} />
-            <View style={[styles.star, { top: 70, left: 280 }]} />
-            <View style={[styles.star, { top: 110, left: 180 }]} />
-            <View style={[styles.star, { top: 30, left: 130 }]} />
-            <View style={[styles.star, { top: 140, left: 320 }]} />
-            <View style={[styles.star, { top: 90, left: 20 }]} />
-            <View style={styles.tentsRow}>
-              <View style={[styles.tent, { borderBottomWidth: 70, borderLeftWidth: 42, borderRightWidth: 42 }]} />
-              <View style={[styles.tent, styles.tentTall, { borderBottomWidth: 92, borderLeftWidth: 55, borderRightWidth: 55 }]} />
-              <View style={[styles.tent, { borderBottomWidth: 78, borderLeftWidth: 46, borderRightWidth: 46 }]} />
-              <View style={[styles.tent, styles.tentTall, { borderBottomWidth: 64, borderLeftWidth: 38, borderRightWidth: 38 }]} />
-            </View>
-          </View>
-
-          <View style={styles.card} pointerEvents="box-none">
+          <View style={styles.card}>
             {/* أيقونة */}
             <View style={styles.iconBox}>
-              <View style={styles.iconBoxInner}>
-                <Text style={styles.iconEmoji}>🏕️</Text>
-              </View>
+              <Text style={styles.iconEmoji}>🏕️</Text>
             </View>
             <Text style={styles.title}>نبض المخيم</Text>
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <View style={styles.dividerDot} />
-              <View style={styles.dividerLine} />
-            </View>
             <Text style={styles.subtitle}>سجل دخول للمتابعة</Text>
 
             {/* رقم الهوية */}
             <Text style={styles.label}>رقم الهوية</Text>
-            <View style={styles.inputRow}>
-              <Text style={styles.inputIcon}>🪪</Text>
-              <TextInput
-                value={id}
-                onChangeText={setId}
-                placeholder="1xxxxxxxxx"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                editable={!loading}
-                style={styles.input}
-              />
-            </View>
+            <TextInput
+              value={id}
+              onChangeText={setId}
+              placeholder="1xxxxxxxxx"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              editable={!loading}
+              style={styles.input}
+            />
 
             {/* كلمة المرور */}
             <Text style={styles.label}>كلمة المرور</Text>
-            <View style={styles.inputRow}>
-              <Text style={styles.inputIcon}>🔒</Text>
-              <TextInput
-                value={pass}
-                onChangeText={setPass}
-                placeholder="••••••••"
-                placeholderTextColor={colors.muted}
-                secureTextEntry
-                editable={!loading}
-                style={styles.input}
-              />
-            </View>
+            <TextInput
+              value={pass}
+              onChangeText={setPass}
+              placeholder="••••••••"
+              placeholderTextColor={colors.muted}
+              secureTextEntry
+              editable={!loading}
+              style={styles.input}
+            />
 
             {/* رسالة الحالة */}
             {!!error && <Text style={[styles.msg, errStyle]}>{error}</Text>}
@@ -187,7 +153,7 @@ export default function LoginScreen({ navigation }) {
               ]}
             >
               <Text style={styles.buttonText}>
-                {loading ? `⏳ جاري الدخول... (${seconds}s)` : 'دخول'}
+                {loading ? `⏳ جاري الدخول... (${seconds}s)` : 'تسجيل الدخول'}
               </Text>
             </Pressable>
 
@@ -195,7 +161,7 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.portalBtnText}>🏕️ أنا من عائلة مسجّلة — استعلام بوابة الأسرة</Text>
             </Pressable>
 
-            <Text style={styles.copyright}>© 2026 نبض المخيم — جميع الحقوق محفوظة</Text>
+            <Text style={styles.copyright}>© 2026 Mahmoud Rateb Ramadan</Text>
 
             {seconds > 10 && (
               <View style={styles.slowBox}>
@@ -212,83 +178,41 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0d1117' },
+  screen: { flex: 1, backgroundColor: colors.bg },
   center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
-
-  scene: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', zIndex: 0 },
-  sunGlowOuter: {
-    position: 'absolute', top: -140, alignSelf: 'center', width: 460, height: 460,
-    borderRadius: 460, backgroundColor: 'rgba(217,119,6,0.28)',
-  },
-  sunGlow: {
-    position: 'absolute', top: -60, alignSelf: 'center', width: 280, height: 280,
-    borderRadius: 280, backgroundColor: 'rgba(245,158,11,0.5)',
-  },
-  star: { position: 'absolute', width: 2, height: 2, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)' },
-  tentsRow: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
-  },
-  tent: {
-    width: 0, height: 0, borderStyle: 'solid', borderTopWidth: 0,
-    borderLeftColor: 'transparent', borderRightColor: 'transparent',
-    borderBottomColor: 'rgba(9,12,16,0.85)',
-  },
-  tentTall: { marginBottom: -6 },
-
   card: {
     width: '100%',
     maxWidth: 384,
-    zIndex: 10,
-    backgroundColor: 'rgba(22,27,34,0.72)',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.35)',
-    borderRadius: 22,
+    borderColor: colors.border,
+    borderRadius: 16,
     padding: 32,
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 28,
-    elevation: 12,
   },
   iconBox: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
-    backgroundColor: 'rgba(245,158,11,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.4)',
+    width: 64,
+    height: 64,
+    backgroundColor: colors.accent,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  iconBoxInner: {
-    width: 54, height: 54, borderRadius: 15, backgroundColor: colors.accent,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  iconEmoji: { fontSize: 26 },
-  title: { color: colors.white, fontWeight: '900', fontSize: 21, textAlign: 'center', letterSpacing: 0.3 },
-  divider: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, marginBottom: 6 },
-  dividerLine: { width: 36, height: 1, backgroundColor: 'rgba(245,158,11,0.35)' },
-  dividerDot: { width: 4, height: 4, borderRadius: 4, backgroundColor: colors.accent },
+  iconEmoji: { fontSize: 30 },
+  title: { color: colors.white, fontWeight: '900', fontSize: 20, textAlign: 'center', marginBottom: 4 },
   subtitle: { color: colors.muted, fontSize: 12, textAlign: 'center', marginBottom: 28 },
   label: { color: colors.muted, fontSize: 12, fontWeight: 'bold', marginBottom: 6, textAlign: 'right' },
-  inputRow: {
-    flexDirection: 'row-reverse', alignItems: 'center',
-    backgroundColor: 'rgba(31,41,55,0.7)',
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.18)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    marginBottom: 16,
-  },
-  inputIcon: { fontSize: 15, marginStart: 8 },
   input: {
-    flex: 1,
-    paddingVertical: 13,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     color: colors.white,
     fontSize: 14,
+    marginBottom: 16,
     textAlign: 'right',
   },
   msg: { fontSize: 12, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 12, textAlign: 'right', borderWidth: 1, overflow: 'hidden' },
@@ -303,18 +227,13 @@ const styles = StyleSheet.create({
   secondsText: { color: colors.muted, fontSize: 12, width: 32, textAlign: 'left' },
   button: {
     backgroundColor: colors.accent,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: 12,
     marginTop: 4,
-    shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
   },
   buttonDisabled: { opacity: 0.6 },
   buttonPressed: { transform: [{ scale: 0.97 }] },
-  buttonText: { color: '#1a1206', fontWeight: '900', fontSize: 15, textAlign: 'center', letterSpacing: 0.5 },
+  buttonText: { color: colors.bg, fontWeight: '900', fontSize: 14, textAlign: 'center' },
   portalBtn: {
     marginTop: 24,
     borderWidth: 1.5,

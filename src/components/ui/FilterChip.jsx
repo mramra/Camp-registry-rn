@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -33,5 +33,5 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
   pressed: { opacity: 0.8 },
   label: { color: colors.white, fontSize: 12, fontWeight: 'bold' },
-  labelSelected: { color: '#1a1206' },
+  labelSelected: { color: '#000' },
 });

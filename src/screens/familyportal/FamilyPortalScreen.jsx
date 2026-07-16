@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,22 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { supabase, fetchFamilyAidHistory, recordApprovalRequest } from '../../lib/supabase';
+import { supabase, fetchFamilyAidHistory, recordApprovalRequest, fetchPortalMessages, sendPortalMessage } from '../../lib/supabase';
 import { getFamilyCategories, CATEGORY_LABELS } from '../../lib/helpers';
 import { MARITAL_BY_GENDER } from '../../lib/formOptions';
 import { formatDate } from '../../lib/utils';
+import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
+
+const MONTHS = [
+  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+];
+
+function joinDob(day, month, year) {
+  if (!day || !month || !year) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
 
 // نفس معرّف المنظمة الثابت المستخدم بالنسخة الأصلية لبوابة الأسرة العامة
 // (هذه الشاشة تعمل بدون تسجيل دخول، فلا يوجد AuthContext لأخذ org_id منه)
@@ -22,20 +33,28 @@ const ORG_ID = 'ddc8abe7-518f-40a4-8c3b-ee03bb0f47d5';
 
 export default function FamilyPortalScreen({ navigation }) {
   const [nationalId, setNationalId] = useState('');
-  const [dob, setDob] = useState('');
+  const [dobDay, setDobDay] = useState(null);
+  const [dobMonth, setDobMonth] = useState(null);
+  const [dobYear, setDobYear] = useState(null);
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
   const [aidHistory, setAidHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [requestOpen, setRequestOpen] = useState(false);
-  const [requestText, setRequestText] = useState('');
-  const [requestPhone, setRequestPhone] = useState('');
-  const [requestSending, setRequestSending] = useState(false);
-  const [requestSent, setRequestSent] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [missingValues, setMissingValues] = useState({});
   const [missingSending, setMissingSending] = useState(false);
   const [missingSent, setMissingSent] = useState(false);
+
+  const currentYear = new Date().getFullYear();
+  const years = useMemo(() => {
+    const arr = [];
+    for (let y = currentYear; y >= 1900; y--) arr.push(String(y));
+    return arr;
+  }, [currentYear]);
+  const days = useMemo(() => Array.from({ length: 31 }, (_, i) => String(i + 1)), []);
 
   const handleSearch = async () => {
     if (!nationalId.trim()) return setError('أدخل رقم الهوية');
@@ -44,10 +63,8 @@ export default function FamilyPortalScreen({ navigation }) {
     setFamily(null);
     setMembers([]);
     setAidHistory([]);
-    setRequestOpen(false);
-    setRequestText('');
-    setRequestPhone('');
-    setRequestSent(false);
+    setMessages([]);
+    setNewMessage('');
     setMissingValues({});
     setMissingSent(false);
     try {
@@ -70,23 +87,25 @@ export default function FamilyPortalScreen({ navigation }) {
         return;
       }
 
-      // التحقق من تاريخ الميلاد إن أُدخل (صيغة YYYY-MM-DD)
-      if (dob.trim() && data.head_dob) {
-        const entered = dob.trim();
+      // التحقق من تاريخ الميلاد إن أُدخل (يوم/شهر/سنة)
+      const enteredDob = joinDob(dobDay, dobMonth, dobYear);
+      if (enteredDob && data.head_dob) {
         const stored = String(data.head_dob).slice(0, 10);
-        if (entered !== stored) {
+        if (enteredDob !== stored) {
           setError('رقم الهوية وتاريخ الميلاد غير متطابقين');
           return;
         }
       }
 
       setFamily(data);
-      const [{ data: mems }, aid] = await Promise.all([
+      const [{ data: mems }, aid, msgs] = await Promise.all([
         supabase.from('family_members').select('*').eq('family_id', data.id),
         fetchFamilyAidHistory(data.id),
+        fetchPortalMessages(data.id),
       ]);
       setMembers(mems || []);
       setAidHistory(aid || []);
+      setMessages(msgs || []);
     } catch {
       setError('حدث خطأ في البحث');
     } finally {
@@ -132,27 +151,24 @@ export default function FamilyPortalScreen({ navigation }) {
     }
   };
 
-  const handleSubmitRequest = async () => {
-    if (!requestText.trim()) return setError('اكتب طلبك أولاً');
-    setRequestSending(true);
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return setError('اكتب رسالتك أولاً');
+    setSendingMessage(true);
     setError('');
     try {
-      await recordApprovalRequest({
+      const sent = await sendPortalMessage({
         orgId: ORG_ID,
         familyId: family.id,
-        action: 'portal_request',
-        changes: { request_text: requestText.trim(), contact_phone: requestPhone.trim() || null },
-        actorName: `${family.head_name} (عبر بوابة الأسرة)`,
-        actorRole: 'family_portal',
+        senderRole: 'family',
+        senderName: family.head_name,
+        message: newMessage.trim(),
       });
-      setRequestSent(true);
-      setRequestOpen(false);
-      setRequestText('');
-      setRequestPhone('');
+      setMessages((prev) => [...prev, sent]);
+      setNewMessage('');
     } catch {
-      setError('تعذّر إرسال الطلب، حاول مرة ثانية');
+      setError('تعذّر إرسال الرسالة، حاول مرة ثانية');
     } finally {
-      setRequestSending(false);
+      setSendingMessage(false);
     }
   };
 
@@ -178,15 +194,18 @@ export default function FamilyPortalScreen({ navigation }) {
               style={styles.input}
             />
 
-            <Text style={styles.label}>تاريخ الميلاد (للتحقق — اختياري، YYYY-MM-DD)</Text>
-            <TextInput
-              value={dob}
-              onChangeText={setDob}
-              placeholder="1990-01-01"
-              placeholderTextColor={colors.muted}
-              editable={!loading}
-              style={styles.input}
-            />
+            <Text style={styles.label}>تاريخ الميلاد (للتحقق — اختياري)</Text>
+            <View style={styles.dobRow}>
+              <View style={styles.dobThird}>
+                <SelectField value={dobDay ? String(dobDay) : null} options={days} onSelect={(v) => setDobDay(Number(v))} placeholder="اليوم" />
+              </View>
+              <View style={styles.dobThird}>
+                <SelectField value={dobMonth ? MONTHS[dobMonth - 1] : null} options={MONTHS} onSelect={(v) => setDobMonth(MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
+              </View>
+              <View style={styles.dobThird}>
+                <SelectField value={dobYear ? String(dobYear) : null} options={years} onSelect={(v) => setDobYear(Number(v))} placeholder="السنة" />
+              </View>
+            </View>
 
             {!!error && <Text style={styles.errorMsg}>{error}</Text>}
 
@@ -326,53 +345,42 @@ export default function FamilyPortalScreen({ navigation }) {
                 )}
 
                 <View style={styles.infoCard}>
-                  <Text style={styles.infoCardTitle}>📝 طلب تعديل بيانات</Text>
+                  <Text style={styles.infoCardTitle}>💬 تواصل مع إدارة المخيم</Text>
+                  <Text style={styles.requestHint}>
+                    اكتب أي استفسار أو طلب (إضافة مولود، تغيير جوال، أي شي ثاني) — بيوصل مباشرة
+                    لمسؤول المخيم وممكن يردّ عليك هون بنفس المكان.
+                  </Text>
 
-                  {requestSent && (
-                    <View style={styles.sentBanner}>
-                      <Text style={styles.sentBannerText}>✅ تم إرسال طلبك — بينتظر مراجعة إدارة المخيم</Text>
+                  {messages.length > 0 && (
+                    <View style={styles.chatBox}>
+                      {messages.map((m) => (
+                        <View
+                          key={m.id}
+                          style={[styles.bubble, m.sender_role === 'staff' ? styles.bubbleStaff : styles.bubbleFamily]}
+                        >
+                          <Text style={styles.bubbleSender}>{m.sender_role === 'staff' ? `👤 ${m.sender_name || 'إدارة المخيم'}` : 'أنت'}</Text>
+                          <Text style={styles.bubbleText}>{m.message}</Text>
+                        </View>
+                      ))}
                     </View>
                   )}
 
-                  {!requestOpen && !requestSent && (
-                    <Pressable style={styles.requestOpenBtn} onPress={() => setRequestOpen(true)}>
-                      <Text style={styles.requestOpenBtnText}>عندي تعديل أو إضافة أحب أطلبها</Text>
-                    </Pressable>
-                  )}
-
-                  {requestOpen && (
-                    <>
-                      <Text style={styles.requestHint}>
-                        اكتب طلبك (مثلاً: إضافة مولود جديد، تغيير رقم الجوال...) — رح يوصل لمندوب
-                        المخيم للمراجعة والتنفيذ، ما رح يتغيّر شي مباشرة.
-                      </Text>
-                      <TextInput
-                        value={requestText}
-                        onChangeText={setRequestText}
-                        placeholder="اكتب طلبك هنا..."
-                        placeholderTextColor={colors.muted}
-                        multiline
-                        style={[styles.input, styles.requestTextInput]}
-                        editable={!requestSending}
-                      />
-                      <TextInput
-                        value={requestPhone}
-                        onChangeText={setRequestPhone}
-                        placeholder="رقم جوال للتواصل (اختياري)"
-                        placeholderTextColor={colors.muted}
-                        keyboardType="phone-pad"
-                        style={styles.input}
-                        editable={!requestSending}
-                      />
-                      <Pressable
-                        style={[styles.button, requestSending && styles.buttonDisabled]}
-                        onPress={handleSubmitRequest}
-                        disabled={requestSending}
-                      >
-                        <Text style={styles.buttonText}>{requestSending ? '⏳ جاري الإرسال...' : '📤 إرسال الطلب'}</Text>
-                      </Pressable>
-                    </>
-                  )}
+                  <TextInput
+                    value={newMessage}
+                    onChangeText={setNewMessage}
+                    placeholder="اكتب رسالتك هنا..."
+                    placeholderTextColor={colors.muted}
+                    multiline
+                    style={[styles.input, styles.requestTextInput]}
+                    editable={!sendingMessage}
+                  />
+                  <Pressable
+                    style={[styles.button, sendingMessage && styles.buttonDisabled]}
+                    onPress={handleSendMessage}
+                    disabled={sendingMessage}
+                  >
+                    <Text style={styles.buttonText}>{sendingMessage ? '⏳ جاري الإرسال...' : '📤 إرسال'}</Text>
+                  </Pressable>
                 </View>
               </View>
             )}
@@ -417,6 +425,8 @@ const styles = StyleSheet.create({
   title: { color: colors.white, fontWeight: '900', fontSize: 20, textAlign: 'center', marginBottom: 4 },
   subtitle: { color: colors.muted, fontSize: 12, textAlign: 'center', marginBottom: 24 },
   label: { color: colors.muted, fontSize: 12, fontWeight: 'bold', marginBottom: 6, textAlign: 'right' },
+  dobRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 16 },
+  dobThird: { flex: 1 },
   input: {
     backgroundColor: colors.surface2,
     borderWidth: 1,
@@ -473,11 +483,12 @@ const styles = StyleSheet.create({
   memberDob: { color: colors.muted, fontSize: 9, marginTop: 2 },
   noAidText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
 
-  requestOpenBtn: {
-    backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
-    borderRadius: 10, paddingVertical: 10, alignItems: 'center',
-  },
-  requestOpenBtnText: { color: colors.accent, fontSize: 12, fontWeight: 'bold' },
+  chatBox: { marginBottom: 12 },
+  bubble: { maxWidth: '85%', borderRadius: 12, padding: 10, marginBottom: 8 },
+  bubbleFamily: { alignSelf: 'flex-end', backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
+  bubbleStaff: { alignSelf: 'flex-start', backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border },
+  bubbleSender: { color: colors.muted, fontSize: 9, marginBottom: 3, textAlign: 'right' },
+  bubbleText: { color: colors.white, fontSize: 12, textAlign: 'right', lineHeight: 18 },
   requestHint: { color: colors.muted, fontSize: 10, lineHeight: 16, textAlign: 'right', marginBottom: 10 },
   requestTextInput: { minHeight: 70, textAlignVertical: 'top' },
   sentBanner: {

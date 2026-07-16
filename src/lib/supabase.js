@@ -68,6 +68,59 @@ export const fetchFamilies = async (orgId, campId = null) => {
   }
 };
 
+export const fetchPortalMessages = async (familyId) => {
+  try {
+    const { data, error } = await supabase
+      .from('portal_messages')
+      .select('*')
+      .eq('family_id', familyId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  } catch {
+    return [];
+  }
+};
+
+export const sendPortalMessage = async ({ orgId, familyId, senderRole, senderName, message }) => {
+  const { data, error } = await supabase
+    .from('portal_messages')
+    .insert([{ org_id: orgId, family_id: familyId, sender_role: senderRole, sender_name: senderName, message }])
+    .select();
+  if (error) throw error;
+  return data?.[0];
+};
+
+// قائمة محادثات بوابة الأسرة لطاقم الموظفين -- كل أسرة لها رسالة واحدة
+// على الأقل، مع آخر رسالة وعدد الرسائل غير المقروءة من طرف الأسرة
+export const fetchPortalConversations = async (orgId) => {
+  const { data, error } = await supabase
+    .from('portal_messages')
+    .select('*, families(head_name, camp_id, camps(name))')
+    .eq('org_id', orgId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  const byFamily = new Map();
+  (data || []).forEach((m) => {
+    if (!byFamily.has(m.family_id)) {
+      byFamily.set(m.family_id, { familyId: m.family_id, headName: m.families?.head_name, campName: m.families?.camps?.name, lastMessage: m, unread: 0 });
+    }
+    const entry = byFamily.get(m.family_id);
+    if (m.sender_role === 'family' && !m.read_by_staff) entry.unread += 1;
+  });
+  return Array.from(byFamily.values());
+};
+
+export const markPortalMessagesRead = async (familyId, role) => {
+  try {
+    const col = role === 'staff' ? 'read_by_staff' : 'read_by_family';
+    const otherRole = role === 'staff' ? 'family' : 'staff';
+    await supabase.from('portal_messages').update({ [col]: true }).eq('family_id', familyId).eq('sender_role', otherRole).eq(col, false);
+  } catch {
+    // فشل تعليم القراءة غير حرج
+  }
+};
+
 export const fetchFamilyAidHistory = async (familyId) => {
   try {
     const { data, error } = await supabase

@@ -13,6 +13,7 @@ import FamilyDetailScreen from '../screens/families/FamilyDetailScreen';
 import FamilyFormScreen from '../screens/families/FamilyFormScreen';
 import FamilyQRScreen from '../screens/families/FamilyQRScreen';
 import SmartSearchScreen from '../screens/search/SmartSearchScreen';
+import PortalMessagesScreen from '../screens/familyportal/PortalMessagesScreen';
 import ExitedFamiliesScreen from '../screens/exited/ExitedFamiliesScreen';
 import CampsListScreen from '../screens/camps/CampsListScreen';
 import CampFormScreen from '../screens/camps/CampFormScreen';
@@ -141,6 +142,7 @@ const RootNavigator = () => {
             <Stack.Screen name="FamilyForm" component={FamilyFormScreen} options={{ title: 'بيانات الأسرة' }} />
             <Stack.Screen name="FamilyQR" component={FamilyQRScreen} options={{ title: 'البطاقة الرقمية' }} />
             <Stack.Screen name="SmartSearch" component={SmartSearchScreen} options={{ title: 'البحث الذكي' }} />
+            <Stack.Screen name="PortalMessages" component={PortalMessagesScreen} options={{ title: 'رسائل بوابة الأسرة' }} />
 
             {/* المخيمات — منقولة بالكامل */}
             <Stack.Screen name="CampsList" component={CampsListScreen} options={{ title: 'المخيمات' }} />

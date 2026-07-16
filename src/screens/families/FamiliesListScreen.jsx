@@ -14,7 +14,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { checkFamilyIssues, isIncomplete, isAgeInRange, getMembers } from '../../lib/helpers';
+import { checkFamilyIssues, isIncomplete, isAgeInRange, getMembers, getVulnerabilityScore, VULNERABILITY_TIER_LABELS } from '../../lib/helpers';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
@@ -34,6 +34,7 @@ const MISS_OPTIONS = [
   { key: 'incomplete', icon: '⚠️', label: 'ناقص' },
   { key: 'dup_id', icon: '🔁', label: 'هوية مكررة' },
   { key: 'dup_phone', icon: '📞', label: 'جوال مكرر' },
+  { key: 'vulnerable', icon: '🆘', label: 'الأشد ضعفاً' },
 ];
 
 const APPROVAL_OPTIONS = [
@@ -200,6 +201,10 @@ export default function FamiliesListScreen() {
       rejected: base.filter((f) => f.review_status === 'rejected').length,
       male: base.filter((f) => f.head_gender === 'ذكر').length,
       female: base.filter((f) => f.head_gender === 'أنثى').length,
+      vulnerable: base.filter((f) => {
+        const t = getVulnerabilityScore(f, membersByFamily[f.id]).tier;
+        return t === 'high' || t === 'critical';
+      }).length,
     };
   }, [families, filterCamp, membersByFamily, dupIdSet, dupPhoneSet]);
 
@@ -215,6 +220,12 @@ export default function FamiliesListScreen() {
     if (filterMiss === 'incomplete') list = list.filter((f) => isIncomplete(f, membersByFamily[f.id]));
     if (filterMiss === 'dup_id') list = list.filter((f) => dupIdSet.has(f.id));
     if (filterMiss === 'dup_phone') list = list.filter((f) => dupPhoneSet.has(f.id));
+    if (filterMiss === 'vulnerable') {
+      list = list.filter((f) => {
+        const t = getVulnerabilityScore(f, membersByFamily[f.id]).tier;
+        return t === 'high' || t === 'critical';
+      });
+    }
 
     if (ageMin || ageMax) {
       list = list.filter((f) => {
@@ -238,6 +249,12 @@ export default function FamiliesListScreen() {
         (a, b) =>
           checkFamilyIssues(b, membersByFamily[b.id]).length -
           checkFamilyIssues(a, membersByFamily[a.id]).length
+      );
+    } else if (filterMiss === 'vulnerable') {
+      list.sort(
+        (a, b) =>
+          getVulnerabilityScore(b, membersByFamily[b.id]).score -
+          getVulnerabilityScore(a, membersByFamily[a.id]).score
       );
     } else {
       list.sort(
@@ -269,6 +286,8 @@ export default function FamiliesListScreen() {
     const isDupId = dupIdSet.has(f.id);
     const isDupPhone = dupPhoneSet.has(f.id);
     const memberCount = getMembers(allMembers, f).length + 1;
+    const vulnerability = getVulnerabilityScore(f, fMembers);
+    const isVulnerable = vulnerability.tier === 'high' || vulnerability.tier === 'critical';
 
     // شريط ملوّن يمين البطاقة حسب نوع المشكلة (أحمر=ناقص، بنفسجي=هوية، أزرق=جوال)
     const borderColor = incomplete
@@ -305,7 +324,13 @@ export default function FamiliesListScreen() {
           {incomplete && <Badge label={`⚠️ ${issues.length} نقص`} color={colors.red} />}
           {isDupId && <Badge label="🔁 هوية" color={colors.purple} />}
           {isDupPhone && <Badge label="📞 جوال" color={colors.blue} />}
-          {!incomplete && !isDupId && !isDupPhone && <Text style={styles.okMark}>✅</Text>}
+          {isVulnerable && (
+            <Badge
+              label={VULNERABILITY_TIER_LABELS[vulnerability.tier]}
+              color={vulnerability.tier === 'critical' ? colors.red : colors.orange}
+            />
+          )}
+          {!incomplete && !isDupId && !isDupPhone && !isVulnerable && <Text style={styles.okMark}>✅</Text>}
         </View>
 
         <View style={styles.cardBottom}>

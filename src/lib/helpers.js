@@ -77,6 +77,47 @@ export function getFamilyPriority(family, members) {
   return { score, tier };
 }
 
+/**
+ * درجة الضعف — مقياس رقمي تراكمي منفصل عن getFamilyPriority (يعتمد
+ * فئات ثابتة كشهيد/أسير). هذا يحسب من بيانات فعلية بكل أسرة: حجم
+ * الأسرة، الإعاقات، كبار السن (60+)، الأمراض المزمنة، الأيتام،
+ * وفقدان المعيل -- عشان ترتيب أولوية توزيعات دقيق حتى بدون فئات مسجَّلة.
+ */
+export function getVulnerabilityScore(family, members) {
+  const mems = members || [];
+  const totalCount = mems.length + 1;
+
+  const healthCount = (raw) => {
+    const n = normalizeHealthValue(raw);
+    return n ? n.split('، ').filter(Boolean).length : 0;
+  };
+
+  const ages = [calcAge(family?.head_dob), ...mems.map((m) => calcAge(m.dob))];
+  const elderlyCount = ages.filter((a) => a !== null && a >= 60).length;
+  const disabilityCount = healthCount(family?.head_disabilities) + mems.reduce((s, m) => s + healthCount(m.disabilities), 0);
+  const chronicCount = healthCount(family?.head_chronic_diseases) + mems.reduce((s, m) => s + healthCount(m.chronic_diseases), 0);
+  const orphanCount = mems.filter((m) => m.orphan_status).length;
+  const noProvider = isNoProviderFamily(family, mems);
+
+  let score = 0;
+  score += Math.max(0, totalCount - 5); // فرد إضافي فوق 5 = نقطة
+  score += disabilityCount * 2;
+  score += elderlyCount;
+  score += chronicCount;
+  score += orphanCount;
+  if (noProvider) score += 3;
+
+  const tier = score >= 8 ? 'critical' : score >= 5 ? 'high' : score >= 2 ? 'medium' : 'low';
+  return { score, tier, totalCount, disabilityCount, elderlyCount, chronicCount, orphanCount, noProvider };
+}
+
+export const VULNERABILITY_TIER_LABELS = {
+  critical: '🔴 حرجة',
+  high: '🟠 عالية',
+  medium: '🟡 متوسطة',
+  low: '🟢 منخفضة',
+};
+
 export function getOrphanCount(family, members) {
   return isNoProviderFamily(family, members) ? (members || []).length : 0;
 }

@@ -12,7 +12,7 @@ import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/nativ
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps, fetchFamilies } from '../../lib/supabase';
-import { calcAge, checkFamilyIssues, getMemberIcon, arrLabel } from '../../lib/helpers';
+import { calcAge, checkFamilyIssues, getMemberIcon, arrLabel, getVulnerabilityScore, VULNERABILITY_TIER_LABELS } from '../../lib/helpers';
 import { formatDate, formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import EmptyState from '../../components/ui/EmptyState';
@@ -270,6 +270,16 @@ export default function FamilyDetailScreen() {
     ['تاريخ التسجيل', formatDate(family.created_at)],
   ].filter(([, v]) => v);
 
+  const vulnerability = getVulnerabilityScore(family, members);
+  const vulnDetails = [
+    vulnerability.totalCount > 5 && `👨‍👩‍👧 أسرة كبيرة (${vulnerability.totalCount} فرد)`,
+    vulnerability.disabilityCount > 0 && `♿ ${vulnerability.disabilityCount} إعاقة`,
+    vulnerability.elderlyCount > 0 && `👴 ${vulnerability.elderlyCount} كبير سن`,
+    vulnerability.chronicCount > 0 && `🩺 ${vulnerability.chronicCount} مرض مزمن`,
+    vulnerability.orphanCount > 0 && `🕊️ ${vulnerability.orphanCount} يتيم`,
+    vulnerability.noProvider && `⚠️ فاقدة معيل`,
+  ].filter(Boolean);
+
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -278,6 +288,15 @@ export default function FamilyDetailScreen() {
             <Text style={styles.offlineBannerText}>
               📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة (التعديل/تسجيل الخروج غير متاح الآن)
             </Text>
+          </View>
+        )}
+
+        {(vulnerability.tier === 'high' || vulnerability.tier === 'critical') && (
+          <View style={[styles.vulnBox, vulnerability.tier === 'critical' && styles.vulnBoxCritical]}>
+            <Text style={styles.vulnTitle}>
+              {VULNERABILITY_TIER_LABELS[vulnerability.tier]} — درجة الضعف {vulnerability.score}
+            </Text>
+            <Text style={styles.vulnDetail}>{vulnDetails.join(' • ')}</Text>
           </View>
         )}
 
@@ -449,6 +468,20 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
   },
+  vulnBox: {
+    backgroundColor: 'rgba(251,146,60,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,146,60,0.35)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  vulnBoxCritical: {
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderColor: 'rgba(239,68,68,0.4)',
+  },
+  vulnTitle: { color: colors.orange, fontWeight: 'bold', fontSize: 13, marginBottom: 4, textAlign: 'right' },
+  vulnDetail: { color: colors.white, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   dupTitle: { color: colors.purple, fontWeight: 'bold', fontSize: 12, marginBottom: 6, textAlign: 'right' },
   dupBadge: {
     backgroundColor: 'rgba(139,92,246,0.15)',

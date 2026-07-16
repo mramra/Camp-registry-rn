@@ -188,18 +188,24 @@ export const AuthProvider = ({ children }) => {
 
         if (error) throw error;
 
-        setSession(data.session);
-        setUser(data.session.user);
         const profileData = await fetchUserProfile(data.session.user.id);
 
         // فحص/تسجيل الجهاز -- ميزة كانت موجودة بالأصل وناقصة كلياً بـRN.
         // مالك المنصة معفى دائماً. غيره: جهاز جديد أو غير معتمد أو محظور
-        // يوقف الدخول فوراً (تسجيل خروج) لحد ما حد يعتمده من شاشة الأجهزة.
+        // يوقف الدخول فوراً لحد ما حد يعتمده من شاشة الأجهزة.
+        //
+        // ⚠️ مهم: هذا الفحص يجب أن يحصل *قبل* setSession/setUser وليس
+        // بعدهما -- تفعيل الجلسة مبكراً (isAuthenticated=true) كان يخلي
+        // RootNavigator ينقل المستخدم فوراً للتطبيق الرئيسي، وبعدها لو
+        // فشل فحص الجهاز كنا نسجّل خروج ونرجع لشاشة الدخول -- لكن هذا
+        // "الرجوع" كان يهدم شاشة الدخول القديمة ويبنيها من جديد (remount)
+        // فتضيع رسالة الخطأ المعروضة عليها (كانت على نسخة مهجورة من
+        // React state)، ويظهر للمستخدم كأنه "رجع لصفحة فاضية بدون أي
+        // خطأ" رغم وجود خطأ حقيقي. هذا البق كان موجوداً من الأصل، يظهر
+        // فقط أول مرة يسجّل فيها جهاز معيّن دخول (جهاز جديد يحتاج موافقة).
         const deviceCheck = await checkDeviceApproval(data.session.user.id, profileData);
         if (!deviceCheck.ok) {
           await supabase.auth.signOut();
-          setSession(null);
-          setUser(null);
           setProfile(null);
           const approver = NEXT_DEVICE_APPROVER[deviceCheck.role] || 'المسؤول عنك';
           const msg =
@@ -209,6 +215,9 @@ export const AuthProvider = ({ children }) => {
           setError(msg);
           return { success: false, error: msg, deviceStatus: deviceCheck.status };
         }
+
+        setSession(data.session);
+        setUser(data.session.user);
 
         return { success: true };
       } catch (err) {

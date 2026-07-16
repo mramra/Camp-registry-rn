@@ -110,7 +110,7 @@ export default function LoginScreen({ navigation }) {
             </View>
           </View>
 
-          <View style={styles.card}>
+          <View style={styles.card} pointerEvents="box-none">
             {/* أيقونة */}
             <View style={styles.iconBox}>
               <View style={styles.iconBoxInner}>
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#0d1117' },
   center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
 
-  scene: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  scene: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', zIndex: 0 },
   sunGlowOuter: {
     position: 'absolute', top: -140, alignSelf: 'center', width: 460, height: 460,
     borderRadius: 460, backgroundColor: 'rgba(217,119,6,0.28)',
@@ -239,6 +239,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 384,
+    zIndex: 10,
     backgroundColor: 'rgba(22,27,34,0.72)',
     borderWidth: 1,
     borderColor: 'rgba(245,158,11,0.35)',

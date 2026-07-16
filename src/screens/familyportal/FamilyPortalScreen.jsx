@@ -10,8 +10,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { supabase, fetchFamilyAidHistory } from '../../lib/supabase';
 import { getFamilyCategories, CATEGORY_LABELS } from '../../lib/helpers';
+import { formatDate } from '../../lib/utils';
 import colors from '../../theme/colors';
 
 // نفس معرّف المنظمة الثابت المستخدم بالنسخة الأصلية لبوابة الأسرة العامة
@@ -23,6 +24,7 @@ export default function FamilyPortalScreen({ navigation }) {
   const [dob, setDob] = useState('');
   const [family, setFamily] = useState(null);
   const [members, setMembers] = useState([]);
+  const [aidHistory, setAidHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -32,16 +34,24 @@ export default function FamilyPortalScreen({ navigation }) {
     setError('');
     setFamily(null);
     setMembers([]);
+    setAidHistory([]);
     try {
       const { data, error: err } = await supabase
         .from('families')
-        .select('*, camps(name)')
+        .select('*, camps(name, portal_open)')
         .eq('org_id', ORG_ID)
         .eq('head_id', nationalId.trim())
         .single();
 
       if (err || !data) {
         setError('لم يتم العثور على أي سجل بهذا الرقم');
+        return;
+      }
+
+      // بوابة المخيم قد تكون مغلقة يدوياً من مندوبه (شاشة إدارة المخيم) --
+      // لو مغلقة، ما نعرض أي بيانات حتى لو الأسرة موجودة فعلياً بالنظام
+      if (data.camps && data.camps.portal_open === false) {
+        setError('بوابة الاستعلام مغلقة حالياً بهذا المخيم — تواصل مع إدارة المخيم مباشرة');
         return;
       }
 
@@ -56,8 +66,12 @@ export default function FamilyPortalScreen({ navigation }) {
       }
 
       setFamily(data);
-      const { data: mems } = await supabase.from('family_members').select('*').eq('family_id', data.id);
+      const [{ data: mems }, aid] = await Promise.all([
+        supabase.from('family_members').select('*').eq('family_id', data.id),
+        fetchFamilyAidHistory(data.id),
+      ]);
       setMembers(mems || []);
+      setAidHistory(aid || []);
     } catch {
       setError('حدث خطأ في البحث');
     } finally {
@@ -160,6 +174,26 @@ export default function FamilyPortalScreen({ navigation }) {
                     ))}
                   </View>
                 )}
+
+                <View style={styles.infoCard}>
+                  <Text style={styles.infoCardTitle}>📦 المساعدات المستلمة ({aidHistory.length})</Text>
+                  {aidHistory.length === 0 ? (
+                    <Text style={styles.noAidText}>لم تُستلَم أي مساعدة بعد</Text>
+                  ) : (
+                    aidHistory.map((h) => {
+                      const typeIcon = { food: '🍚', shelter: '🏠', hygiene: '🧼', financial: '💵' }[h.dist_rounds?.type] || '📦';
+                      return (
+                        <View key={h.id} style={styles.memberRow}>
+                          <Text style={styles.memberId}>{typeIcon}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.memberName}>{h.dist_rounds?.name || 'جولة توزيع'}</Text>
+                          </View>
+                          <Text style={styles.memberDob}>{formatDate(h.dist_rounds?.round_date || h.received_at)}</Text>
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
               </View>
             )}
           </View>
@@ -257,6 +291,7 @@ const styles = StyleSheet.create({
   memberId: { color: colors.muted, fontSize: 9, marginTop: 2 },
   memberRelation: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
   memberDob: { color: colors.muted, fontSize: 9, marginTop: 2 },
+  noAidText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
 
   footerText: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: 16 },
   backLink: { color: colors.accent, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },

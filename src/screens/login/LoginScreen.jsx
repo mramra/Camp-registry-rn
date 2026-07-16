@@ -89,9 +89,25 @@ export default function LoginScreen({ navigation }) {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.center} keyboardShouldPersistTaps="handled">
-          {/* توهّج خلفي زخرفي خلف البطاقة (يحاكي إضاءة استوديو) */}
-          <View style={styles.glowTop} pointerEvents="none" />
-          <View style={styles.glowBottom} pointerEvents="none" />
+          {/* مشهد خلفية دافئ (سماء متوهّجة + نجوم + خيام بالظل) --
+              بدون هذا المشهد، تأثير "الزجاج" الشفاف على البطاقة ما إله
+              أي معنى بصري لأنه وراءها لون واحد فاضي بس (نفس مبدأ أي
+              تصميم Glassmorphism: لازم محتوى فعلي وراء الزجاج) */}
+          <View style={styles.scene} pointerEvents="none">
+            <View style={styles.sunGlow} />
+            <View style={[styles.star, { top: 40, left: 50 }]} />
+            <View style={[styles.star, { top: 70, left: 280 }]} />
+            <View style={[styles.star, { top: 110, left: 180 }]} />
+            <View style={[styles.star, { top: 30, left: 130 }]} />
+            <View style={[styles.star, { top: 140, left: 320 }]} />
+            <View style={[styles.star, { top: 90, left: 20 }]} />
+            <View style={styles.tentsRow}>
+              <View style={[styles.tent, { borderBottomWidth: 70, borderLeftWidth: 42, borderRightWidth: 42 }]} />
+              <View style={[styles.tent, styles.tentTall, { borderBottomWidth: 92, borderLeftWidth: 55, borderRightWidth: 55 }]} />
+              <View style={[styles.tent, { borderBottomWidth: 78, borderLeftWidth: 46, borderRightWidth: 46 }]} />
+              <View style={[styles.tent, styles.tentTall, { borderBottomWidth: 64, borderLeftWidth: 38, borderRightWidth: 38 }]} />
+            </View>
+          </View>
 
           <View style={styles.card}>
             {/* أيقونة */}
@@ -195,30 +211,38 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
+  screen: { flex: 1, backgroundColor: '#0d1117' },
   center: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
 
-  glowTop: {
-    position: 'absolute', top: -80, alignSelf: 'center', width: 320, height: 320,
-    borderRadius: 320, backgroundColor: 'rgba(245,158,11,0.08)',
+  scene: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  sunGlow: {
+    position: 'absolute', top: -70, alignSelf: 'center', width: 300, height: 300,
+    borderRadius: 300, backgroundColor: 'rgba(245,158,11,0.22)',
   },
-  glowBottom: {
-    position: 'absolute', bottom: -100, alignSelf: 'center', width: 280, height: 280,
-    borderRadius: 280, backgroundColor: 'rgba(245,158,11,0.05)',
+  star: { position: 'absolute', width: 2, height: 2, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.55)' },
+  tentsRow: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
   },
+  tent: {
+    width: 0, height: 0, borderStyle: 'solid', borderTopWidth: 0,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent',
+    borderBottomColor: 'rgba(9,12,16,0.85)',
+  },
+  tentTall: { marginBottom: -6 },
 
   card: {
     width: '100%',
     maxWidth: 384,
-    backgroundColor: 'rgba(22,27,34,0.88)',
+    backgroundColor: 'rgba(22,27,34,0.72)',
     borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.25)',
+    borderColor: 'rgba(245,158,11,0.35)',
     borderRadius: 22,
     padding: 32,
     shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
+    shadowOpacity: 0.2,
+    shadowRadius: 28,
     elevation: 12,
   },
   iconBox: {

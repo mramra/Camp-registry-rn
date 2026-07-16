@@ -429,6 +429,17 @@ export default function FamilyDetailScreen() {
         )}
 
         <View style={styles.actionsRow}>
+          <Pressable
+            style={styles.qrBtn}
+            onPress={() => navigation.push('FamilyQR', {
+              familyId,
+              headName: family.head_name,
+              campName,
+              tent: family.tent,
+            })}
+          >
+            <Text style={styles.qrBtnText}>🔲 البطاقة الرقمية</Text>
+          </Pressable>
           {canEdit && (
             <Pressable
               style={[styles.editBtn, !!offlineInfo && styles.btnDisabled]}
@@ -564,6 +575,8 @@ const styles = StyleSheet.create({
   notes: { color: colors.white, fontSize: 12, textAlign: 'right', lineHeight: 20 },
 
   actionsRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  qrBtn: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, borderRadius: 12 },
+  qrBtnText: { color: colors.white, fontWeight: '900', fontSize: 13, textAlign: 'center' },
   editBtn: { flex: 1, backgroundColor: colors.accent, paddingVertical: 12, borderRadius: 12 },
   editBtnText: { color: '#000', fontWeight: '900', fontSize: 13, textAlign: 'center' },
   deleteBtn: {

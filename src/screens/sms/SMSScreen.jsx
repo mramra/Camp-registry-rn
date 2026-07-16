@@ -275,6 +275,42 @@ export default function SMSScreen() {
       return showError('تعذّر طلب الإذن: ' + e.message);
     }
 
+    // الخدمة الخلفية (Foreground Service حقيقي) -- استيراد بالداخل عمداً
+    // (مو بأعلى الملف) لنفس سبب SmsManager: مكتبة أصلية، لازم ما تنهار لو
+    // استُدعيت بمنصة/بناء ما فيه المكتبة مربوطة فعلياً. كل استدعاء محاط
+    // بـtry/catch مستقل -- لو فشلت الخدمة الخلفية لأي سبب، الإرسال
+    // يكمل عادياً بالمقدمة بدل ما ينكسر التطبيق كامل (نفس درس خطأ
+    // الإشعارات السابق: لا استدعاء أصلي بدون حماية كاملة أبداً). تُفعَّل
+    // بعد التأكد من الإذن مباشرة -- لو فُعِّلت قبله ورُفض الإذن، الإشعار
+    // كان رح يضل عالق للأبد بدون إيقاف.
+    let bgServiceActive = false;
+    try {
+      const BackgroundService = require('react-native-background-actions').default;
+      await BackgroundService.start(async () => {
+        // هذا الجسم فاضي عمداً -- المهمة الفعلية (حلقة الإرسال) تشتغل
+        // بنفس JS thread بره هذا الاستدعاء (انظر الحلقة تحت)، والخدمة
+        // هون بس مسؤولة عن الإشعار الدائم اللي يخلي أندرويد ما يوقف
+        // JS thread لو صغّر المستخدم التطبيق أو قفل الشاشة. نبقيها
+        // "شغّالة" بحلقة فحص بسيطة لحد ما نوقفها يدوياً بعد انتهاء
+        // الإرسال الحقيقي.
+        while (BackgroundService.isRunning()) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }, {
+        taskName: 'إرسال الرسائل',
+        taskTitle: 'جاري إرسال الرسائل',
+        taskDesc: `0 من ${sel.length}`,
+        taskIcon: { name: 'ic_launcher', type: 'mipmap' },
+        color: '#f59e0b',
+        linkingURI: 'campregistry://sms',
+        foregroundServiceType: ['dataSync'],
+      });
+      bgServiceActive = true;
+    } catch {
+      // فشل تفعيل الخدمة الخلفية غير حرج -- الإرسال يكمل بالمقدمة عادي
+      bgServiceActive = false;
+    }
+
     setDirectSending(true);
     setDirectProgress({ done: 0, total: sel.length });
     let ok = 0;
@@ -300,9 +336,26 @@ export default function SMSScreen() {
         fail++;
       }
       setDirectProgress({ done: i + 1, total: sel.length });
+      if (bgServiceActive) {
+        try {
+          const BackgroundService = require('react-native-background-actions').default;
+          await BackgroundService.updateNotification({ taskDesc: `${i + 1} من ${sel.length}` });
+        } catch {
+          // فشل تحديث الإشعار غير حرج -- الإرسال يكمل عادي
+        }
+      }
       // فاصل بسيط بين كل رسالة وأخرى -- يقلّل احتمال تفعيل حماية أندرويد
       // ضد السبام (مو ضمانة كاملة، بس يخفف الاحتمال).
       await new Promise((r) => setTimeout(r, 350));
+    }
+
+    if (bgServiceActive) {
+      try {
+        const BackgroundService = require('react-native-background-actions').default;
+        await BackgroundService.stop();
+      } catch {
+        // فشل إيقاف الخدمة غير حرج -- ستتوقف تلقائياً لما JS thread يهدأ
+      }
     }
 
     setDirectSending(false);

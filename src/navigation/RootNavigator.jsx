@@ -11,6 +11,7 @@ import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import FamiliesListScreen from '../screens/families/FamiliesListScreen';
 import FamilyDetailScreen from '../screens/families/FamilyDetailScreen';
 import FamilyFormScreen from '../screens/families/FamilyFormScreen';
+import FamilyQRScreen from '../screens/families/FamilyQRScreen';
 import ExitedFamiliesScreen from '../screens/exited/ExitedFamiliesScreen';
 import CampsListScreen from '../screens/camps/CampsListScreen';
 import CampFormScreen from '../screens/camps/CampFormScreen';
@@ -137,6 +138,7 @@ const RootNavigator = () => {
             <Stack.Screen name="ExitedFamilies" component={ExitedFamiliesScreen} options={{ title: 'الأسر الخارجة' }} />
             <Stack.Screen name="FamilyDetail" component={FamilyDetailScreen} options={{ title: 'تفاصيل الأسرة' }} />
             <Stack.Screen name="FamilyForm" component={FamilyFormScreen} options={{ title: 'بيانات الأسرة' }} />
+            <Stack.Screen name="FamilyQR" component={FamilyQRScreen} options={{ title: 'البطاقة الرقمية' }} />
 
             {/* المخيمات — منقولة بالكامل */}
             <Stack.Screen name="CampsList" component={CampsListScreen} options={{ title: 'المخيمات' }} />

@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { supabase, fetchFamilyAidHistory } from '../../lib/supabase';
+import { supabase, fetchFamilyAidHistory, recordApprovalRequest } from '../../lib/supabase';
 import { getFamilyCategories, CATEGORY_LABELS } from '../../lib/helpers';
 import { formatDate } from '../../lib/utils';
 import colors from '../../theme/colors';
@@ -27,6 +27,11 @@ export default function FamilyPortalScreen({ navigation }) {
   const [aidHistory, setAidHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestText, setRequestText] = useState('');
+  const [requestPhone, setRequestPhone] = useState('');
+  const [requestSending, setRequestSending] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
 
   const handleSearch = async () => {
     if (!nationalId.trim()) return setError('أدخل رقم الهوية');
@@ -35,6 +40,10 @@ export default function FamilyPortalScreen({ navigation }) {
     setFamily(null);
     setMembers([]);
     setAidHistory([]);
+    setRequestOpen(false);
+    setRequestText('');
+    setRequestPhone('');
+    setRequestSent(false);
     try {
       const { data, error: err } = await supabase
         .from('families')
@@ -80,6 +89,30 @@ export default function FamilyPortalScreen({ navigation }) {
   };
 
   const categories = family ? getFamilyCategories(family, members) : [];
+
+  const handleSubmitRequest = async () => {
+    if (!requestText.trim()) return setError('اكتب طلبك أولاً');
+    setRequestSending(true);
+    setError('');
+    try {
+      await recordApprovalRequest({
+        orgId: ORG_ID,
+        familyId: family.id,
+        action: 'portal_request',
+        changes: { request_text: requestText.trim(), contact_phone: requestPhone.trim() || null },
+        actorName: `${family.head_name} (عبر بوابة الأسرة)`,
+        actorRole: 'family_portal',
+      });
+      setRequestSent(true);
+      setRequestOpen(false);
+      setRequestText('');
+      setRequestPhone('');
+    } catch {
+      setError('تعذّر إرسال الطلب، حاول مرة ثانية');
+    } finally {
+      setRequestSending(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -194,6 +227,55 @@ export default function FamilyPortalScreen({ navigation }) {
                     })
                   )}
                 </View>
+                <View style={styles.infoCard}>
+                  <Text style={styles.infoCardTitle}>📝 طلب تعديل بيانات</Text>
+
+                  {requestSent && (
+                    <View style={styles.sentBanner}>
+                      <Text style={styles.sentBannerText}>✅ تم إرسال طلبك — بينتظر مراجعة إدارة المخيم</Text>
+                    </View>
+                  )}
+
+                  {!requestOpen && !requestSent && (
+                    <Pressable style={styles.requestOpenBtn} onPress={() => setRequestOpen(true)}>
+                      <Text style={styles.requestOpenBtnText}>عندي تعديل أو إضافة أحب أطلبها</Text>
+                    </Pressable>
+                  )}
+
+                  {requestOpen && (
+                    <>
+                      <Text style={styles.requestHint}>
+                        اكتب طلبك (مثلاً: إضافة مولود جديد، تغيير رقم الجوال...) — رح يوصل لمندوب
+                        المخيم للمراجعة والتنفيذ، ما رح يتغيّر شي مباشرة.
+                      </Text>
+                      <TextInput
+                        value={requestText}
+                        onChangeText={setRequestText}
+                        placeholder="اكتب طلبك هنا..."
+                        placeholderTextColor={colors.muted}
+                        multiline
+                        style={[styles.input, styles.requestTextInput]}
+                        editable={!requestSending}
+                      />
+                      <TextInput
+                        value={requestPhone}
+                        onChangeText={setRequestPhone}
+                        placeholder="رقم جوال للتواصل (اختياري)"
+                        placeholderTextColor={colors.muted}
+                        keyboardType="phone-pad"
+                        style={styles.input}
+                        editable={!requestSending}
+                      />
+                      <Pressable
+                        style={[styles.button, requestSending && styles.buttonDisabled]}
+                        onPress={handleSubmitRequest}
+                        disabled={requestSending}
+                      >
+                        <Text style={styles.buttonText}>{requestSending ? '⏳ جاري الإرسال...' : '📤 إرسال الطلب'}</Text>
+                      </Pressable>
+                    </>
+                  )}
+                </View>
               </View>
             )}
           </View>
@@ -292,6 +374,19 @@ const styles = StyleSheet.create({
   memberRelation: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
   memberDob: { color: colors.muted, fontSize: 9, marginTop: 2 },
   noAidText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
+
+  requestOpenBtn: {
+    backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)',
+    borderRadius: 10, paddingVertical: 10, alignItems: 'center',
+  },
+  requestOpenBtnText: { color: colors.accent, fontSize: 12, fontWeight: 'bold' },
+  requestHint: { color: colors.muted, fontSize: 10, lineHeight: 16, textAlign: 'right', marginBottom: 10 },
+  requestTextInput: { minHeight: 70, textAlignVertical: 'top' },
+  sentBanner: {
+    backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)',
+    borderRadius: 10, padding: 10, alignItems: 'center',
+  },
+  sentBannerText: { color: colors.green, fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
 
   footerText: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: 16 },
   backLink: { color: colors.accent, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },

@@ -22,6 +22,7 @@ const ACTION_LABEL = {
   insert: { icon: '➕', label: 'إضافة أسرة جديدة', color: colors.green },
   update: { icon: '✏️', label: 'تعديل بيانات أسرة', color: colors.blue },
   delete: { icon: '🗑️', label: 'طلب حذف أسرة', color: colors.red },
+  portal_request: { icon: '💬', label: 'طلب من بوابة الأسرة', color: colors.accent },
   movement_entry: { icon: '🟢', label: 'تسجيل دخول أسرة', color: colors.green },
   movement_exit: { icon: '🔴', label: 'تسجيل خروج أسرة', color: colors.red },
   movement_transfer: { icon: '🔵', label: 'نقل أسرة بين مخيمات', color: colors.blue },
@@ -116,6 +117,7 @@ export default function PendingRequestsScreen() {
     const isMovement = req.action?.startsWith('movement_');
     const isCamp = req.action?.startsWith('camp_');
     const isUser = req.action?.startsWith('user_');
+    const isPortalRequest = req.action === 'portal_request';
     const submitter = memberByUserId[req.changed_by];
     const submitterName = req.user_name || submitter?.full_name || '—';
     const submitterRole = req.user_role || submitter?.role;
@@ -123,11 +125,11 @@ export default function PendingRequestsScreen() {
     const campData = req.new_data || req.old_data || {};
     const userData = req.new_data || req.old_data || {};
     const title = isCamp ? campData.name || '—' : isUser ? userData.full_name || '—' : famName;
-    return { meta, isMovement, isCamp, isUser, submitterName, submitterRole, title, campData, userData };
+    return { meta, isMovement, isCamp, isUser, isPortalRequest, submitterName, submitterRole, title, campData, userData };
   };
 
   const renderRequest = ({ item: req }) => {
-    const { meta, isMovement, isCamp, isUser, submitterName, submitterRole, title, campData, userData } = getRequestInfo(req);
+    const { meta, isMovement, isCamp, isUser, isPortalRequest, submitterName, submitterRole, title, campData, userData } = getRequestInfo(req);
     const isLog = tab === 'log';
 
     return (
@@ -168,6 +170,13 @@ export default function PendingRequestsScreen() {
             {!!req.new_data?.from_camp && <Text style={styles.detailText}>📤 من: {campMap[req.new_data.from_camp] || '—'}</Text>}
             {!!req.new_data?.to_camp && <Text style={styles.detailText}>📥 إلى: {campMap[req.new_data.to_camp] || '—'}</Text>}
             {!!req.new_data?.reason && <Text style={styles.detailText}>📝 {req.new_data.reason}</Text>}
+          </View>
+        )}
+
+        {isPortalRequest && (
+          <View style={styles.detailBox}>
+            <Text style={styles.detailText}>💬 {req.changes?.request_text || '—'}</Text>
+            {!!req.changes?.contact_phone && <Text style={styles.detailText}>📱 للتواصل: {req.changes.contact_phone}</Text>}
           </View>
         )}
 

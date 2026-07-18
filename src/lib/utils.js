@@ -71,6 +71,26 @@ export function randomPassword(length = 10) {
  */
 export async function getDeviceFingerprint() {
   const KEY = 'device_fingerprint';
+
+  // على الويب: AsyncStorage أحياناً ما يثبّت القيمة صح بين تحميلات
+  // الصفحة (لوحظ فعلياً: عشرات سجلات "متصفح ويب" ببصمة مختلفة لكل
+  // تحميل لنفس المستخدم بجدول devices) -- localStorage المباشر أضمن
+  // وأبسط على الويب تحديداً، AsyncStorage يبقى للموبايل (يشتغل صح هناك).
+  if (Platform.OS === 'web') {
+    try {
+      let fp = window.localStorage.getItem(KEY);
+      if (!fp) {
+        fp = generateId();
+        window.localStorage.setItem(KEY, fp);
+      }
+      return fp;
+    } catch {
+      // فشل الوصول لـlocalStorage (خصوصية متصفح صارمة مثلاً) -- نولّد
+      // بصمة مؤقتة بالذاكرة فقط، أفضل من كراش كامل
+      return generateId();
+    }
+  }
+
   let fp = await AsyncStorage.getItem(KEY);
   if (!fp) {
     fp = generateId();

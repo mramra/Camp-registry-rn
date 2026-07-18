@@ -57,3 +57,44 @@ export async function notifyNow(title, body, data = {}) {
     // فشل الإشعار غير حرج -- لا نعطّل أي عملية أساسية بسببه
   }
 }
+
+/**
+ * تسجيل رمز Expo Push الحقيقي لهذا الجهاز وحفظه بقاعدة البيانات --
+ * يُستدعى بعد تسجيل الدخول الناجح. هذا مختلف جوهرياً عن notifyNow():
+ * notifyNow محلي (يحتاج JS شغّال بالجهاز نفسه)، بينما هذا الرمز يُستخدم
+ * من *سيرفر* (Edge Function) لإرسال إشعار يصل حتى لو التطبيق مقفول
+ * تماماً (force stop) -- إشعار Push حقيقي.
+ *
+ * محاط بحماية كاملة (مثل باقي الاستدعاءات الأصلية بهذا الملف): فشل
+ * التسجيل غير حرج، التطبيق يستمر عادياً بدون Push فقط.
+ */
+export async function registerPushToken(userId, orgId) {
+  if (Platform.OS === 'web' || !userId || !orgId) return;
+  try {
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let status = existing;
+    if (status !== 'granted') {
+      const req = await Notifications.requestPermissionsAsync();
+      status = req.status;
+    }
+    if (status !== 'granted') return;
+
+    const Constants = require('expo-constants').default;
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
+    const tokenResult = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+    const token = tokenResult?.data;
+    if (!token) return;
+
+    // استيراد ديناميكي لتفادي حلقة استيراد دائرية (هذا الملف مستورَد من
+    // App.js أصلاً، وsupabase.js مستقل عنه)
+    const { supabase } = require('./supabase');
+    await supabase.from('push_tokens').upsert(
+      { user_id: userId, org_id: orgId, token, platform: Platform.OS, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,token' }
+    );
+  } catch {
+    // فشل تسجيل رمز Push غير حرج -- التطبيق يستمر عادياً بدون إشعارات
+    // خارجية، الإشعارات المحلية (notifyNow) تبقى تشتغل طبيعي
+  }
+}
+

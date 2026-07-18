@@ -154,7 +154,7 @@ export default function UsersListScreen() {
 
   const handleToggleActive = async (u) => {
     // تفعيل/تعطيل سريع من القائمة (نفس منطق الأصل: تحديث مباشر بدون Edge Function)
-    const result = await updateOrgMember(u.id, { is_active: !u.is_active });
+    const result = await updateOrgMember(u.id, { is_active: !u.is_active }, { ...profile, org_id: orgId });
     if (result.success) {
       showSuccess(u.is_active ? 'تم تعطيل الحساب' : 'تم تفعيل الحساب');
       loadData();

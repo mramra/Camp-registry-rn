@@ -229,7 +229,49 @@ export const fetchOrgMembers = async (orgId) => {
   return data || [];
 };
 
-export const updateOrgMember = async (memberId, updates) => {
+/**
+ * إرسال إشعار Push حقيقي (يصل حتى لو التطبيق مقفول تماماً) لكل الموظفين
+ * المطابقين للأدوار المحدَّدة (وللمخيم لو حدِّد، بالنسبة لمندوبي المخيمات
+ * تحديداً). يستدعي Edge Function على السيرفر (send-push) بدل الاعتماد
+ * على إشعار محلي يحتاج JS شغّال بجهاز المستقبِل.
+ *
+ * fire-and-forget عمداً: فشل الإرسال (لو حصل) غير حرج، لا يوقف أي عملية
+ * أساسية (إرسال رسالة بالبوابة مثلاً يبقى ينجح حتى لو فشل الـPush).
+ */
+export const sendPushToRoles = async ({ orgId, roles, campId, title, body, data }) => {
+  try {
+    await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ orgId, roles, campId, title, body, data }),
+    });
+  } catch (err) {
+    console.warn('[sendPushToRoles]', err.message);
+  }
+};
+
+// تسجيل حدث بسجل التدقيق الشامل (audit_logs -- نفس الجدول المستخدم أصلاً
+// لتسجيل إجراءات الأجهزة، وسّعناه ليغطي كل الإجراءات الإدارية الحساسة
+// بدل جدول منفصل). fire-and-forget عمداً: فشل التسجيل نفسه لا يجب أبداً
+// أن يوقف أو يفشّل العملية الإدارية الأصلية (حظر جهاز، تغيير دور...).
+export const logAudit = async ({ orgId, actor, action, entityType, entityId, entityLabel, details }) => {
+  try {
+    await supabase.from('audit_logs').insert({
+      org_id: orgId,
+      user_id: actor?.id || null,
+      user_name: actor?.full_name || null,
+      user_role: actor?.role || null,
+      action: `${entityType}_${action}`, // مثال: user_update، camp_delete
+      target_id: entityId || null,
+      target_name: entityLabel || null,
+      details: details || null,
+    });
+  } catch (err) {
+    console.warn('[logAudit]', err.message);
+  }
+};
+
+export const updateOrgMember = async (memberId, updates, actor) => {
   try {
     const { data, error } = await supabase
       .from('org_members')
@@ -237,6 +279,17 @@ export const updateOrgMember = async (memberId, updates) => {
       .eq('id', memberId)
       .select();
     if (error) throw error;
+    if (actor) {
+      logAudit({
+        orgId: actor.org_id,
+        actor,
+        action: 'update',
+        entityType: 'user',
+        entityId: memberId,
+        entityLabel: data?.[0]?.full_name,
+        details: updates,
+      });
+    }
     return { success: true, data: data[0] };
   } catch (err) {
     return { success: false, error: err.message };
@@ -267,10 +320,20 @@ export const updateCamp = async (campId, updates) => {
   }
 };
 
-export const deleteCamp = async (campId) => {
+export const deleteCamp = async (campId, camp, actor) => {
   try {
     const { error } = await supabase.from('camps').delete().eq('id', campId);
     if (error) throw error;
+    if (actor) {
+      logAudit({
+        orgId: actor.org_id,
+        actor,
+        action: 'delete',
+        entityType: 'camp',
+        entityId: campId,
+        entityLabel: camp?.name,
+      });
+    }
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -383,9 +446,26 @@ export const unblockDevice = async (device, reviewer, orgId) => {
   await logDeviceAudit('device_unblocked', device, reviewer, orgId);
 };
 
-export const removeDevice = async (deviceId) => {
+export const removeDevice = async (deviceId, device, reviewer, orgId) => {
   const { error } = await supabase.from('devices').delete().eq('id', deviceId);
   if (error) throw error;
+  if (device && reviewer && orgId) await logDeviceAudit('device_removed', device, reviewer, orgId);
+};
+
+export const fetchAuditLogs = async (orgId, limit = 200) => {
+  try {
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.warn('[fetchAuditLogs]', err.message);
+    return [];
+  }
 };
 
 export const fetchDeviceAuditMap = async (orgId, deviceIds) => {

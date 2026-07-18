@@ -113,7 +113,7 @@ export default function DevicesScreen() {
         onPress: async () => {
           setBusyId(device.id);
           try {
-            await removeDevice(device.id);
+            await removeDevice(device.id, device, profile, orgId);
             // إزالة فورية من الواجهة بدل انتظار إعادة تحميل كاملة -- مع 10+
             // جهاز بنفس الاسم العام (زي "Android" بس) كان صعب تلاحظ اختفاء
             // وحدة وسط باقي المتطابقين، فيبدو الحذف "ما اشتغل" رغم نجاحه.

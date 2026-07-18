@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { supabase, fetchFamilyAidHistory, recordApprovalRequest, fetchPortalMessages, sendPortalMessage } from '../../lib/supabase';
+import { supabase, fetchFamilyAidHistory, recordApprovalRequest, fetchPortalMessages, sendPortalMessage, sendPushToRoles } from '../../lib/supabase';
 import { formatDate } from '../../lib/utils';
 import { MARITAL_BY_GENDER } from '../../lib/formOptions';
 import colors from '../../theme/colors';
@@ -118,6 +118,13 @@ export default function FamilyPortalScreen({ navigation }) {
       });
       setMissingSent(true);
       setMissingValues({});
+      sendPushToRoles({
+        orgId: ORG_ID,
+        roles: ['platform_owner', 'super_admin', 'camp_delegate'],
+        campId: family.camp_id,
+        title: '📋 استكمال بيانات من بوابة الأسرة',
+        body: `${family.head_name} استكمل بيانات ناقصة -- بانتظار المراجعة`,
+      });
     } catch {
       setError('تعذّر إرسال البيانات، حاول مرة ثانية');
     } finally {
@@ -139,6 +146,13 @@ export default function FamilyPortalScreen({ navigation }) {
       });
       setMessages((prev) => [...prev, sent]);
       setNewMessage('');
+      sendPushToRoles({
+        orgId: ORG_ID,
+        roles: ['platform_owner', 'super_admin', 'camp_delegate'],
+        campId: family.camp_id,
+        title: '💬 رسالة جديدة من بوابة الأسرة',
+        body: `${family.head_name}: ${newMessage.trim().slice(0, 100)}`,
+      });
     } catch {
       setError('تعذّر إرسال الرسالة، حاول مرة ثانية');
     } finally {

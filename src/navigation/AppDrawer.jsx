@@ -116,6 +116,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
           ? [
               { icon: '📋', label: 'الطلبات المعلّقة', screen: 'PendingRequests', count: pendingCount, pageKey: 'pending_requests' },
               { icon: '🗄️', label: 'إدارة البيانات والتشخيص', screen: 'Data', pageKey: 'data' },
+              { icon: '📋', label: 'سجل التدقيق الشامل', screen: 'AuditLog', pageKey: 'data' },
             ]
           : []),
         // عناصر حساب عامة -- متاحة لكل مستخدم بغض النظر عن دوره (كانت

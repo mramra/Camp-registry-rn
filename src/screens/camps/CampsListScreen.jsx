@@ -157,7 +157,7 @@ export default function CampsListScreen() {
         text: 'حذف',
         style: 'destructive',
         onPress: async () => {
-          const result = await deleteCamp(camp.id);
+          const result = await deleteCamp(camp.id, camp, { ...profile, org_id: orgId });
           if (result.success) {
             showSuccess('تم حذف المخيم');
             loadData();

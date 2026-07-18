@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, fetchAllPagePermissions, checkDeviceApproval } from '../lib/supabase';
+import { registerPushToken } from '../lib/notifications';
 import { hasPermission, canAccessPageSync } from '../lib/permissions';
 import { cacheData, getCachedData, withTimeout } from '../lib/offlineCache';
 
@@ -218,6 +219,10 @@ export const AuthProvider = ({ children }) => {
 
         setSession(data.session);
         setUser(data.session.user);
+
+        // تسجيل رمز Push الحقيقي -- بدون انتظار (fire-and-forget) عشان
+        // ما يبطّئ إحساس المستخدم بسرعة الدخول؛ فشله غير حرج أصلاً
+        registerPushToken(data.session.user.id, profileData?.org_id);
 
         return { success: true };
       } catch (err) {

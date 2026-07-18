@@ -135,7 +135,7 @@ export default function UserFormScreen() {
           ...permissions,
           bypass_approval: bypassApproval,
           can_review_approvals: role !== 'assistant' ? canReviewApprovals : false,
-        });
+        }, { ...profile, org_id: orgId });
         if (!result.success) {
           showError(result.error || 'فشل التحديث');
           return;

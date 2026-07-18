@@ -4,8 +4,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
-import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { naturalCompare } from '../../lib/helpers';
+import { fetchFamilies, fetchFamilyMembers, fetchCamps, supabase } from '../../lib/supabase';
+import { naturalCompare, getVulnerabilityScore } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -58,6 +58,42 @@ export default function CampCompareScreen() {
         }
       });
 
+      // درجة الضعف لكل أسرة -- عدد الأسر شديدة/حرجة الضعف لكل مخيم
+      const membersByFam = {};
+      members.forEach((m) => {
+        (membersByFam[m.family_id] = membersByFam[m.family_id] || []).push(m);
+      });
+      const campVulnerable = {};
+      families.forEach((f) => {
+        const tier = getVulnerabilityScore(f, membersByFam[f.id]).tier;
+        if (tier === 'high' || tier === 'critical') {
+          campVulnerable[f.camp_id] = (campVulnerable[f.camp_id] || 0) + 1;
+        }
+      });
+
+      // عدد الأسر يلي استلمت مساعدة فعلياً (مرة واحدة على الأقل) لكل مخيم --
+      // وفجوة التغطية الدقيقة (أسرة شديدة الضعف + لم تستلم مساعدة، مو مجرد
+      // طرح تقريبي للمجاميع لأنها قد لا تكون نفس الأسر)
+      const campAidReceived = {};
+      const campCoverageGap = {};
+      try {
+        const { data: aidRows } = await withTimeout(
+          supabase.from('camp_dist_families').select('family_id').eq('_deleted', false).in('family_id', [...famIdSet]),
+          10000,
+          'انتهت مهلة تحميل بيانات المساعدات'
+        );
+        const familiesWithAid = new Set((aidRows || []).map((r) => r.family_id));
+        families.forEach((f) => {
+          if (familiesWithAid.has(f.id)) campAidReceived[f.camp_id] = (campAidReceived[f.camp_id] || 0) + 1;
+          const tier = getVulnerabilityScore(f, membersByFam[f.id]).tier;
+          if ((tier === 'high' || tier === 'critical') && !familiesWithAid.has(f.id)) {
+            campCoverageGap[f.camp_id] = (campCoverageGap[f.camp_id] || 0) + 1;
+          }
+        });
+      } catch {
+        // فشل تحميل بيانات المساعدات غير حرج -- تظهر كـ0 بدل ما توقف الشاشة كاملة
+      }
+
       const visibleCamps = getVisibleCamps(camps);
       const rows = visibleCamps.map((c) => {
         const fCount = campFams[c.id] || 0;
@@ -74,6 +110,9 @@ export default function CampCompareScreen() {
           capacity: cap,
           pct,
           incomplete: campIncomplete[c.id] || 0,
+          vulnerable: campVulnerable[c.id] || 0,
+          aidReceived: campAidReceived[c.id] || 0,
+          coverageGap: campCoverageGap[c.id] || 0,
           status: c.status || 'active',
         };
       });
@@ -108,6 +147,7 @@ export default function CampCompareScreen() {
       if (sortBy === 'families') return b.families - a.families;
       if (sortBy === 'members') return b.members - a.members;
       if (sortBy === 'pct') return (b.pct ?? -1) - (a.pct ?? -1);
+      if (sortBy === 'vulnerable') return b.vulnerable - a.vulnerable;
       if (sortBy === 'name') return naturalCompare(a.name, b.name);
       return 0;
     });
@@ -118,6 +158,8 @@ export default function CampCompareScreen() {
       families: filtered.reduce((s, c) => s + c.families, 0),
       members: filtered.reduce((s, c) => s + c.members, 0),
       incomplete: filtered.reduce((s, c) => s + c.incomplete, 0),
+      vulnerable: filtered.reduce((s, c) => s + c.vulnerable, 0),
+      aidReceived: filtered.reduce((s, c) => s + c.aidReceived, 0),
     }),
     [filtered]
   );
@@ -126,6 +168,7 @@ export default function CampCompareScreen() {
     { key: 'families', label: 'ترتيب: الأسر' },
     { key: 'members', label: 'ترتيب: الأفراد' },
     { key: 'pct', label: 'ترتيب: الإشغال' },
+    { key: 'vulnerable', label: 'ترتيب: الأشد ضعفاً' },
     { key: 'name', label: 'ترتيب: الاسم' },
   ];
 
@@ -156,6 +199,19 @@ export default function CampCompareScreen() {
             ['👤', 'فرد', c.members, colors.blue],
             ['📊', 'سعة', c.capacity || '—', colors.muted],
             ['⚠️', 'ناقص', c.incomplete, c.incomplete > 0 ? colors.red : colors.muted],
+          ].map(([icon, label, val, color]) => (
+            <View key={label} style={styles.miniStat}>
+              <Text style={[styles.miniStatValue, { color }]}>{val}</Text>
+              <Text style={styles.miniStatLabel}>{icon}{label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.statsGrid}>
+          {[
+            ['🆘', 'شديدة الضعف', c.vulnerable, c.vulnerable > 0 ? colors.red : colors.muted],
+            ['📦', 'استلمت مساعدة', c.aidReceived, colors.green],
+            ['🕳️', 'فجوة تغطية', c.coverageGap, c.coverageGap > 0 ? colors.orange : colors.muted],
           ].map(([icon, label, val, color]) => (
             <View key={label} style={styles.miniStat}>
               <Text style={[styles.miniStatValue, { color }]}>{val}</Text>
@@ -213,19 +269,12 @@ export default function CampCompareScreen() {
               </View>
             )}
 
-            {!!offlineInfo && (
-              <View style={styles.offlineBanner}>
-                <Text style={styles.offlineBannerText}>
-                  📡 لا يوجد اتصال — بيانات محفوظة من {formatDateTime(offlineInfo.savedAt)}، قد تكون غير محدّثة
-                </Text>
-              </View>
-            )}
-
             <View style={styles.totalsGrid}>
               {[
                 ['👨‍👩‍👧‍👦', 'الأسر', totals.families, colors.accent],
                 ['👤', 'الأفراد', totals.members, colors.blue],
-                ['⚠️', 'ناقصة', totals.incomplete, colors.red],
+                ['🆘', 'شديدة الضعف', totals.vulnerable, colors.red],
+                ['📦', 'استلمت مساعدة', totals.aidReceived, colors.green],
               ].map(([icon, label, val, color]) => (
                 <View key={label} style={styles.totalBox}>
                   <Text style={[styles.totalValue, { color }]}>{val}</Text>
@@ -257,11 +306,6 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
-  offlineBanner: {
-    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
-    borderRadius: 12, padding: 10, marginBottom: 12,
-  },
-  offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
   offlineBanner: {
     backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.4)',
     borderRadius: 12, padding: 10, marginBottom: 12,

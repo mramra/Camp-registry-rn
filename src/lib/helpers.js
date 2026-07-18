@@ -11,6 +11,22 @@ export function calcAge(dob) {
   return age >= 0 && age < 120 ? age : null;
 }
 
+/**
+ * أقصى عمر (بالسنوات الكاملة) يُعتبر فيه الشخص "رضيع" -- مصدر الحقيقة
+ * الوحيد لهذا الرقم بكامل التطبيق. القاعدة المتّفق عليها: "رضيع = أقل
+ * من سنتين" (0 و1 سنة فقط، مو سنتين كاملتين) = عمر أقصى 1 سنة كاملة.
+ * أي مكان بالكود يحتاج يعرف "هل هذا الشخص رضيع؟" لازم يستدعي isInfantAge()
+ * بدل ما يكتب شرط (age < 2) خام بنفسه -- هيك أي تعديل مستقبلي على تعريف
+ * الرضيع (تغيير السن مثلاً) يصير بمكان واحد بس، وما يصير فرق بصمت بين
+ * شاشة وشاشة زي ما حصل قبل هذا التوحيد.
+ */
+export const INFANT_MAX_AGE = 1;
+
+/** هل هذا العمر (بالسنوات) يقع ضمن تعريف "رضيع" (أقل من سنتين)؟ */
+export function isInfantAge(age) {
+  return age !== null && age !== undefined && age <= INFANT_MAX_AGE;
+}
+
 export function parseArr(v) {
   if (Array.isArray(v)) return v;
   if (!v) return [];
@@ -369,12 +385,10 @@ export function buildFamHasNamedWife(members) {
 export function buildFamWithInfant(members, families) {
   const s = new Set();
   (members || []).forEach((m) => {
-    const a = calcAge(m.dob);
-    if (a !== null && a < 2) s.add(m.family_id);
+    if (isInfantAge(calcAge(m.dob))) s.add(m.family_id);
   });
   (families || []).forEach((f) => {
-    const a = calcAge(f.head_dob);
-    if (a !== null && a < 2) s.add(f.id);
+    if (isInfantAge(calcAge(f.head_dob))) s.add(f.id);
   });
   return s;
 }

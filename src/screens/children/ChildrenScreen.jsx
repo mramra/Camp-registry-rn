@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { calcAge, naturalCompare, buildCampExportBanner } from '../../lib/helpers';
+import { calcAge, naturalCompare, buildCampExportBanner, isInfantAge, INFANT_MAX_AGE } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -32,8 +32,23 @@ export default function ChildrenScreen() {
   const [search, setSearch] = useState('');
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
+  const infantsActive = ageMin === '0' && ageMax === String(INFANT_MAX_AGE);
+  const toggleInfants = () => {
+    if (infantsActive) {
+      setAgeMin('');
+      setAgeMax('');
+    } else {
+      setAgeMin('0');
+      setAgeMax(String(INFANT_MAX_AGE));
+    }
+  };
   const [orphansOnly, setOrphansOnly] = useState(false);
-  const [infantsOnly, setInfantsOnly] = useState(false);
+  // شارة "رضّع" ما عادت حالة منفصلة (كانت infantsOnly) -- صارت مجرد
+  // اختصار يعبّي خانتي "من/إلى" مباشرة بحدود isInfantAge المركزية
+  // (0 إلى INFANT_MAX_AGE). هيك تستخدم شارة "رضّع" وخانة البحث اليدوي
+  // نفس آلية الفلترة بالضبط (ageMin/ageMax)، فمستحيل يختلف رقم الشارة
+  // عن رقم البحث اليدوي بعد اليوم -- بدل ما يكون فيه مسارين منفصلين
+  // ممكن ينفصلا بصمت زي ما صار قبل هذا التوحيد.
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
@@ -101,10 +116,9 @@ export default function ChildrenScreen() {
       .filter((k) => !ageMin || k.age >= Number(ageMin))
       .filter((k) => !ageMax || k.age <= Number(ageMax))
       .filter((k) => !orphansOnly || !!k.orphan_status)
-      .filter((k) => !infantsOnly || k.age < 2)
       .filter((k) => !search.trim() || (k.name || '').includes(search) || (k.famName || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
-  }, [members, famMap, campMap, filterCamp, ageMin, ageMax, orphansOnly, infantsOnly, search]);
+  }, [members, famMap, campMap, filterCamp, ageMin, ageMax, orphansOnly, search]);
 
   const orphansCount = useMemo(() => {
     return members
@@ -120,7 +134,7 @@ export default function ChildrenScreen() {
       .filter((m) => {
         const age = calcAge(m.dob);
         const f = famMap[m.family_id] || {};
-        return age !== null && age < 2 && (!filterCamp || f.camp_id === filterCamp);
+        return isInfantAge(age) && (!filterCamp || f.camp_id === filterCamp);
       }).length;
   }, [members, famMap, filterCamp]);
 
@@ -213,11 +227,11 @@ export default function ChildrenScreen() {
                 <Text style={styles.ageLabel}>أيتام</Text>
               </Pressable>
               <Pressable
-                style={[styles.ageBox, infantsOnly && styles.ageBoxActive]}
-                onPress={() => setInfantsOnly((v) => !v)}
+                style={[styles.ageBox, infantsActive && styles.ageBoxActive]}
+                onPress={toggleInfants}
               >
                 <Text style={styles.ageIcon}>🍼</Text>
-                <Text style={[styles.ageCount, infantsOnly && styles.ageCountActive]}>{infantsCount}</Text>
+                <Text style={[styles.ageCount, infantsActive && styles.ageCountActive]}>{infantsCount}</Text>
                 <Text style={styles.ageLabel}>رضع</Text>
               </Pressable>
             </View>

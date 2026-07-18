@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing } from '../../lib/helpers';
+import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -15,8 +15,8 @@ import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import colors from '../../theme/colors';
 
 const AGE_GROUPS = [
-  { label: 'رضيع 0-2', min: 0, max: 2 },
-  { label: 'طفل 3-12', min: 3, max: 12 },
+  { label: `رضيع 0-${INFANT_MAX_AGE}`, min: 0, max: INFANT_MAX_AGE },
+  { label: `طفل ${INFANT_MAX_AGE + 1}-12`, min: INFANT_MAX_AGE + 1, max: 12 },
   { label: 'مراهق 13-17', min: 13, max: 17 },
   { label: 'شاب 18-35', min: 18, max: 35 },
   { label: 'كهل 36-59', min: 36, max: 59 },
@@ -251,10 +251,7 @@ export default function AnalysisScreen() {
       const a = calcAge(p.personDob);
       return a !== null && a < 18;
     });
-    const infantPersons = allPersons.filter((p) => {
-      const a = calcAge(p.personDob);
-      return a !== null && a < 2;
-    });
+    const infantPersons = allPersons.filter((p) => isInfantAge(calcAge(p.personDob)));
 
     const memsByFam = {};
     mems.forEach((m) => {

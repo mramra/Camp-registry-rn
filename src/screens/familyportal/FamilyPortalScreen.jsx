@@ -10,14 +10,40 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { supabase, fetchFamilyAidHistory, recordApprovalRequest, fetchPortalMessages, sendPortalMessage, sendPushToRoles } from '../../lib/supabase';
+import { sendPushToRoles } from '../../lib/supabase';
 import { formatDate } from '../../lib/utils';
 import { MARITAL_BY_GENDER } from '../../lib/formOptions';
 import colors from '../../theme/colors';
 
 // نفس معرّف المنظمة الثابت المستخدم بالنسخة الأصلية لبوابة الأسرة العامة
-// (هذه الشاشة تعمل بدون تسجيل دخول، فلا يوجد AuthContext لأخذ org_id منه)
 const ORG_ID = 'ddc8abe7-518f-40a4-8c3b-ee03bb0f47d5';
+const FUNCTION_URL = 'https://ojclpkenecicujkqhhlu.supabase.co/functions/v1/family-portal';
+const ANON_KEY = 'sb_publishable_d6q8hoDDcohuZFHk3jxI7g_IBWWCmNu';
+
+/**
+ * كل عمليات البوابة تمر إجبارياً عبر Edge Function واحدة (family-portal)
+ * بدل أي وصول مباشر لقاعدة البيانات -- كانت هذه الشاشة تستعلم مباشرة
+ * (supabase.from('families').select(...)) بصلاحيات anon مفتوحة، وهذا
+ * شكّل ثغرة حقيقية: أي طلب مباشر لقاعدة البيانات بنفس مفتاح anon
+ * المُضمَّن أصلاً بالتطبيق كان يقدر يقرأ بيانات *كل* الأسر بأي مخيم
+ * بوابته مفتوحة، بدون أي تحقق فعلي من رقم الهوية أو الجوال (التحقق
+ * كان بواجهة التطبيق فقط، مو بقاعدة البيانات). اكتُشفت واتصلحت مباشرة.
+ *
+ * الآن: كل استدعاء (بحث/إرسال رسالة/استكمال بيانات/طلب حر) يبعث رقم
+ * الهوية والجوال، ودالة السيرفر (بصلاحيات service_role تتجاوز RLS)
+ * تتحقق من تطابقهما فعلياً *قبل* أي قراءة أو كتابة -- لا سياسة anon
+ * SELECT مفتوحة على هذه الجداول بعد الآن إطلاقاً.
+ */
+async function callFamilyPortalAPI(action, { nationalId, phone, familyId, message, fields }) {
+  const res = await fetch(FUNCTION_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: ANON_KEY },
+    body: JSON.stringify({ action, nationalId, phone, familyId, message, fields }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'حدث خطأ');
+  return json;
+}
 
 export default function FamilyPortalScreen({ navigation }) {
   const [nationalId, setNationalId] = useState('');
@@ -47,43 +73,13 @@ export default function FamilyPortalScreen({ navigation }) {
     setMissingValues({});
     setMissingSent(false);
     try {
-      const { data, error: err } = await supabase
-        .from('families')
-        .select('*, camps(name, portal_open)')
-        .eq('org_id', ORG_ID)
-        .eq('head_id', nationalId.trim())
-        .single();
-
-      if (err || !data) {
-        setError('لم يتم العثور على أي سجل بهذا الرقم');
-        return;
-      }
-
-      // بوابة المخيم قد تكون مغلقة يدوياً من مندوبه (شاشة إدارة المخيم) --
-      // لو مغلقة، ما نعرض أي بيانات حتى لو الأسرة موجودة فعلياً بالنظام
-      if (data.camps && data.camps.portal_open === false) {
-        setError('بوابة الاستعلام مغلقة حالياً بهذا المخيم — تواصل مع إدارة المخيم مباشرة');
-        return;
-      }
-
-      // رقم الجوال هو "كلمة السر" -- تحقق إجباري (مو اختياري زي تاريخ
-      // الميلاد سابقاً)، لازم يطابق رقم الجوال المسجَّل لرب الأسرة بالضبط
-      if (!data.phone1 || data.phone1.trim() !== phone.trim()) {
-        setError('رقم الهوية أو رقم الجوال غير صحيح');
-        return;
-      }
-
-      setFamily(data);
-      const [{ data: mems }, aid, msgs] = await Promise.all([
-        supabase.from('family_members').select('*').eq('family_id', data.id),
-        fetchFamilyAidHistory(data.id),
-        fetchPortalMessages(data.id),
-      ]);
-      setMembers(mems || []);
-      setAidHistory(aid || []);
-      setMessages(msgs || []);
-    } catch {
-      setError('حدث خطأ في البحث');
+      const result = await callFamilyPortalAPI('lookup', { nationalId, phone });
+      setFamily(result.family);
+      setMembers(result.members || []);
+      setAidHistory(result.aidHistory || []);
+      setMessages(result.messages || []);
+    } catch (e) {
+      setError(e.message || 'حدث خطأ في البحث');
     } finally {
       setLoading(false);
     }
@@ -108,14 +104,7 @@ export default function FamilyPortalScreen({ navigation }) {
     try {
       const fields = {};
       filled.forEach((d) => { fields[d.key] = missingValues[d.key].trim(); });
-      await recordApprovalRequest({
-        orgId: ORG_ID,
-        familyId: family.id,
-        action: 'portal_request',
-        changes: { type: 'missing_data', fields },
-        actorName: `${family.head_name} (استكمال بيانات عبر البوابة)`,
-        actorRole: 'family_portal',
-      });
+      await callFamilyPortalAPI('submitMissingData', { nationalId, phone, familyId: family.id, fields });
       setMissingSent(true);
       setMissingValues({});
       sendPushToRoles({
@@ -125,8 +114,8 @@ export default function FamilyPortalScreen({ navigation }) {
         title: '📋 استكمال بيانات من بوابة الأسرة',
         body: `${family.head_name} استكمل بيانات ناقصة -- بانتظار المراجعة`,
       });
-    } catch {
-      setError('تعذّر إرسال البيانات، حاول مرة ثانية');
+    } catch (e) {
+      setError(e.message || 'تعذّر إرسال البيانات، حاول مرة ثانية');
     } finally {
       setMissingSending(false);
     }
@@ -137,24 +126,19 @@ export default function FamilyPortalScreen({ navigation }) {
     setSendingMessage(true);
     setError('');
     try {
-      const sent = await sendPortalMessage({
-        orgId: ORG_ID,
-        familyId: family.id,
-        senderRole: 'family',
-        senderName: family.head_name,
-        message: newMessage.trim(),
-      });
-      setMessages((prev) => [...prev, sent]);
+      const msgText = newMessage.trim();
+      const result = await callFamilyPortalAPI('sendMessage', { nationalId, phone, familyId: family.id, message: msgText });
+      setMessages((prev) => [...prev, result.message]);
       setNewMessage('');
       sendPushToRoles({
         orgId: ORG_ID,
         roles: ['platform_owner', 'super_admin', 'camp_delegate'],
         campId: family.camp_id,
         title: '💬 رسالة جديدة من بوابة الأسرة',
-        body: `${family.head_name}: ${newMessage.trim().slice(0, 100)}`,
+        body: `${family.head_name}: ${msgText.slice(0, 100)}`,
       });
-    } catch {
-      setError('تعذّر إرسال الرسالة، حاول مرة ثانية');
+    } catch (e) {
+      setError(e.message || 'تعذّر إرسال الرسالة، حاول مرة ثانية');
     } finally {
       setSendingMessage(false);
     }

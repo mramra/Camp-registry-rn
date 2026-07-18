@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { calcAge, hasHealthData, getOrphanCount } from '../../lib/helpers';
+import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -114,12 +114,10 @@ export default function AnalysisScreen() {
     const mems = members.filter((m) => famIds.has(m.family_id));
     const famNameMap = Object.fromEntries(fams.map((f) => [f.id, f.head_name]));
 
-    // رضيع بالأسرة (أقل من سنتين) = أمها/زوجة رب الأسرة تُحسب "مرضعة" تلقائياً
-    const familyHasInfant = {};
-    mems.forEach((m) => {
-      const a = calcAge(m.dob);
-      if (a !== null && a < 2) familyHasInfant[m.family_id] = true;
-    });
+    // رضيع بالأسرة (أقل من سنتين) = زوجة/أم رب الأسرة تُحسب "مرضعة" تلقائياً
+    // -- دوال مركزية موحّدة (helpers.js) بدل حساب محلي مكرر
+    const famWithInfant = buildFamWithInfant(mems, fams);
+    const famHasNamedWife = buildFamHasNamedWife(mems);
 
     const allPersons = [
       ...fams.map((f) => ({
@@ -136,7 +134,7 @@ export default function AnalysisScreen() {
         chronic: f.head_chronic_diseases,
         needs: f.head_needs,
         marital: f.head_marital,
-        isNursing: f.head_gender === 'أنثى' && !!familyHasInfant[f.id],
+        isNursing: f.head_gender === 'أنثى' && isAutoNursing({ relation: null, age: calcAge(f.head_dob), family_id: f.id, isHead: true }, famHasNamedWife, famWithInfant),
       })),
       ...mems.map((m) => ({
         personName: m.name,
@@ -152,7 +150,7 @@ export default function AnalysisScreen() {
         chronic: m.chronic_diseases,
         needs: m.needs,
         marital: null,
-        isNursing: m.relation === 'زوجة' && !!familyHasInfant[m.family_id],
+        isNursing: isAutoNursing({ relation: m.relation, age: calcAge(m.dob), family_id: m.family_id, isHead: false }, famHasNamedWife, famWithInfant),
       })),
     ];
 

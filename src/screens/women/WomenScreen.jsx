@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { calcAge, naturalCompare, normalizeHealthValue, buildCampExportBanner } from '../../lib/helpers';
+import { calcAge, naturalCompare, normalizeHealthValue, buildCampExportBanner, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -90,12 +90,11 @@ export default function WomenScreen() {
   const famMap = useMemo(() => Object.fromEntries(families.map((f) => [f.id, f])), [families]);
 
   const allWomen = useMemo(() => {
-    // رضيع بالأسرة (أقل من سنتين) = أمها/زوجة رب الأسرة تُحسب "مرضعة" تلقائياً
-    const familyHasInfant = {};
-    members.forEach((m) => {
-      const age = calcAge(m.dob);
-      if (age !== null && age < 2) familyHasInfant[m.family_id] = true;
-    });
+    // رضيع بالأسرة (أقل من سنتين) = زوجة/أم رب الأسرة تُحسب "مرضعة" تلقائياً
+    // -- دوال مركزية موحّدة (helpers.js) بدل حساب محلي مكرر، عشان ما يصير
+    // فرق بين شاشة وشاشة تانية بنفس الحساب (كان يحصل قبل التوحيد).
+    const famWithInfant = buildFamWithInfant(members, families);
+    const famHasNamedWife = buildFamHasNamedWife(members);
 
     // عدد أفراد كل أسرة (رب الأسرة + كل الأفراد المسجّلين تحتها)
     const familyMemberCount = {};
@@ -116,7 +115,7 @@ export default function WomenScreen() {
         type: 'رأس الأسرة',
         marital: f.head_marital || '—',
         status: f.head_female_status || '',
-        isNursing: !!familyHasInfant[f.id],
+        isNursing: isAutoNursing({ relation: null, age: calcAge(f.head_dob), family_id: f.id, isHead: true }, famHasNamedWife, famWithInfant),
         chronic: normalizeHealthValue(f.head_chronic_diseases),
         familySize: familyMemberCount[f.id] || 1,
         camp: campMap[f.camp_id] || '—',
@@ -135,7 +134,7 @@ export default function WomenScreen() {
           type: m.relation || 'أنثى',
           marital: '—',
           status: '',
-          isNursing: m.relation === 'زوجة' && !!familyHasInfant[m.family_id],
+          isNursing: isAutoNursing({ relation: m.relation, age: calcAge(m.dob), family_id: m.family_id, isHead: false }, famHasNamedWife, famWithInfant),
           chronic: normalizeHealthValue(m.chronic_diseases),
           familySize: familyMemberCount[m.family_id] || 1,
           camp: campMap[f.camp_id] || '—',

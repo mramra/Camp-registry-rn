@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Alert,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import colors from '../../theme/colors';
@@ -68,7 +69,12 @@ export default function LoginScreen({ navigation }) {
       setAttempts(n);
       if (n >= 5) setLockUntil(Date.now() + 60000);
       else if (n >= 3) setLockUntil(Date.now() + 15000);
-      setError('❌ ' + (result.error || 'خطأ غير معروف'));
+      const msg = result.error || 'خطأ غير معروف';
+      setError('❌ ' + msg);
+      // نافذة تنبيه حقيقية (Alert) بالإضافة للنص أعلاه -- مستحيل تختفي
+      // وراء الكيبورد أو أي مشكلة تخطيط/تمرير، لازم "حسناً" للإغلاق.
+      // أُضيفت بعد تكرار بلاغ "ما ظهرت رسالة خطأ" رغم إصلاحات سابقة.
+      Alert.alert('❌ فشل تسجيل الدخول', msg);
     }
     setLoading(false);
   }

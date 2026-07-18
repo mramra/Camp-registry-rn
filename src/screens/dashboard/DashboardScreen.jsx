@@ -13,7 +13,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
-import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchPendingRequestsCount, fetchPendingDevicesCount } from '../../lib/supabase';
+import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchPendingRequestsCount, fetchPendingDevicesCount, fetchUnreadPortalMessagesCount } from '../../lib/supabase';
 import { calcAge, isIncomplete } from '../../lib/helpers';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -35,6 +35,7 @@ export default function DashboardScreen() {
   const canSendBirthdayMsgs = isOwner || profile?.role === 'super_admin' || profile?.role === 'camp_delegate';
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [pendingDevicesCount, setPendingDevicesCount] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const { getAllowedCampIds, filterLocal } = useDataScope();
 
   const [stats, setStats] = useState(null);
@@ -165,6 +166,12 @@ export default function DashboardScreen() {
         fetchPendingRequestsCount(profile.org_id).then(setPendingRequestsCount);
         fetchPendingDevicesCount(profile.org_id).then(setPendingDevicesCount);
       }
+      if (isOwner || profile?.role === 'super_admin' || profile?.role === 'camp_delegate') {
+        fetchUnreadPortalMessagesCount(
+          profile.org_id,
+          profile?.role === 'camp_delegate' ? profile.camp_id : null
+        ).then(setUnreadMessagesCount);
+      }
     }, [profile, isOwner])
   );
 
@@ -274,6 +281,34 @@ export default function DashboardScreen() {
             </Text>
           </View>
         )}
+
+        {/* اختصارات سريعة -- أكثر 4 إجراءات استخداماً، بدل فتح القائمة
+            الجانبية كل مرة */}
+        <View style={styles.quickRow}>
+          <Pressable style={styles.quickBtn} onPress={() => navigation.push('FamilyForm')}>
+            <Text style={styles.quickIcon}>➕</Text>
+            <Text style={styles.quickLabel}>إضافة أسرة</Text>
+          </Pressable>
+          <Pressable style={styles.quickBtn} onPress={() => navigation.push('SmartSearch')}>
+            <Text style={styles.quickIcon}>🔍</Text>
+            <Text style={styles.quickLabel}>البحث الذكي</Text>
+          </Pressable>
+          <Pressable style={styles.quickBtn} onPress={() => navigation.push('PortalMessages')}>
+            <View>
+              <Text style={styles.quickIcon}>💬</Text>
+              {unreadMessagesCount > 0 && (
+                <View style={styles.quickBadge}>
+                  <Text style={styles.quickBadgeText}>{unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.quickLabel}>رسائل البوابة</Text>
+          </Pressable>
+          <Pressable style={styles.quickBtn} onPress={() => navigation.push('SMS')}>
+            <Text style={styles.quickIcon}>📤</Text>
+            <Text style={styles.quickLabel}>SMS</Text>
+          </Pressable>
+        </View>
 
         {/* بحث ذكي — رباب الأسر والأفراد معاً */}
         <TextInput
@@ -455,6 +490,19 @@ const styles = StyleSheet.create({
   },
   birthdayTitle: { color: colors.pink, fontWeight: '900', fontSize: 13, textAlign: 'right' },
   birthdayHint: { color: colors.muted, fontSize: 11, marginTop: 4, textAlign: 'right' },
+
+  quickRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  quickBtn: {
+    flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 14, paddingVertical: 12, alignItems: 'center', justifyContent: 'center',
+  },
+  quickIcon: { fontSize: 20, marginBottom: 4 },
+  quickLabel: { color: colors.white, fontSize: 10, fontWeight: 'bold', textAlign: 'center' },
+  quickBadge: {
+    position: 'absolute', top: -6, right: -10, backgroundColor: colors.red,
+    borderRadius: 999, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+  },
+  quickBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900' },
 
   searchInput: {
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,

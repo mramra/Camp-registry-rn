@@ -240,31 +240,44 @@ export default function WomenScreen() {
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
               />
-              <ExportButton
-                label="📊 تصدير الكشف"
-                getRows={() =>
-                  womenData.map((w, i) => ({
-                    '#': i + 1,
-                    'الخيمة': w.tent,
-                    'الاسم': w.name,
-                    'العمر': w.age ?? '',
-                    'الصلة': w.type,
-                    'الحالة الاجتماعية': w.marital,
-                    'الوضع': w.status,
-                    'مرضعة؟': w.isNursing ? 'نعم' : 'لا',
-                    'عدد أفراد الأسرة': w.familySize,
-                    'أمراض مزمنة': w.chronic,
-                    'المخيم': w.camp,
-                  }))
-                }
-                getBanner={() => {
-                  if (!filterCamp || !showBanner) return null;
-                  const camp = camps.find((c) => c.id === filterCamp);
-                  return buildCampExportBanner(camp, orgMembers);
-                }}
-                sheetName="النساء"
-                fileName="سجل_النساء"
-              />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <ExportButton
+                  label="📊 تصدير الكشف"
+                  getRows={() =>
+                    womenData.map((w, i) => ({
+                      '#': i + 1,
+                      'الخيمة': w.tent,
+                      'الاسم': w.name,
+                      'العمر': w.age ?? '',
+                      'الصلة': w.type,
+                      'الحالة الاجتماعية': w.marital,
+                      'الوضع': w.status,
+                      'مرضعة؟': w.isNursing ? 'نعم' : 'لا',
+                      'عدد أفراد الأسرة': w.familySize,
+                      'أمراض مزمنة': w.chronic,
+                      'المخيم': w.camp,
+                    }))
+                  }
+                  getBanner={() => {
+                    if (!filterCamp || !showBanner) return null;
+                    const camp = camps.find((c) => c.id === filterCamp);
+                    return buildCampExportBanner(camp, orgMembers);
+                  }}
+                  sheetName="النساء"
+                  fileName="سجل_النساء"
+                />
+                <Pressable
+                  style={styles.smsBtn}
+                  onPress={() => {
+                    const preselectFamilyIds = [...new Set(womenData.map((w) => w.famId))];
+                    const birthdayNames = {};
+                    womenData.forEach((w) => { birthdayNames[w.famId] = w.name; });
+                    navigation.navigate('SMS', { preselectFamilyIds, birthdayNames });
+                  }}
+                >
+                  <Text style={styles.smsBtnText}>📤 SMS</Text>
+                </Pressable>
+              </View>
             </View>
 
             <CampDelegatePanel
@@ -393,6 +406,11 @@ const getStyles = () =>
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
+    smsBtn: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent,
+      borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center', justifyContent: 'center',
+    },
+    smsBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 12 },
     ageRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 10 },
     ageLabel: { color: colors.muted, fontSize: 12, marginStart: 4 },
     ageInput: {

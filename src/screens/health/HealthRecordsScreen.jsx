@@ -226,27 +226,40 @@ export default function HealthRecordsScreen() {
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
               />
-              <ExportButton
-                label="📊 تصدير الكشف"
-                getRows={() =>
-                  healthData.map((r, i) => ({
-                    '#': i + 1,
-                    'الخيمة': r.tent,
-                    'الاسم': r.name,
-                    'الصلة': r.role,
-                    'النوع': r.healthType,
-                    'الحالة': r.val,
-                    'المخيم': r.camp,
-                  }))
-                }
-                sheetName="الصحة"
-                fileName="سجل_الصحة"
-                getBanner={() => {
-                  if (!filterCamp || !showBanner) return null;
-                  const camp = camps.find((c) => c.id === filterCamp);
-                  return buildCampExportBanner(camp, orgMembers);
-                }}
-              />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <ExportButton
+                  label="📊 تصدير الكشف"
+                  getRows={() =>
+                    healthData.map((r, i) => ({
+                      '#': i + 1,
+                      'الخيمة': r.tent,
+                      'الاسم': r.name,
+                      'الصلة': r.role,
+                      'النوع': r.healthType,
+                      'الحالة': r.val,
+                      'المخيم': r.camp,
+                    }))
+                  }
+                  sheetName="الصحة"
+                  fileName="سجل_الصحة"
+                  getBanner={() => {
+                    if (!filterCamp || !showBanner) return null;
+                    const camp = camps.find((c) => c.id === filterCamp);
+                    return buildCampExportBanner(camp, orgMembers);
+                  }}
+                />
+                <Pressable
+                  style={styles.smsBtn}
+                  onPress={() => {
+                    const preselectFamilyIds = [...new Set(healthData.map((r) => r.famId))];
+                    const birthdayNames = {};
+                    healthData.forEach((r) => { birthdayNames[r.famId] = r.name; });
+                    navigation.navigate('SMS', { preselectFamilyIds, birthdayNames });
+                  }}
+                >
+                  <Text style={styles.smsBtnText}>📤 SMS</Text>
+                </Pressable>
+              </View>
             </View>
 
             <CampDelegatePanel
@@ -309,6 +322,11 @@ const getStyles = () =>
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
+    smsBtn: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent,
+      borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center', justifyContent: 'center',
+    },
+    smsBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 12 },
     categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
     categoryCell: {
       flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,

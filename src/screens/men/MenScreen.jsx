@@ -215,28 +215,41 @@ export default function MenScreen() {
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
               />
-              <ExportButton
-                label="📊 تصدير الكشف"
-                getRows={() =>
-                  menData.map((w, i) => ({
-                    '#': i + 1,
-                    'الخيمة': w.tent,
-                    'الاسم': w.name,
-                    'العمر': w.age ?? '',
-                    'الصلة': w.type,
-                    'الحالة الاجتماعية': w.marital,
-                    'أمراض مزمنة': w.chronic,
-                    'المخيم': w.camp,
-                  }))
-                }
-                sheetName="الرجال"
-                fileName="سجل_الرجال"
-                getBanner={() => {
-                  if (!filterCamp || !showBanner) return null;
-                  const camp = camps.find((c) => c.id === filterCamp);
-                  return buildCampExportBanner(camp, orgMembers);
-                }}
-              />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <ExportButton
+                  label="📊 تصدير الكشف"
+                  getRows={() =>
+                    menData.map((w, i) => ({
+                      '#': i + 1,
+                      'الخيمة': w.tent,
+                      'الاسم': w.name,
+                      'العمر': w.age ?? '',
+                      'الصلة': w.type,
+                      'الحالة الاجتماعية': w.marital,
+                      'أمراض مزمنة': w.chronic,
+                      'المخيم': w.camp,
+                    }))
+                  }
+                  sheetName="الرجال"
+                  fileName="سجل_الرجال"
+                  getBanner={() => {
+                    if (!filterCamp || !showBanner) return null;
+                    const camp = camps.find((c) => c.id === filterCamp);
+                    return buildCampExportBanner(camp, orgMembers);
+                  }}
+                />
+                <Pressable
+                  style={styles.smsBtn}
+                  onPress={() => {
+                    const preselectFamilyIds = [...new Set(menData.map((w) => w.famId))];
+                    const birthdayNames = {};
+                    menData.forEach((w) => { birthdayNames[w.famId] = w.name; });
+                    navigation.navigate('SMS', { preselectFamilyIds, birthdayNames });
+                  }}
+                >
+                  <Text style={styles.smsBtnText}>📤 SMS</Text>
+                </Pressable>
+              </View>
             </View>
 
             <CampDelegatePanel
@@ -360,6 +373,11 @@ const getStyles = () =>
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
+    smsBtn: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent,
+      borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center', justifyContent: 'center',
+    },
+    smsBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 12 },
     ageRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 10 },
     ageLabel: { color: colors.muted, fontSize: 12, marginStart: 4 },
     ageInput: {

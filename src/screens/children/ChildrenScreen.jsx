@@ -15,34 +15,37 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
+import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import colors from '../../theme/colors';
 
-// حقول تصدير كشف الأطفال القابلة للتخصيص -- default:true تعني معلَّمة
-// مسبقاً بنافذة الاختيار (حسب طلب محمود صراحة)، بدون حقل خاص برقم
-// الخيمة إطلاقاً (الترتيب يعتمد الخيمة داخلياً، بس مو معروضة كعمود)
+// حقول تصدير كشف الأطفال القابلة للتخصيص بالنقر (ترقيم = ترتيب الأعمدة
+// الفعلي بالملف) عبر مكوّن FieldPicker المشترك. الحقول الأساسية الـ11
+// مرقَّمة مسبقاً 1→11 بالضبط حسب الترتيب المطلوب، الاختيارية تبدأ بـ0
+// (غير محدَّدة، المستخدم يفعّلها بالنقر يدوياً). بدون حقل خاص برقم
+// الخيمة إطلاقاً (الترتيب يعتمد الخيمة داخلياً، بس مو معروضة كعمود).
 const CHILD_FIELD_DEFS = [
-  { key: 'number', label: 'ترقيم تلقائي', default: true },
-  { key: 'name', label: 'اسم الطفل', default: true },
-  { key: 'national_id', label: 'رقم هوية الطفل', default: true },
-  { key: 'dob', label: 'تاريخ الميلاد', default: true },
-  { key: 'age', label: 'العمر', default: true },
-  { key: 'gender', label: 'الجنس', default: true },
-  { key: 'relation', label: 'الصلة', default: true },
-  { key: 'head_name', label: 'اسم رب الأسرة', default: true },
-  { key: 'head_id', label: 'هوية رب الأسرة', default: true },
-  { key: 'head_phone', label: 'رقم جوال رب الأسرة', default: true },
-  { key: 'camp_name', label: 'اسم المخيم', default: true },
-  // اختيارية -- غير معلَّمة افتراضياً
-  { key: 'mother_name', label: 'اسم الأم', default: false },
-  { key: 'mother_id', label: 'رقم هوية الأم', default: false },
-  { key: 'chronic', label: 'أمراض مزمنة', default: false },
-  { key: 'disabilities', label: 'إعاقات', default: false },
-  { key: 'injuries', label: 'إصابات', default: false },
-  { key: 'orphan', label: 'يتيم؟', default: false },
-  { key: 'orphan_cause', label: 'سبب اليتم', default: false },
-  { key: 'needs', label: 'احتياجات خاصة', default: false },
-  { key: 'original_address', label: 'المنطقة الأصلية', default: false },
+  { key: 'number', label: 'ترقيم تلقائي', order: 1 },
+  { key: 'name', label: 'اسم الطفل', order: 2 },
+  { key: 'national_id', label: 'رقم هوية الطفل', order: 3 },
+  { key: 'dob', label: 'تاريخ الميلاد', order: 4 },
+  { key: 'age', label: 'العمر', order: 5 },
+  { key: 'gender', label: 'الجنس', order: 6 },
+  { key: 'relation', label: 'الصلة', order: 7 },
+  { key: 'head_name', label: 'اسم رب الأسرة', order: 8 },
+  { key: 'head_id', label: 'هوية رب الأسرة', order: 9 },
+  { key: 'head_phone', label: 'رقم جوال رب الأسرة', order: 10 },
+  { key: 'camp_name', label: 'اسم المخيم', order: 11 },
+  // اختيارية -- غير محدَّدة افتراضياً (order: 0)
+  { key: 'mother_name', label: 'اسم الأم', order: 0 },
+  { key: 'mother_id', label: 'رقم هوية الأم', order: 0 },
+  { key: 'chronic', label: 'أمراض مزمنة', order: 0 },
+  { key: 'disabilities', label: 'إعاقات', order: 0 },
+  { key: 'injuries', label: 'إصابات', order: 0 },
+  { key: 'orphan', label: 'يتيم؟', order: 0 },
+  { key: 'orphan_cause', label: 'سبب اليتم', order: 0 },
+  { key: 'needs', label: 'احتياجات خاصة', order: 0 },
+  { key: 'original_address', label: 'المنطقة الأصلية', order: 0 },
 ];
 
 export default function ChildrenScreen() {
@@ -57,9 +60,7 @@ export default function ChildrenScreen() {
   const [filterCamp, setFilterCamp] = useState('');
   const [showBanner, setShowBanner] = useState(true);
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
-  const [selectedFields, setSelectedFields] = useState(
-    () => new Set(CHILD_FIELD_DEFS.filter((f) => f.default).map((f) => f.key))
-  );
+  const [childFields, setChildFields] = useState(() => CHILD_FIELD_DEFS.map((f) => ({ ...f })));
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [ageMin, setAgeMin] = useState('');
@@ -171,7 +172,8 @@ export default function ChildrenScreen() {
   }, [members, famMap, filterCamp]);
 
   const handleCustomExport = async () => {
-    if (!selectedFields.size) return showError('اختر حقلاً واحداً على الأقل');
+    const selected = orderedSelected(childFields);
+    if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
     try {
       // الترتيب حسب رقم الخيمة داخلياً فقط -- بدون أي عمود مخصَّص لها
       // بالجدول الناتج (حسب طلب محمود صراحة)
@@ -185,9 +187,8 @@ export default function ChildrenScreen() {
         const famMembers = members.filter((m) => m.family_id === k.family_id);
         const mother = famMembers.find((m) => VALID_MOTHER_RELATIONS.includes(m.relation || ''));
         const row = {};
-        selectedFields.forEach((key) => {
-          const def = CHILD_FIELD_DEFS.find((d) => d.key === key);
-          switch (key) {
+        selected.forEach((def) => {
+          switch (def.key) {
             case 'number': row[def.label] = i + 1; break;
             case 'name': row[def.label] = k.name || ''; break;
             case 'national_id': row[def.label] = k.national_id || ''; break;
@@ -389,28 +390,9 @@ export default function ChildrenScreen() {
       </BottomSheetModal>
 
       <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
-        {CHILD_FIELD_DEFS.map((f) => {
-          const checked = selectedFields.has(f.key);
-          return (
-            <Pressable
-              key={f.key}
-              style={styles.fieldRow}
-              onPress={() => {
-                setSelectedFields((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(f.key)) next.delete(f.key);
-                  else next.add(f.key);
-                  return next;
-                });
-              }}
-            >
-              <Text style={styles.fieldCheckbox}>{checked ? '☑️' : '⬜'}</Text>
-              <Text style={styles.fieldLabel}>{f.label}</Text>
-            </Pressable>
-          );
-        })}
+        <FieldPicker title="📋 حقول كشف الأطفال" cols={childFields} onChange={setChildFields} startOpen />
         <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
-          <Text style={styles.customExportBtnText}>📥 تصدير ({selectedFields.size} حقل)</Text>
+          <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(childFields).length} حقل)</Text>
         </Pressable>
       </BottomSheetModal>
     </SafeAreaView>
@@ -468,9 +450,6 @@ const getStyles = () =>
     cardSubMeta: { color: colors.muted, fontSize: 10, marginTop: 4, textAlign: 'right' },
 
     campOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-    fieldRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-    fieldCheckbox: { fontSize: 16 },
-    fieldLabel: { color: colors.white, fontSize: 13 },
     customExportBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 14 },
     customExportBtnText: { color: '#000', fontWeight: '900', fontSize: 14 },
     campOptionText: { color: colors.white, fontSize: 13, textAlign: 'right' },

@@ -14,75 +14,9 @@ import PageHeader from '../../components/ui/PageHeader';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import SelectField from '../../components/ui/SelectField';
 import FormSection from '../../components/ui/FormSection';
+import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import { showToast } from '../../utils/toast';
 import colors from '../../theme/colors';
-
-/** منتقي حقول قابل للطي — كل حقل يبدأ غير محدد، وكل ما تضغط حقل ياخذ
- * الرقم التسلسلي التالي حسب ترتيب ضغطك (مو ترتيب ثابت بالقائمة). لما تلغي
- * تحديد حقل بالنص، يُعاد ترقيم الحقول اللي بعده عشان يضلوا متسلسلين بلا فجوات.
- * ترتيب الأرقام هذا هو نفسه ترتيب الأعمدة بالملف المُصدَّر. */
-function FieldPicker({ title, cols, onChange }) {
-  const [open, setOpen] = useState(false);
-  const selectedCount = cols.filter((c) => c.order > 0).length;
-
-  const toggle = (key) => {
-    const current = cols.find((c) => c.key === key);
-    if (current.order > 0) {
-      // إلغاء التحديد: صفّر رقمه، وأنزل رقم كل حقل كان بعده بواحد
-      const removedOrder = current.order;
-      onChange(
-        cols.map((c) => {
-          if (c.key === key) return { ...c, order: 0 };
-          if (c.order > removedOrder) return { ...c, order: c.order - 1 };
-          return c;
-        })
-      );
-    } else {
-      // تحديد جديد: ياخذ الرقم التالي بعد آخر رقم مستخدم
-      const maxOrder = Math.max(0, ...cols.map((c) => c.order));
-      onChange(cols.map((c) => (c.key === key ? { ...c, order: maxOrder + 1 } : c)));
-    }
-  };
-  const selectAll = () => onChange(cols.map((c, i) => ({ ...c, order: i + 1 })));
-  const selectNone = () => onChange(cols.map((c) => ({ ...c, order: 0 })));
-
-  return (
-    <View style={styles.fieldPicker}>
-      <Pressable style={styles.fieldPickerHeader} onPress={() => setOpen((o) => !o)}>
-        <Text style={styles.fieldPickerTitle}>{title} ({selectedCount})</Text>
-        <Text style={styles.chevron}>{open ? '▲' : '▼'}</Text>
-      </Pressable>
-      {open && (
-        <View style={styles.fieldPickerBody}>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-            <Pressable style={styles.miniBtn} onPress={selectAll}><Text style={styles.miniBtnText}>الكل</Text></Pressable>
-            <Pressable style={styles.miniBtn} onPress={selectNone}><Text style={styles.miniBtnText}>لا شيء</Text></Pressable>
-          </View>
-          <View style={styles.chipsWrap}>
-            {cols.map((c) => (
-              <Pressable
-                key={c.key}
-                onPress={() => toggle(c.key)}
-                style={[styles.chip, c.order > 0 && styles.chipActive]}
-              >
-                {c.order > 0 && (
-                  <View style={styles.chipOrderBadge}>
-                    <Text style={styles.chipOrderText}>{c.order}</Text>
-                  </View>
-                )}
-                <Text style={[styles.chipText, c.order > 0 && styles.chipTextActive]}>{c.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
-
-/** يفرز الحقول المحددة حسب رقم ترتيب اختيارها (تصاعدياً) -- هذا الترتيب
- * هو ترتيب الأعمدة الفعلي بملف الإكسل المُصدَّر. */
-const orderedSelected = (cols) => cols.filter((c) => c.order > 0).sort((a, b) => a.order - b.order);
 
 export default function ExportScreen() {
   const { profile, orgId } = useAuth();
@@ -944,22 +878,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 10, color: colors.white, fontSize: 13, marginBottom: 12, textAlign: 'right',
   },
-
-  fieldPicker: { backgroundColor: colors.surface2, borderRadius: 12, marginBottom: 10, overflow: 'hidden' },
-  fieldPickerHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', padding: 12 },
-  fieldPickerTitle: { color: colors.accent, fontWeight: '900', fontSize: 12 },
-  chevron: { color: colors.muted, fontSize: 10 },
-  fieldPickerBody: { paddingHorizontal: 12, paddingBottom: 12 },
-  chipsWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
-  chip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
-  chipActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
-  chipText: { color: colors.muted, fontSize: 11 },
-  chipTextActive: { color: colors.accent, fontWeight: 'bold' },
-  chipOrderBadge: { backgroundColor: colors.accent, borderRadius: 999, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
-  chipOrderText: { color: colors.bg, fontSize: 9, fontWeight: '900' },
-
-  miniBtn: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  miniBtnText: { color: colors.muted, fontSize: 10 },
 
   modeBtn: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   modeBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },

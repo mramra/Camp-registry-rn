@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { naturalCompare, normalizeHealthValue, buildCampExportBanner } from '../../lib/helpers';
+import { naturalCompare, normalizeHealthValue, buildCampExportBanner, calcAge } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -15,8 +15,27 @@ import FilterChip from '../../components/ui/FilterChip';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
+import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
+import { exportXLSX } from '../../lib/excelIO';
 import colors from '../../theme/colors';
+
+const HEALTH_FIELD_DEFS = [
+  { key: 'number', label: 'ترقيم تلقائي', order: 1 },
+  { key: 'name', label: 'الاسم', order: 2 },
+  { key: 'role', label: 'الصلة', order: 3 },
+  { key: 'healthType', label: 'نوع الحالة', order: 4 },
+  { key: 'val', label: 'التفاصيل', order: 5 },
+  { key: 'headName', label: 'اسم رب الأسرة', order: 6 },
+  { key: 'headId', label: 'هوية رب الأسرة', order: 7 },
+  { key: 'headPhone', label: 'رقم جوال رب الأسرة', order: 8 },
+  { key: 'camp', label: 'اسم المخيم', order: 9 },
+  // اختيارية
+  { key: 'national_id', label: 'رقم هوية الشخص', order: 0 },
+  { key: 'dob', label: 'تاريخ الميلاد', order: 0 },
+  { key: 'age', label: 'العمر', order: 0 },
+  { key: 'originalAddress', label: 'المنطقة الأصلية', order: 0 },
+];
 
 const HEALTH_TYPES = [
   { key: 'all', label: 'الكل', icon: '🏥' },
@@ -44,6 +63,8 @@ export default function HealthRecordsScreen() {
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
   const [showBanner, setShowBanner] = useState(true);
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
+  const [healthFields, setHealthFields] = useState(() => HEALTH_FIELD_DEFS.map((f) => ({ ...f })));
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [healthType, setHealthType] = useState('all');
@@ -115,10 +136,16 @@ export default function HealthRecordsScreen() {
             uid: 'f-' + f.id + key,
             famId: f.id,
             name: f.head_name,
+            national_id: f.head_id || '',
+            dob: f.head_dob || '',
             role: 'رب الأسرة',
             healthType: FIELD_MAP[key].label,
             key,
             val,
+            headName: f.head_name || '',
+            headId: f.head_id || '',
+            headPhone: f.phone1 || '',
+            originalAddress: f.original_address || '',
             camp: campMap[f.camp_id] || '—',
             camp_id: f.camp_id || '',
             tent: f.tent || '—',
@@ -137,10 +164,16 @@ export default function HealthRecordsScreen() {
             uid: 'm-' + m.id + key,
             famId: f.id,
             name: m.name || '—',
+            national_id: m.national_id || '',
+            dob: m.dob || '',
             role: m.relation || 'فرد',
             healthType: FIELD_MAP[key].label,
             key,
             val,
+            headName: f.head_name || '',
+            headId: f.head_id || '',
+            headPhone: f.phone1 || '',
+            originalAddress: f.original_address || '',
             camp: campMap[f.camp_id] || '—',
             camp_id: f.camp_id || '',
             tent: f.tent || '—',
@@ -172,6 +205,40 @@ export default function HealthRecordsScreen() {
       .filter((r) => !search.trim() || (r.name || '').includes(search) || (r.val || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [campRecords, healthType, search]);
+
+  const handleCustomExport = async () => {
+    const selected = orderedSelected(healthFields);
+    if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
+    try {
+      const rows = healthData.map((r, i) => {
+        const row = {};
+        selected.forEach((def) => {
+          switch (def.key) {
+            case 'number': row[def.label] = i + 1; break;
+            case 'name': row[def.label] = r.name || ''; break;
+            case 'role': row[def.label] = r.role || ''; break;
+            case 'healthType': row[def.label] = r.healthType || ''; break;
+            case 'val': row[def.label] = r.val || ''; break;
+            case 'headName': row[def.label] = r.headName || ''; break;
+            case 'headId': row[def.label] = r.headId || ''; break;
+            case 'headPhone': row[def.label] = r.headPhone || ''; break;
+            case 'camp': row[def.label] = r.camp || ''; break;
+            case 'national_id': row[def.label] = r.national_id || ''; break;
+            case 'dob': row[def.label] = r.dob || ''; break;
+            case 'age': row[def.label] = r.dob ? (calcAge(r.dob) ?? '') : ''; break;
+            case 'originalAddress': row[def.label] = r.originalAddress || ''; break;
+            default: break;
+          }
+        });
+        return row;
+      });
+      await exportXLSX(rows, 'الصحة', 'كشف_الصحة_مخصص');
+      setFieldPickerOpen(false);
+    } catch (e) {
+      showError('تعذّر التصدير: ' + e.message);
+    }
+  };
+
 
   const HEALTH_COLOR = { chronic: colors.accent, disability: colors.blue, injury: colors.red, needs: colors.purple };
 
@@ -259,6 +326,9 @@ export default function HealthRecordsScreen() {
                 >
                   <Text style={styles.smsBtnText}>📤 SMS</Text>
                 </Pressable>
+                <Pressable style={styles.smsBtn} onPress={() => setFieldPickerOpen(true)}>
+                  <Text style={styles.smsBtnText}>⚙️ تخصيص الحقول</Text>
+                </Pressable>
               </View>
             </View>
 
@@ -307,6 +377,13 @@ export default function HealthRecordsScreen() {
           </Pressable>
         ))}
       </BottomSheetModal>
+
+      <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
+        <FieldPicker title="📋 حقول كشف الصحة" cols={healthFields} onChange={setHealthFields} startOpen />
+        <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
+          <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(healthFields).length} حقل)</Text>
+        </Pressable>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -354,5 +431,7 @@ const getStyles = () =>
     healthValueText: { color: colors.white, fontSize: 12, textAlign: 'right' },
 
     campOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    customExportBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 14 },
+    customExportBtnText: { color: '#000', fontWeight: '900', fontSize: 14 },
     campOptionText: { color: colors.white, fontSize: 13, textAlign: 'right' },
   });

@@ -14,8 +14,29 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
+import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
+import { exportXLSX } from '../../lib/excelIO';
 import colors from '../../theme/colors';
+
+const MEN_FIELD_DEFS = [
+  { key: 'number', label: 'ترقيم تلقائي', order: 1 },
+  { key: 'name', label: 'الاسم', order: 2 },
+  { key: 'national_id', label: 'رقم الهوية', order: 3 },
+  { key: 'dob', label: 'تاريخ الميلاد', order: 4 },
+  { key: 'age', label: 'العمر', order: 5 },
+  { key: 'type', label: 'الصلة', order: 6 },
+  { key: 'marital', label: 'الحالة الاجتماعية', order: 7 },
+  { key: 'headName', label: 'اسم رب الأسرة', order: 8 },
+  { key: 'headId', label: 'هوية رب الأسرة', order: 9 },
+  { key: 'headPhone', label: 'رقم جوال رب الأسرة', order: 10 },
+  { key: 'camp', label: 'اسم المخيم', order: 11 },
+  // اختيارية
+  { key: 'chronic', label: 'أمراض مزمنة', order: 0 },
+  { key: 'disabilities', label: 'إعاقات', order: 0 },
+  { key: 'injuries', label: 'إصابات', order: 0 },
+  { key: 'originalAddress', label: 'المنطقة الأصلية', order: 0 },
+];
 
 export default function MenScreen() {
   const navigation = useNavigation();
@@ -28,6 +49,8 @@ export default function MenScreen() {
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
   const [showBanner, setShowBanner] = useState(true);
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
+  const [menFields, setMenFields] = useState(() => MEN_FIELD_DEFS.map((f) => ({ ...f })));
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [menType, setMenType] = useState('');
@@ -96,10 +119,18 @@ export default function MenScreen() {
         id: 'f-' + f.id,
         famId: f.id,
         name: f.head_name,
+        national_id: f.head_id || '',
+        dob: f.head_dob || '',
         age: calcAge(f.head_dob),
         type: 'رأس الأسرة',
         marital: f.head_marital || '—',
         chronic: normalizeHealthValue(f.head_chronic_diseases),
+        disabilities: normalizeHealthValue(f.head_disabilities),
+        injuries: normalizeHealthValue(f.head_injuries),
+        headName: f.head_name || '',
+        headId: f.head_id || '',
+        headPhone: f.phone1 || '',
+        originalAddress: f.original_address || '',
         camp: campMap[f.camp_id] || '—',
         camp_id: f.camp_id || '',
         tent: f.tent || '—',
@@ -112,10 +143,18 @@ export default function MenScreen() {
           id: 'm-' + m.id,
           famId: m.family_id,
           name: m.name || '—',
+          national_id: m.national_id || '',
+          dob: m.dob || '',
           age: calcAge(m.dob),
           type: m.relation || 'ذكر',
           marital: '—',
           chronic: normalizeHealthValue(m.chronic_diseases),
+          disabilities: normalizeHealthValue(m.disabilities),
+          injuries: normalizeHealthValue(m.injuries),
+          headName: f.head_name || '',
+          headId: f.head_id || '',
+          headPhone: f.phone1 || '',
+          originalAddress: f.original_address || '',
           camp: campMap[f.camp_id] || '—',
           camp_id: f.camp_id || '',
           tent: f.tent || '—',
@@ -156,6 +195,42 @@ export default function MenScreen() {
       .filter((w) => !search.trim() || (w.name || '').includes(search))
       .sort((a, b) => naturalCompare(a.tent, b.tent));
   }, [allMen, filterCamp, menType, specialFilter, ageMin, ageMax, search]);
+
+  const handleCustomExport = async () => {
+    const selected = orderedSelected(menFields);
+    if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
+    try {
+      const rows = menData.map((w, i) => {
+        const row = {};
+        selected.forEach((def) => {
+          switch (def.key) {
+            case 'number': row[def.label] = i + 1; break;
+            case 'name': row[def.label] = w.name || ''; break;
+            case 'national_id': row[def.label] = w.national_id || ''; break;
+            case 'dob': row[def.label] = w.dob || ''; break;
+            case 'age': row[def.label] = w.age ?? ''; break;
+            case 'type': row[def.label] = w.type || ''; break;
+            case 'marital': row[def.label] = w.marital || ''; break;
+            case 'headName': row[def.label] = w.headName || ''; break;
+            case 'headId': row[def.label] = w.headId || ''; break;
+            case 'headPhone': row[def.label] = w.headPhone || ''; break;
+            case 'camp': row[def.label] = w.camp || ''; break;
+            case 'chronic': row[def.label] = w.chronic || ''; break;
+            case 'disabilities': row[def.label] = w.disabilities || ''; break;
+            case 'injuries': row[def.label] = w.injuries || ''; break;
+            case 'originalAddress': row[def.label] = w.originalAddress || ''; break;
+            default: break;
+          }
+        });
+        return row;
+      });
+      await exportXLSX(rows, 'الرجال', 'كشف_الرجال_مخصص');
+      setFieldPickerOpen(false);
+    } catch (e) {
+      showError('تعذّر التصدير: ' + e.message);
+    }
+  };
+
 
   const RELATION_ICONS = { 'رأس الأسرة': '🏠', 'زوج': '🤵', 'أب': '👴', 'ابن': '👦', 'أخ': '👬', 'ذكر': '👨' };
   const relationTypes = useMemo(() => {
@@ -248,6 +323,9 @@ export default function MenScreen() {
                   }}
                 >
                   <Text style={styles.smsBtnText}>📤 SMS</Text>
+                </Pressable>
+                <Pressable style={styles.smsBtn} onPress={() => setFieldPickerOpen(true)}>
+                  <Text style={styles.smsBtnText}>⚙️ تخصيص الحقول</Text>
                 </Pressable>
               </View>
             </View>
@@ -358,6 +436,13 @@ export default function MenScreen() {
           </Pressable>
         ))}
       </BottomSheetModal>
+
+      <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
+        <FieldPicker title="📋 حقول كشف الرجال" cols={menFields} onChange={setMenFields} startOpen />
+        <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
+          <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(menFields).length} حقل)</Text>
+        </Pressable>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -413,5 +498,7 @@ const getStyles = () =>
     chronicText: { color: colors.accent, fontSize: 10, marginTop: 2, textAlign: 'right' },
 
     campOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    customExportBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 14 },
+    customExportBtnText: { color: '#000', fontWeight: '900', fontSize: 14 },
     campOptionText: { color: colors.white, fontSize: 13, textAlign: 'right' },
   });

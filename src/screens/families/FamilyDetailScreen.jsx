@@ -403,8 +403,9 @@ export default function FamilyDetailScreen() {
                       <Text style={styles.memberName}>{m.name}</Text>
                       <Text style={styles.memberMeta}>
                         {m.relation || '—'}
-                        {m.dob ? ` · ${calcAge(m.dob)} سنة` : ''}
+                        {m.dob ? ` · ${formatDate(m.dob)} (${calcAge(m.dob)} سنة)` : ''}
                       </Text>
+                      {!!m.national_id && <Text style={styles.memberMeta}>🪪 {m.national_id}</Text>}
                       {badges.length > 0 && (
                         <View style={styles.badgesRow}>
                           {badges.map((b, i) => (

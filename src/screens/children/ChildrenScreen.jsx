@@ -5,7 +5,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { calcAge, naturalCompare, buildCampExportBanner, isInfantAge, INFANT_MAX_AGE } from '../../lib/helpers';
+import { calcAge, naturalCompare, buildCampExportBanner, isInfantAge, INFANT_MAX_AGE, VALID_MOTHER_RELATIONS, normalizeHealthValue } from '../../lib/helpers';
+import { exportXLSX } from '../../lib/excelIO';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -16,6 +17,33 @@ import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import ExportButton from '../../components/ui/ExportButton';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import colors from '../../theme/colors';
+
+// حقول تصدير كشف الأطفال القابلة للتخصيص -- default:true تعني معلَّمة
+// مسبقاً بنافذة الاختيار (حسب طلب محمود صراحة)، بدون حقل خاص برقم
+// الخيمة إطلاقاً (الترتيب يعتمد الخيمة داخلياً، بس مو معروضة كعمود)
+const CHILD_FIELD_DEFS = [
+  { key: 'number', label: 'ترقيم تلقائي', default: true },
+  { key: 'name', label: 'اسم الطفل', default: true },
+  { key: 'national_id', label: 'رقم هوية الطفل', default: true },
+  { key: 'dob', label: 'تاريخ الميلاد', default: true },
+  { key: 'age', label: 'العمر', default: true },
+  { key: 'gender', label: 'الجنس', default: true },
+  { key: 'relation', label: 'الصلة', default: true },
+  { key: 'head_name', label: 'اسم رب الأسرة', default: true },
+  { key: 'head_id', label: 'هوية رب الأسرة', default: true },
+  { key: 'head_phone', label: 'رقم جوال رب الأسرة', default: true },
+  { key: 'camp_name', label: 'اسم المخيم', default: true },
+  // اختيارية -- غير معلَّمة افتراضياً
+  { key: 'mother_name', label: 'اسم الأم', default: false },
+  { key: 'mother_id', label: 'رقم هوية الأم', default: false },
+  { key: 'chronic', label: 'أمراض مزمنة', default: false },
+  { key: 'disabilities', label: 'إعاقات', default: false },
+  { key: 'injuries', label: 'إصابات', default: false },
+  { key: 'orphan', label: 'يتيم؟', default: false },
+  { key: 'orphan_cause', label: 'سبب اليتم', default: false },
+  { key: 'needs', label: 'احتياجات خاصة', default: false },
+  { key: 'original_address', label: 'المنطقة الأصلية', default: false },
+];
 
 export default function ChildrenScreen() {
   const navigation = useNavigation();
@@ -28,6 +56,10 @@ export default function ChildrenScreen() {
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
   const [showBanner, setShowBanner] = useState(true);
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
+  const [selectedFields, setSelectedFields] = useState(
+    () => new Set(CHILD_FIELD_DEFS.filter((f) => f.default).map((f) => f.key))
+  );
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [ageMin, setAgeMin] = useState('');
@@ -138,6 +170,56 @@ export default function ChildrenScreen() {
       }).length;
   }, [members, famMap, filterCamp]);
 
+  const handleCustomExport = async () => {
+    if (!selectedFields.size) return showError('اختر حقلاً واحداً على الأقل');
+    try {
+      // الترتيب حسب رقم الخيمة داخلياً فقط -- بدون أي عمود مخصَّص لها
+      // بالجدول الناتج (حسب طلب محمود صراحة)
+      const sorted = [...childrenData].sort((a, b) => naturalCompare(a.tent, b.tent));
+      const healthCount = (raw) => {
+        const n = normalizeHealthValue(raw);
+        return n ? n.split('، ').filter(Boolean).length : 0;
+      };
+      const rows = sorted.map((k, i) => {
+        const f = famMap[k.family_id] || {};
+        const famMembers = members.filter((m) => m.family_id === k.family_id);
+        const mother = famMembers.find((m) => VALID_MOTHER_RELATIONS.includes(m.relation || ''));
+        const row = {};
+        selectedFields.forEach((key) => {
+          const def = CHILD_FIELD_DEFS.find((d) => d.key === key);
+          switch (key) {
+            case 'number': row[def.label] = i + 1; break;
+            case 'name': row[def.label] = k.name || ''; break;
+            case 'national_id': row[def.label] = k.national_id || ''; break;
+            case 'dob': row[def.label] = k.dob || ''; break;
+            case 'age': row[def.label] = k.age ?? ''; break;
+            case 'gender': row[def.label] = k.gender || ''; break;
+            case 'relation': row[def.label] = k.relation || ''; break;
+            case 'head_name': row[def.label] = f.head_name || ''; break;
+            case 'head_id': row[def.label] = f.head_id || ''; break;
+            case 'head_phone': row[def.label] = f.phone1 || ''; break;
+            case 'camp_name': row[def.label] = k.camp || ''; break;
+            case 'mother_name': row[def.label] = mother?.name || ''; break;
+            case 'mother_id': row[def.label] = mother?.national_id || ''; break;
+            case 'chronic': row[def.label] = healthCount(k.chronic_diseases); break;
+            case 'disabilities': row[def.label] = healthCount(k.disabilities); break;
+            case 'injuries': row[def.label] = healthCount(k.injuries); break;
+            case 'orphan': row[def.label] = k.orphan_status ? 'نعم' : 'لا'; break;
+            case 'orphan_cause': row[def.label] = k.orphan_cause || ''; break;
+            case 'needs': row[def.label] = k.needs || ''; break;
+            case 'original_address': row[def.label] = f.original_address || ''; break;
+            default: break;
+          }
+        });
+        return row;
+      });
+      await exportXLSX(rows, 'الأطفال', 'كشف_الأطفال_مخصص');
+      setFieldPickerOpen(false);
+    } catch (e) {
+      showError('تعذّر التصدير: ' + e.message);
+    }
+  };
+
   const styles = getStyles();
 
   if (loading) {
@@ -219,6 +301,9 @@ export default function ChildrenScreen() {
                   }}
                 >
                   <Text style={styles.smsBtnText}>📤 SMS</Text>
+                </Pressable>
+                <Pressable style={styles.smsBtn} onPress={() => setFieldPickerOpen(true)}>
+                  <Text style={styles.smsBtnText}>⚙️ تخصيص الحقول</Text>
                 </Pressable>
               </View>
             </View>
@@ -302,6 +387,32 @@ export default function ChildrenScreen() {
           </Pressable>
         ))}
       </BottomSheetModal>
+
+      <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
+        {CHILD_FIELD_DEFS.map((f) => {
+          const checked = selectedFields.has(f.key);
+          return (
+            <Pressable
+              key={f.key}
+              style={styles.fieldRow}
+              onPress={() => {
+                setSelectedFields((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(f.key)) next.delete(f.key);
+                  else next.add(f.key);
+                  return next;
+                });
+              }}
+            >
+              <Text style={styles.fieldCheckbox}>{checked ? '☑️' : '⬜'}</Text>
+              <Text style={styles.fieldLabel}>{f.label}</Text>
+            </Pressable>
+          );
+        })}
+        <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
+          <Text style={styles.customExportBtnText}>📥 تصدير ({selectedFields.size} حقل)</Text>
+        </Pressable>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -357,5 +468,10 @@ const getStyles = () =>
     cardSubMeta: { color: colors.muted, fontSize: 10, marginTop: 4, textAlign: 'right' },
 
     campOption: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    fieldRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+    fieldCheckbox: { fontSize: 16 },
+    fieldLabel: { color: colors.white, fontSize: 13 },
+    customExportBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 14 },
+    customExportBtnText: { color: '#000', fontWeight: '900', fontSize: 14 },
     campOptionText: { color: colors.white, fontSize: 13, textAlign: 'right' },
   });

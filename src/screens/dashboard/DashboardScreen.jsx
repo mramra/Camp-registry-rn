@@ -379,7 +379,16 @@ export default function DashboardScreen() {
             <Text style={styles.birthdayTitle}>
               🎂 {todaysBirthdays.length === 1
                 ? `اليوم عيد ميلاد ${todaysBirthdays[0].personName}${todaysBirthdays[0].isHead ? '' : ' (فرد بالأسرة)'}`
-                : `${todaysBirthdays.length} عيد ميلاد اليوم (رباب أسر وأفراد)`}
+                : (() => {
+                    // لما يكون فيه أكثر من عيد ميلاد اليوم، نعرض الأسماء
+                    // (أول 3 كحد أقصى ثم "و X آخرين") بدل عدد مجرَّد بلا
+                    // أسماء -- كانت هذي المشكلة بالضبط.
+                    const names = todaysBirthdays.map((b) => b.personName).filter(Boolean);
+                    const preview = names.length <= 3
+                      ? names.join('، ')
+                      : `${names.slice(0, 3).join('، ')} و${names.length - 3} آخرين`;
+                    return `اليوم عيد ميلاد ${preview} (${todaysBirthdays.length})`;
+                  })()}
             </Text>
             <Text style={styles.birthdayHint}>اضغط لإرسال رسالة تهنئة ←</Text>
           </Pressable>

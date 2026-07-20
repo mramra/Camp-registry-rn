@@ -18,20 +18,25 @@ import { showError, showSuccess } from '../../utils/toast';
 import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
-import { buildCampExportBanner, naturalCompare } from '../../lib/helpers';
+import { buildCampExportBanner, naturalCompare, getVulnerabilityScore, VULNERABILITY_TIER_LABELS } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import SelectField from '../../components/ui/SelectField';
+import Badge from '../../components/ui/Badge';
 import colors from '../../theme/colors';
 
 const SORT_OPTIONS = [
   { value: 'size_desc', label: '👤 حجم الأسرة (الأكبر أولاً)' },
+  { value: 'vulnerability_desc', label: '🎯 درجة الضعف (الأشد أولاً)' },
   { value: 'tent_asc', label: '⛺ رقم الخيمة' },
   { value: 'alpha', label: '🔤 أبجدي' },
 ];
+
+const TIER_KEYS = ['critical', 'high', 'medium', 'low'];
+const TIER_COLOR = { critical: colors.red, high: colors.orange, medium: colors.accent, low: colors.green };
 
 /**
  * شاشة جولة توزيع واحدة — تُفتح مباشرة من قائمة الجولات (بدون أي شاشة
@@ -58,6 +63,7 @@ export default function DistributionReceiveScreen() {
   const [tab, setTab] = useState('pending'); // pending | received
   const [filterCamp, setFilterCamp] = useState('');
   const [filterOtherRound, setFilterOtherRound] = useState('');
+  const [filterTier, setFilterTier] = useState('');
   const [sortMode, setSortMode] = useState('size_desc');
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -152,6 +158,10 @@ export default function DistributionReceiveScreen() {
       list = list.filter((f) => !otherRoundReceivedIds.has(f.id));
     }
 
+    if (filterTier) {
+      list = list.filter((f) => getVulnerabilityScore(f, membersByFamily[f.id]).tier === filterTier);
+    }
+
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((f) => {
@@ -167,7 +177,7 @@ export default function DistributionReceiveScreen() {
     }
 
     return list;
-  }, [families, filterCamp, filterOtherRound, otherRoundReceivedIds, search, membersByFamily]);
+  }, [families, filterCamp, filterOtherRound, otherRoundReceivedIds, filterTier, search, membersByFamily]);
 
   const pendingCount = baseFiltered.filter((f) => !receivedIds.has(f.id)).length;
   const receivedCount = baseFiltered.filter((f) => receivedIds.has(f.id)).length;
@@ -181,6 +191,11 @@ export default function DistributionReceiveScreen() {
           return naturalCompare(a.head_name, b.head_name);
         case 'tent_asc':
           return naturalCompare(a.tent, b.tent);
+        case 'vulnerability_desc': {
+          const av = getVulnerabilityScore(a, membersByFamily[a.id]).score;
+          const bv = getVulnerabilityScore(b, membersByFamily[b.id]).score;
+          return bv - av; // الأشد ضعفاً أولاً
+        }
         default: {
           const am = (membersByFamily[a.id]?.length || 0) + 1;
           const bm = (membersByFamily[b.id]?.length || 0) + 1;
@@ -271,6 +286,7 @@ export default function DistributionReceiveScreen() {
     'رقم الهوية': f.head_id || '',
     'رقم الخيمة': f.tent || '',
     'عدد الأفراد': 1 + (membersByFamily[f.id]?.length || 0),
+    'درجة الضعف': VULNERABILITY_TIER_LABELS[getVulnerabilityScore(f, membersByFamily[f.id]).tier],
     'الجوال': f.phone1 || '',
   });
 
@@ -323,6 +339,7 @@ export default function DistributionReceiveScreen() {
   const renderFamily = ({ item: f }) => {
     const memberCount = 1 + (membersByFamily[f.id]?.length || 0);
     const selected = selectedIds.has(f.id);
+    const tier = getVulnerabilityScore(f, membersByFamily[f.id]).tier;
 
     return (
       <Pressable
@@ -332,7 +349,10 @@ export default function DistributionReceiveScreen() {
         <View style={styles.cardRow}>
           {tab === 'pending' && selected && <Text style={styles.selectedIcon}>✓</Text>}
           <View style={{ flex: 1 }}>
-            <Text style={[styles.familyName, selected && styles.familyNameSelected]}>{f.head_name || '—'}</Text>
+            <View style={styles.nameRow}>
+              <Text style={[styles.familyName, selected && styles.familyNameSelected]}>{f.head_name || '—'}</Text>
+              <Badge label={VULNERABILITY_TIER_LABELS[tier]} color={TIER_COLOR[tier]} />
+            </View>
             <Text style={styles.metaLine}>
               {memberCount} أفراد{f.tent ? ` · ⛺ ${f.tent}` : ''}{f.camp_id ? ` · 🏕️ ${campMap[f.camp_id] || '—'}` : ''}
             </Text>
@@ -363,7 +383,7 @@ export default function DistributionReceiveScreen() {
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderFamily}
-        extraData={{ filterCamp, filterOtherRound, sortMode, search, tab, selectedIds, receivedIds }}
+        extraData={{ filterCamp, filterOtherRound, filterTier, sortMode, search, tab, selectedIds, receivedIds }}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View>
@@ -425,6 +445,21 @@ export default function DistributionReceiveScreen() {
               options={SORT_OPTIONS}
               onSelect={setSortMode}
             />
+
+            {/* درجة الضعف -- تعتمد getVulnerabilityScore المركزية (حجم الأسرة،
+                إعاقات، كبار سن، أمراض مزمنة، أيتام، فقدان معيل) لترتيب أولوية
+                التوزيع على الاحتياج الفعلي، لا فقط عدد الأفراد. */}
+            <Text style={styles.tierLabel}>🎯 درجة الضعف:</Text>
+            <View style={styles.tierRow}>
+              {TIER_KEYS.map((t) => (
+                <FilterChip
+                  key={t}
+                  label={VULNERABILITY_TIER_LABELS[t]}
+                  selected={filterTier === t}
+                  onPress={() => setFilterTier((v) => (v === t ? '' : t))}
+                />
+              ))}
+            </View>
 
             {/* 4) البحث */}
             <TextInput
@@ -490,6 +525,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   chipsRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  tierLabel: { color: colors.muted, fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 6 },
+  tierRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   resultCount: { color: colors.accent, fontSize: 11, fontWeight: 'bold', marginBottom: 8, textAlign: 'right' },
   selectAllRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   selectAllBtn: { flex: 1, backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)', borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
@@ -502,6 +539,7 @@ const styles = StyleSheet.create({
   cardSelected: { backgroundColor: 'rgba(245,158,11,0.18)', borderColor: colors.accent, borderWidth: 1.5 },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   selectedIcon: { fontSize: 16, fontWeight: '900', color: colors.accent },
+  nameRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   familyName: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right' },
   familyNameSelected: { color: colors.accent },
   metaLine: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },

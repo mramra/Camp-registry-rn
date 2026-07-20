@@ -377,18 +377,22 @@ export default function DashboardScreen() {
             }
           >
             <Text style={styles.birthdayTitle}>
-              🎂 {todaysBirthdays.length === 1
-                ? `اليوم عيد ميلاد ${todaysBirthdays[0].personName}${todaysBirthdays[0].isHead ? '' : ' (فرد بالأسرة)'}`
-                : (() => {
-                    // لما يكون فيه أكثر من عيد ميلاد اليوم، نعرض الأسماء
-                    // (أول 3 كحد أقصى ثم "و X آخرين") بدل عدد مجرَّد بلا
-                    // أسماء -- كانت هذي المشكلة بالضبط.
-                    const names = todaysBirthdays.map((b) => b.personName).filter(Boolean);
-                    const preview = names.length <= 3
-                      ? names.join('، ')
-                      : `${names.slice(0, 3).join('، ')} و${names.length - 3} آخرين`;
-                    return `اليوم عيد ميلاد ${preview} (${todaysBirthdays.length})`;
-                  })()}
+              🎂 {(() => {
+                // الاسم يُختصر دايماً لأول كلمتين (الاسم الشخصي + اسم الأب)
+                // بدل الاسم الرباعي الكامل -- سواء كان عيد ميلاد واحد أو أكثر.
+                const shortName = (n) => (n || '').trim().split(/\s+/).slice(0, 2).join(' ');
+                if (todaysBirthdays.length === 1) {
+                  const b = todaysBirthdays[0];
+                  return `اليوم عيد ميلاد ${shortName(b.personName)}${b.isHead ? '' : ' (فرد بالأسرة)'}`;
+                }
+                // أكثر من عيد ميلاد اليوم: نعرض الأسماء (أول 3 كحد أقصى ثم
+                // "و X آخرين") بدل عدد مجرَّد بلا أسماء -- كانت هذي المشكلة بالضبط.
+                const names = todaysBirthdays.map((b) => shortName(b.personName)).filter(Boolean);
+                const preview = names.length <= 3
+                  ? names.join('، ')
+                  : `${names.slice(0, 3).join('، ')} و${names.length - 3} آخرين`;
+                return `اليوم عيد ميلاد ${preview} (${todaysBirthdays.length})`;
+              })()}
             </Text>
             <Text style={styles.birthdayHint}>اضغط لإرسال رسالة تهنئة ←</Text>
           </Pressable>

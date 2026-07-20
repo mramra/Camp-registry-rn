@@ -282,6 +282,7 @@ export const AuthProvider = ({ children }) => {
     session,
     profile: effectiveProfile,
     realProfile: profile,
+    refreshProfile: () => (user?.id ? fetchUserProfile(user.id) : Promise.resolve(null)),
     previewAs,
     setPreviewAs,
     isPreviewMode: !!previewAs,

@@ -20,7 +20,7 @@ const ROLE_AR = {
 };
 
 export default function SettingsScreen() {
-  const { profile, logout, isOwner } = useAuth();
+  const { profile, logout, isOwner, refreshProfile } = useAuth();
   const navigation = useNavigation();
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -60,6 +60,10 @@ export default function SettingsScreen() {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPass });
       if (error) throw error;
+      if (profile?.must_change_pass) {
+        await supabase.from('org_members').update({ must_change_pass: false }).eq('id', profile.id);
+        await refreshProfile();
+      }
       showToast('تم تغيير كلمة المرور بنجاح', 'success');
       setNewPass('');
       setConfirmPass('');

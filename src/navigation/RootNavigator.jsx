@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { fetchPendingRequestsCount, fetchPendingDevicesCount, fetchUnreadPortalMessagesCount } from '../lib/supabase';
 import { notifyNow } from '../lib/notifications';
 import LoginScreen from '../screens/login/LoginScreen';
+import ForceChangePasswordScreen from '../screens/login/ForceChangePasswordScreen';
 import FamilyPortalScreen from '../screens/familyportal/FamilyPortalScreen';
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import FamiliesListScreen from '../screens/families/FamiliesListScreen';
@@ -81,6 +82,11 @@ const RootNavigator = () => {
   const isSuperAdmin = profile?.role === 'super_admin';
   const isCampDelegate = profile?.role === 'camp_delegate';
   const canSeePortalMessages = isOwner || isSuperAdmin || isCampDelegate;
+  // إجبار تغيير كلمة المرور عند أول دخول (أو بعد إعادة تعيينها) --
+  // مبني على الملف الحقيقي (realProfile) وليس المُعايَن (previewAs)،
+  // عشان معاينة مالك المنصة لدور تاني ما توقّفه بشاشة تغيير كلمة مرور
+  // مو بتاعته.
+  const mustChangePassword = !isPreviewMode && !!realProfile?.must_change_pass;
 
   useEffect(() => {
     if (!isAuthenticated || !orgId || !(isOwner || profile?.can_review_approvals || canSeePortalMessages)) return;
@@ -146,6 +152,8 @@ const RootNavigator = () => {
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="FamilyPortal" component={FamilyPortalScreen} options={{ headerShown: false }} />
           </>
+        ) : mustChangePassword ? (
+          <Stack.Screen name="ForceChangePassword" component={ForceChangePasswordScreen} options={{ headerShown: false }} />
         ) : (
           <>
             <Stack.Screen

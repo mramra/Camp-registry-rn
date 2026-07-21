@@ -750,7 +750,11 @@ export default function ExportScreen() {
                       onPress={() => cxToggleOne(item.id)}
                       style={[styles.pickerRow, cxSelected.has(item.id) && styles.pickerRowActive]}
                     >
-                      <Text style={styles.checkbox}>{cxSelected.has(item.id) ? '☑' : '☐'}</Text>
+                      <View style={cxSelected.has(item.id) ? styles.orderBadge : styles.orderBadgeEmpty}>
+                        {cxSelected.has(item.id) && (
+                          <Text style={styles.orderBadgeText}>{[...cxSelected].indexOf(item.id) + 1}</Text>
+                        )}
+                      </View>
                       <Text style={styles.pickerTent}>⛺{item.tent || '—'}</Text>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.pickerName} numberOfLines={1}>{cxMode === 'families' ? item.head_name : item.name}</Text>
@@ -904,6 +908,14 @@ const styles = StyleSheet.create({
   pickerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 8, borderRadius: 8, marginBottom: 2 },
   pickerRowActive: { backgroundColor: 'rgba(245,158,11,0.1)' },
   checkbox: { color: colors.accent, fontSize: 16 },
+  orderBadge: {
+    width: 22, height: 22, borderRadius: 11, backgroundColor: colors.accent,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  orderBadgeText: { color: '#000', fontWeight: '900', fontSize: 11 },
+  orderBadgeEmpty: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: colors.border,
+  },
   pickerTent: { color: colors.accent, fontSize: 11, fontWeight: 'bold', width: 40, textAlign: 'center' },
   pickerName: { color: colors.white, fontSize: 12 },
   pickerSub: { color: colors.muted, fontSize: 10 },

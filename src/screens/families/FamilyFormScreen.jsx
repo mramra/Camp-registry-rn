@@ -4,7 +4,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
@@ -333,6 +332,14 @@ export default function FamilyFormScreen() {
 
     members.forEach((m, i) => {
       if (!m.name.trim()) e[`member_${i}`] = 'اسم الفرد مطلوب';
+      else {
+        const err = validateName(m.name);
+        if (err) e[`member_${i}`] = err;
+      }
+      const nid = (m.national_id || '').trim();
+      if (!nid) e[`member_id_${i}`] = 'رقم الهوية مطلوب';
+      else if (nid.length < 9) e[`member_id_${i}`] = 'رقم الهوية أقل من 9 أرقام';
+      else if (!luhnCheck(nid)) e[`member_id_${i}`] = 'رقم الهوية غير صحيح';
     });
 
     setErrors(e);
@@ -345,42 +352,42 @@ export default function FamilyFormScreen() {
     // فحص أخير قبل الحفظ (يحمي من حالات السباق لو الفحص الفوري ما وصل
     // وقته) -- يشمل رؤساء الأسر والأفراد، وحاجز فعلي يوقف الحفظ لحد ما
     // المستخدم يأكّد صراحة إنه قاصد يكمل رغم التكرار.
+    // حاجز تكرار نهائي قبل الحفظ -- يشمل اسم ورقم هوية رب الأسرة وكل
+    // فرد على حدة، ويمنع الحفظ فعلياً (بدون خيار "تجاوز") لو فيه أي
+    // تكرار، مع تلوين الحقل المتكرر بالأحمر بدل نافذة تأكيد منفصلة.
+    const dupErrors = {};
+    const dupChecks = [];
+
     if (!familyId || headId.trim() !== existingFamily?.head_id) {
-      const id = headId.trim();
-      const [{ data: dupRows }, { data: memRows }] = await Promise.all([
-        supabase
-          .from('families')
-          .select('id, head_name')
-          .eq('org_id', orgId)
-          .eq('head_id', id)
-          .neq('id', familyId || '00000000-0000-0000-0000-000000000000'),
-        supabase
-          .from('family_members')
-          .select('id, name, families!inner(head_name, org_id)')
-          .eq('families.org_id', orgId)
-          .eq('national_id', id)
-          .neq('family_id', familyId || '00000000-0000-0000-0000-000000000000')
-          .limit(1),
-      ]);
-      const conflictText =
-        dupRows?.length > 0
-          ? `رقم الهوية مستخدم بالفعل لرب أسرة "${dupRows[0].head_name}"`
-          : memRows?.length > 0
-          ? `رقم الهوية مستخدم بالفعل لفرد اسمه "${memRows[0].name}" بأسرة "${memRows[0].families?.head_name}"`
-          : '';
-      if (conflictText) {
-        const proceed = await new Promise((resolve) => {
-          Alert.alert(
-            '⚠️ رقم هوية مكرر',
-            `${conflictText}\n\nمتأكد تبي تكمل الحفظ رغم التكرار؟`,
-            [
-              { text: 'إلغاء', style: 'cancel', onPress: () => resolve(false) },
-              { text: 'متابعة الحفظ', style: 'destructive', onPress: () => resolve(true) },
-            ]
-          );
-        });
-        if (!proceed) return;
+      dupChecks.push(
+        checkDuplicate('id', headId.trim(), familyId).then((w) => { if (w) dupErrors.headId = w; })
+      );
+    }
+    if (!familyId || headName.trim() !== existingFamily?.head_name) {
+      dupChecks.push(
+        checkDuplicate('name', headName.trim(), familyId).then((w) => { if (w) dupErrors.headName = w; })
+      );
+    }
+    members.forEach((m, i) => {
+      const nid = (m.national_id || '').trim();
+      const nm = (m.name || '').trim();
+      if (nid.length >= 9) {
+        dupChecks.push(
+          checkDuplicate('id', nid, familyId).then((w) => { if (w) dupErrors[`member_id_${i}`] = w; })
+        );
       }
+      if (nm.split(/\s+/).filter(Boolean).length >= 4) {
+        dupChecks.push(
+          checkDuplicate('name', nm, familyId).then((w) => { if (w) dupErrors[`member_${i}`] = w; })
+        );
+      }
+    });
+
+    await Promise.all(dupChecks);
+    if (Object.keys(dupErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...dupErrors }));
+      showError('فيه تكرار برقم هوية أو اسم — راجع الحقول الملوَّنة بالأحمر');
+      return;
     }
 
     setSaving(true);
@@ -747,7 +754,7 @@ export default function FamilyFormScreen() {
                   onChangeText={(v) => updateMember(m.localId, 'name', v)}
                   error={errors[`member_${i}`]}
                 />
-                {!!memberDupWarnings[m.localId]?.name && (
+                {!errors[`member_${i}`] && !!memberDupWarnings[m.localId]?.name && (
                   <View style={styles.dupWarnBox}>
                     <Text style={styles.dupWarnText}>{memberDupWarnings[m.localId].name}</Text>
                   </View>
@@ -769,8 +776,9 @@ export default function FamilyFormScreen() {
                   onChangeText={(v) => updateMember(m.localId, 'national_id', v)}
                   keyboardType="number-pad"
                   maxLength={9}
+                  error={errors[`member_id_${i}`]}
                 />
-                {!!memberDupWarnings[m.localId]?.id && (
+                {!errors[`member_id_${i}`] && !!memberDupWarnings[m.localId]?.id && (
                   <View style={styles.dupWarnBox}>
                     <Text style={styles.dupWarnText}>{memberDupWarnings[m.localId].id}</Text>
                   </View>

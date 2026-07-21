@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { formatDate } from '../../lib/utils';
-import { MARITAL_BY_GENDER } from '../../lib/formOptions';
+import { MARITAL_BY_GENDER, HOUSING_TYPE_OPTIONS } from '../../lib/formOptions';
 import colors from '../../theme/colors';
 
 // نفس معرّف المنظمة الثابت المستخدم بالنسخة الأصلية لبوابة الأسرة العامة
@@ -92,6 +92,8 @@ export default function FamilyPortalScreen({ navigation }) {
         !family.phone1?.trim() && { key: 'phone1', label: '📱 رقم الجوال', kind: 'phone' },
         !family.head_dob && { key: 'head_dob', label: '📅 تاريخ الميلاد (YYYY-MM-DD)', kind: 'date' },
         !family.head_marital?.trim() && { key: 'head_marital', label: '💍 الحالة الاجتماعية', kind: 'marital' },
+        !family.address?.trim() && { key: 'address', label: '🏠 السكن الحالي (وصف)', kind: 'text' },
+        !family.housing_type?.trim() && { key: 'housing_type', label: '🏘️ نوع المسكن', kind: 'housing' },
       ].filter(Boolean)
     : [];
 
@@ -262,11 +264,25 @@ export default function FamilyPortalScreen({ navigation }) {
                                   </Pressable>
                                 ))}
                               </View>
+                            ) : d.kind === 'housing' ? (
+                              <View style={styles.maritalRow}>
+                                {HOUSING_TYPE_OPTIONS.map((opt) => (
+                                  <Pressable
+                                    key={opt}
+                                    onPress={() => setMissingValues((v) => ({ ...v, [d.key]: opt }))}
+                                    style={[styles.maritalChip, missingValues[d.key] === opt && styles.maritalChipActive]}
+                                  >
+                                    <Text style={[styles.maritalChipText, missingValues[d.key] === opt && styles.maritalChipTextActive]}>
+                                      {opt}
+                                    </Text>
+                                  </Pressable>
+                                ))}
+                              </View>
                             ) : (
                               <TextInput
                                 value={missingValues[d.key] || ''}
                                 onChangeText={(v) => setMissingValues((prev) => ({ ...prev, [d.key]: v }))}
-                                placeholder={d.kind === 'date' ? '1990-01-01' : '05xxxxxxxx'}
+                                placeholder={d.kind === 'date' ? '1990-01-01' : d.kind === 'phone' ? '05xxxxxxxx' : 'اكتب هنا...'}
                                 placeholderTextColor={colors.muted}
                                 keyboardType={d.kind === 'phone' ? 'phone-pad' : 'default'}
                                 editable={!missingSending}

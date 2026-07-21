@@ -58,6 +58,10 @@ export default function FamilyPortalScreen({ navigation }) {
   const [missingValues, setMissingValues] = useState({});
   const [missingSending, setMissingSending] = useState(false);
   const [missingSent, setMissingSent] = useState(false);
+  const [urgentOpen, setUrgentOpen] = useState(false);
+  const [urgentText, setUrgentText] = useState('');
+  const [urgentSending, setUrgentSending] = useState(false);
+  const [urgentSent, setUrgentSent] = useState(false);
 
   const handleSearch = async () => {
     if (!nationalId.trim()) return setError('أدخل رقم الهوية');
@@ -71,6 +75,9 @@ export default function FamilyPortalScreen({ navigation }) {
     setNewMessage('');
     setMissingValues({});
     setMissingSent(false);
+    setUrgentOpen(false);
+    setUrgentText('');
+    setUrgentSent(false);
     try {
       const result = await callFamilyPortalAPI('lookup', { nationalId, phone });
       setFamily(result.family);
@@ -112,6 +119,26 @@ export default function FamilyPortalScreen({ navigation }) {
       setError(e.message || 'تعذّر إرسال البيانات، حاول مرة ثانية');
     } finally {
       setMissingSending(false);
+    }
+  };
+
+  const handleSendUrgent = async () => {
+    if (!urgentText.trim()) return setError('اكتب وصف الحالة العاجلة أولاً');
+    setUrgentSending(true);
+    setError('');
+    try {
+      await callFamilyPortalAPI('sendUrgentRequest', {
+        nationalId,
+        phone,
+        familyId: family.id,
+        fields: { requestText: urgentText.trim() },
+      });
+      setUrgentSent(true);
+      setUrgentText('');
+    } catch (e) {
+      setError(e.message || 'تعذّر إرسال الطلب، حاول مرة ثانية');
+    } finally {
+      setUrgentSending(false);
     }
   };
 
@@ -180,6 +207,42 @@ export default function FamilyPortalScreen({ navigation }) {
                 <View style={styles.foundBanner}>
                   <Text style={styles.foundBannerText}>✅ تم العثور على السجل</Text>
                 </View>
+
+                {urgentSent ? (
+                  <View style={styles.sentBanner}>
+                    <Text style={styles.sentBannerText}>✅ استُلم طلب المساعدة العاجل — رح يتواصل معك مسؤول المخيم بأقرب وقت</Text>
+                  </View>
+                ) : urgentOpen ? (
+                  <View style={[styles.infoCard, styles.urgentCard]}>
+                    <Text style={styles.urgentTitle}>🚨 وصف الحالة العاجلة</Text>
+                    <Text style={styles.requestHint}>اشرح الحالة باختصار (مرض، إصابة، خطر مباشر...) — بيوصل فوراً لمسؤول المخيم بإشعار مباشر.</Text>
+                    <TextInput
+                      value={urgentText}
+                      onChangeText={setUrgentText}
+                      placeholder="مثال: طفل مريض ويحتاج إسعاف فوري..."
+                      placeholderTextColor={colors.muted}
+                      multiline
+                      style={[styles.input, styles.requestTextInput]}
+                      editable={!urgentSending}
+                    />
+                    <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+                      <Pressable
+                        style={[styles.button, styles.urgentButton, { flex: 1 }, urgentSending && styles.buttonDisabled]}
+                        onPress={handleSendUrgent}
+                        disabled={urgentSending}
+                      >
+                        <Text style={styles.buttonText}>{urgentSending ? '⏳ جاري الإرسال...' : '🚨 إرسال الآن'}</Text>
+                      </Pressable>
+                      <Pressable style={styles.urgentCancelBtn} onPress={() => setUrgentOpen(false)} disabled={urgentSending}>
+                        <Text style={styles.urgentCancelText}>إلغاء</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable style={styles.urgentTrigger} onPress={() => setUrgentOpen(true)}>
+                    <Text style={styles.urgentTriggerText}>🚨 أحتاج مساعدة عاجلة الآن</Text>
+                  </Pressable>
+                )}
 
                 <View style={styles.infoCard}>
                   <Text style={styles.infoCardTitle}>👤 بيانات الأسرة</Text>
@@ -453,6 +516,17 @@ const styles = StyleSheet.create({
   sentBannerText: { color: colors.green, fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
 
   missingCard: { borderColor: 'rgba(239,68,68,0.35)' },
+
+  urgentTrigger: {
+    backgroundColor: 'rgba(239,68,68,0.12)', borderWidth: 1.5, borderColor: colors.red,
+    borderRadius: 12, paddingVertical: 12, alignItems: 'center',
+  },
+  urgentTriggerText: { color: colors.red, fontWeight: '900', fontSize: 13 },
+  urgentCard: { borderColor: colors.red, borderWidth: 1.5 },
+  urgentTitle: { color: colors.red, fontWeight: '900', fontSize: 13, textAlign: 'right', marginBottom: 6 },
+  urgentButton: { backgroundColor: colors.red },
+  urgentCancelBtn: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  urgentCancelText: { color: colors.muted, fontSize: 13, fontWeight: 'bold' },
   maritalRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   maritalChip: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,

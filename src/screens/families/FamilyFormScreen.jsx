@@ -108,6 +108,7 @@ export default function FamilyFormScreen() {
   const [governorateCurrent, setGovernorateCurrent] = useState('');
   const [displacementStatus, setDisplacementStatus] = useState('');
   const [incomeSource, setIncomeSource] = useState('');
+  const [walletType, setWalletType] = useState('');
   const [housingType, setHousingType] = useState('');
   const [housingCondition, setHousingCondition] = useState('');
 
@@ -235,6 +236,7 @@ export default function FamilyFormScreen() {
         setGovernorateCurrent(data.governorate_current || '');
         setDisplacementStatus(data.displacement_status || '');
         setIncomeSource(data.income_source || '');
+        setWalletType(data.wallet_type || '');
         setHousingType(data.housing_type || '');
         setHousingCondition(data.housing_condition || '');
         setNotes(data.notes || '');
@@ -411,6 +413,7 @@ export default function FamilyFormScreen() {
         governorate_current: governorateCurrent || null,
         displacement_status: displacementStatus || null,
         income_source: incomeSource || null,
+        wallet_type: walletType || null,
         housing_type: housingType || null,
         housing_condition: housingCondition || null,
         category_tags: JSON.stringify(categories),
@@ -604,8 +607,8 @@ export default function FamilyFormScreen() {
               style={styles.halfInput}
             />
             <FormInput
-              label="رقم بديل"
-              placeholder="05xxxxxxxx"
+              label="📱 رقم واتساب"
+              placeholder="05xxxxxxxx (اتركه فارغاً لو نفس رقم الجوال)"
               value={phone2}
               onChangeText={setPhone2}
               keyboardType="phone-pad"
@@ -730,6 +733,14 @@ export default function FamilyFormScreen() {
             options={INCOME_SOURCE_OPTIONS}
             onSelect={setIncomeSource}
             placeholder="اختر مصدر الدخل"
+          />
+          <SelectField
+            wheel
+            label="💳 محفظة إلكترونية"
+            value={walletType}
+            options={['بدون', 'PalPay', 'JawwalPay']}
+            onSelect={setWalletType}
+            placeholder="اختر نوع المحفظة"
           />
         </FormSection>
 

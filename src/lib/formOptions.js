@@ -48,7 +48,7 @@ export const TRACKED_FIELDS = {
   head_dob: 'تاريخ الميلاد',
   head_marital: 'الحالة الاجتماعية',
   phone1: 'الهاتف 1',
-  phone2: 'الهاتف 2',
+  phone2: 'رقم واتساب',
   camp_id: 'المخيم',
   tent: 'الخيمة',
   original_address: 'العنوان الأصلي',
@@ -59,6 +59,7 @@ export const TRACKED_FIELDS = {
   housing_type: 'نوع المسكن',
   housing_condition: 'حالة المسكن',
   income_source: 'مصدر الدخل',
+  wallet_type: 'المحفظة الإلكترونية',
   notes: 'ملاحظات',
   status: 'الحالة',
 };

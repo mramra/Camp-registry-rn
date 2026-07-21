@@ -210,7 +210,6 @@ export function checkFamilyIssues(f, members) {
 
   if (!f.head_id?.trim()) issues.push('رقم الهوية ناقص');
   if (!f.phone1?.trim()) issues.push('رقم الجوال ناقص');
-  if (!f.camp_id) issues.push('المخيم غير محدد');
   if (!f.head_dob) issues.push('تاريخ الميلاد ناقص');
   if (!f.head_marital?.trim()) issues.push('الحالة الاجتماعية ناقصة');
 

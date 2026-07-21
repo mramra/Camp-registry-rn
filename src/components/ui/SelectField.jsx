@@ -28,7 +28,12 @@ export default function SelectField({ label, value, placeholder = 'اختر', op
 
       <BottomSheetModal visible={visible} onClose={() => setVisible(false)} title={label || placeholder}>
         {wheel ? (
-          <WheelPicker options={options} value={value} onChange={onSelect} />
+          <WheelPicker
+            options={options}
+            value={value}
+            onChange={onSelect}
+            onCommit={() => setTimeout(() => setVisible(false), 250)}
+          />
         ) : (
           options.map((opt) => {
             const optValue = typeof opt === 'string' ? opt : opt.value;

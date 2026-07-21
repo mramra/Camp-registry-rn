@@ -91,6 +91,8 @@ export default function FamilyFormScreen() {
   const [headName, setHeadName] = useState('');
   const [headId, setHeadId] = useState('');
   const [idDupWarning, setIdDupWarning] = useState('');
+  const [nameDupWarning, setNameDupWarning] = useState('');
+  const [memberDupWarnings, setMemberDupWarnings] = useState({}); // { [localId]: { name: '', id: '' } }
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
   const [headGender, setHeadGender] = useState('');
@@ -128,9 +130,39 @@ export default function FamilyFormScreen() {
     if (orgId) fetchCamps(orgId).then(setCamps);
   }, [orgId]);
 
-  // فحص تكرار رقم الهوية أثناء الكتابة (مع تأخير بسيط بعد التوقف) -- يشمل
-  // رؤساء الأسر الأخرى وأفراد أي أسرة ثانية كمان (مو رؤساء الأسر بس زي
-  // فحص لحظة الحفظ القديم)، وتحذير ثابت واضح بدل توست عابر يختفي بسرعة.
+  // فحص تكرار عام (هوية أو اسم) بمقابل كل رؤساء الأسر وكل الأفراد بالمنظمة --
+  // مُعاد استخدامها لرب الأسرة ولكل فرد على حدة (مهمة 4: تنبيه فوري عند
+  // التكرار أثناء الكتابة، مو بس لحظة الحفظ).
+  const checkDuplicate = async (kind, value, excludeFamilyId) => {
+    const famCol = kind === 'id' ? 'head_id' : 'head_name';
+    const memCol = kind === 'id' ? 'national_id' : 'name';
+    const label = kind === 'id' ? 'رقم الهوية' : 'الاسم';
+    try {
+      const [{ data: famRows }, { data: memRows }] = await Promise.all([
+        supabase
+          .from('families')
+          .select('id, head_name')
+          .eq('org_id', orgId)
+          .eq(famCol, value)
+          .neq('id', excludeFamilyId || '00000000-0000-0000-0000-000000000000')
+          .limit(1),
+        supabase
+          .from('family_members')
+          .select('id, name, family_id, families!inner(head_name, org_id)')
+          .eq('families.org_id', orgId)
+          .eq(memCol, value)
+          .neq('family_id', excludeFamilyId || '00000000-0000-0000-0000-000000000000')
+          .limit(1),
+      ]);
+      if (famRows?.length > 0) return `⚠️ نفس ${label} مسجَّل لرب أسرة "${famRows[0].head_name}"`;
+      if (memRows?.length > 0) return `⚠️ نفس ${label} مسجَّل لفرد اسمه "${memRows[0].name}" بأسرة "${memRows[0].families?.head_name}"`;
+      return '';
+    } catch {
+      return ''; // فحص التكرار غير حرج -- تجاهل أي عطل فيه بصمت
+    }
+  };
+
+  // فحص تكرار رقم الهوية أثناء الكتابة (رب الأسرة)
   useEffect(() => {
     const id = headId.trim();
     if (!orgId || id.length < 9) {
@@ -138,36 +170,47 @@ export default function FamilyFormScreen() {
       return;
     }
     const timer = setTimeout(async () => {
-      try {
-        const [{ data: famRows }, { data: memRows }] = await Promise.all([
-          supabase
-            .from('families')
-            .select('id, head_name')
-            .eq('org_id', orgId)
-            .eq('head_id', id)
-            .neq('id', familyId || '00000000-0000-0000-0000-000000000000')
-            .limit(1),
-          supabase
-            .from('family_members')
-            .select('id, name, family_id, families!inner(head_name, org_id)')
-            .eq('families.org_id', orgId)
-            .eq('national_id', id)
-            .neq('family_id', familyId || '00000000-0000-0000-0000-000000000000')
-            .limit(1),
-        ]);
-        if (famRows?.length > 0) {
-          setIdDupWarning(`⚠️ نفس رقم الهوية مسجَّل لرب أسرة "${famRows[0].head_name}"`);
-        } else if (memRows?.length > 0) {
-          setIdDupWarning(`⚠️ نفس رقم الهوية مسجَّل لفرد اسمه "${memRows[0].name}" بأسرة "${memRows[0].families?.head_name}"`);
-        } else {
-          setIdDupWarning('');
-        }
-      } catch {
-        // فحص التكرار غير حرج -- تجاهل أي عطل فيه بصمت
-      }
+      setIdDupWarning(await checkDuplicate('id', id, familyId));
     }, 600);
     return () => clearTimeout(timer);
   }, [headId, orgId, familyId]);
+
+  // فحص تكرار الاسم أثناء الكتابة (رب الأسرة) -- بس بعد ما يصير الاسم
+  // رباعياً كامل (تفادي فحص أثناء الكتابة الجزئية بلا داعي)
+  useEffect(() => {
+    const name = headName.trim();
+    if (!orgId || name.split(/\s+/).filter(Boolean).length < 4) {
+      setNameDupWarning('');
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setNameDupWarning(await checkDuplicate('name', name, familyId));
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [headName, orgId, familyId]);
+
+  // فحص تكرار اسم وهوية كل فرد أثناء الكتابة -- فحص واحد مؤجَّل يغطي كل
+  // الأفراد دفعة وحدة (بدل useEffect منفصل لكل فرد، غير ممكن لعدد ديناميكي)
+  const membersSignature = members.map((m) => `${m.localId}:${m.name}:${m.national_id}`).join('|');
+  useEffect(() => {
+    if (!orgId) return;
+    const timer = setTimeout(async () => {
+      const results = await Promise.all(
+        members.map(async (m) => {
+          const nm = (m.name || '').trim();
+          const nid = (m.national_id || '').trim();
+          const [nameW, idW] = await Promise.all([
+            nm.split(/\s+/).filter(Boolean).length >= 4 ? checkDuplicate('name', nm, familyId) : '',
+            nid.length >= 9 ? checkDuplicate('id', nid, familyId) : '',
+          ]);
+          return [m.localId, { name: nameW, id: idW }];
+        })
+      );
+      setMemberDupWarnings(Object.fromEntries(results));
+    }, 700);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [membersSignature, orgId, familyId]);
 
   useEffect(() => {
     if (!familyId) return;
@@ -525,6 +568,11 @@ export default function FamilyFormScreen() {
             onChangeText={setHeadName}
             error={errors.headName}
           />
+          {!!nameDupWarning && !errors.headName && (
+            <View style={styles.dupWarnBox}>
+              <Text style={styles.dupWarnText}>{nameDupWarning}</Text>
+            </View>
+          )}
           <FormInput
             label="رقم الهوية *"
             placeholder="1xxxxxxxxx"
@@ -541,7 +589,7 @@ export default function FamilyFormScreen() {
           )}
           <View style={styles.row}>
             <FormInput
-              label="رقم الجوال"
+              label="رقم الجوال *"
               placeholder="05xxxxxxxx"
               value={phone1}
               onChangeText={setPhone1}
@@ -699,6 +747,11 @@ export default function FamilyFormScreen() {
                   onChangeText={(v) => updateMember(m.localId, 'name', v)}
                   error={errors[`member_${i}`]}
                 />
+                {!!memberDupWarnings[m.localId]?.name && (
+                  <View style={styles.dupWarnBox}>
+                    <Text style={styles.dupWarnText}>{memberDupWarnings[m.localId].name}</Text>
+                  </View>
+                )}
 
                 <View style={styles.row}>
                   <View style={styles.halfInput}>
@@ -710,13 +763,18 @@ export default function FamilyFormScreen() {
                 </View>
 
                 <FormInput
-                  label="رقم الهوية (اختياري)"
+                  label="رقم الهوية *"
                   placeholder="9 أرقام"
                   value={m.national_id}
                   onChangeText={(v) => updateMember(m.localId, 'national_id', v)}
                   keyboardType="number-pad"
                   maxLength={9}
                 />
+                {!!memberDupWarnings[m.localId]?.id && (
+                  <View style={styles.dupWarnBox}>
+                    <Text style={styles.dupWarnText}>{memberDupWarnings[m.localId].id}</Text>
+                  </View>
+                )}
                 {m.national_id?.length >= 9 && (
                   <Text style={[styles.hint, { color: luhnCheck(m.national_id) ? colors.green : colors.red }]}>
                     {luhnCheck(m.national_id) ? '✅ هوية صحيحة' : '❌ هوية غير صحيحة'}

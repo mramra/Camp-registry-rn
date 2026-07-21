@@ -16,7 +16,7 @@ const VISIBLE_COUNT = 5;
 const CENTER_OFFSET = ITEM_HEIGHT * Math.floor(VISIBLE_COUNT / 2);
 export const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_COUNT;
 
-export default function WheelPicker({ options, value, onChange }) {
+export default function WheelPicker({ options, value, onChange, onCommit }) {
   const scrollRef = useRef(null);
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -39,7 +39,10 @@ export default function WheelPicker({ options, value, onChange }) {
 
   const commitIndex = (idx) => {
     const clamped = Math.max(0, Math.min(normalized.length - 1, idx));
-    if (normalized[clamped]) onChange(normalized[clamped].value);
+    if (normalized[clamped]) {
+      onChange(normalized[clamped].value);
+      onCommit?.();
+    }
   };
 
   const handleMomentumEnd = (e) => {

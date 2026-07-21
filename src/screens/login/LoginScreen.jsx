@@ -166,7 +166,7 @@ export default function LoginScreen({ navigation }) {
             </Pressable>
 
             <Pressable onPress={() => navigation.navigate('FamilyPortal')} style={styles.portalBtn}>
-              <Text style={styles.portalBtnText}>🏕️ أنا من عائلة مسجّلة — استعلام بوابة الأسرة</Text>
+              <Text style={styles.portalBtnText}>🏕️ بوابة الأسرة</Text>
             </Pressable>
 
             <Text style={styles.copyright}>© 2026 Mahmoud Rateb Ramadan</Text>
@@ -248,10 +248,10 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
     backgroundColor: 'rgba(245,158,11,0.1)',
     borderRadius: 12,
-    paddingVertical: 13,
+    paddingVertical: 16,
     paddingHorizontal: 12,
   },
-  portalBtnText: { color: colors.accent, fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  portalBtnText: { color: colors.accent, fontSize: 17, fontWeight: '900', textAlign: 'center' },
   copyright: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: 8, opacity: 0.6 },
   slowBox: {
     marginTop: 16,

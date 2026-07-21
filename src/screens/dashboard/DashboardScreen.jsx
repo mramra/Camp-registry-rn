@@ -376,21 +376,23 @@ export default function DashboardScreen() {
               })
             }
           >
-            <Text style={styles.birthdayTitle}>
-              🎂 {(() => {
-                if (todaysBirthdays.length === 1) {
-                  const b = todaysBirthdays[0];
-                  return `اليوم عيد ميلاد ${b.personName}${b.isHead ? '' : ' (فرد بالأسرة)'}`;
-                }
-                // أكثر من عيد ميلاد اليوم: نعرض الأسماء (أول 3 كحد أقصى ثم
-                // "و X آخرين") بدل عدد مجرَّد بلا أسماء -- كانت هذي المشكلة بالضبط.
-                const names = todaysBirthdays.map((b) => b.personName).filter(Boolean);
-                const preview = names.length <= 3
-                  ? names.join('، ')
-                  : `${names.slice(0, 3).join('، ')} و${names.length - 3} آخرين`;
-                return `اليوم عيد ميلاد ${preview} (${todaysBirthdays.length})`;
-              })()}
-            </Text>
+            {todaysBirthdays.length === 1 ? (
+              <Text style={styles.birthdayTitle}>
+                🎂 اليوم عيد ميلاد {todaysBirthdays[0].personName}
+                {todaysBirthdays[0].isHead ? '' : ' (فرد بالأسرة)'}
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.birthdayTitle}>🎂 {todaysBirthdays.length} أعياد ميلاد اليوم</Text>
+                <View style={styles.birthdayList}>
+                  {todaysBirthdays.map((b, i) => (
+                    <Text key={`${b.familyId}-${i}`} style={styles.birthdayListItem}>
+                      🎉 {b.personName}{b.isHead ? '' : ' (فرد بالأسرة)'}
+                    </Text>
+                  ))}
+                </View>
+              </>
+            )}
             <Text style={styles.birthdayHint}>اضغط لإرسال رسالة تهنئة ←</Text>
           </Pressable>
         )}
@@ -499,6 +501,8 @@ const styles = StyleSheet.create({
     borderRadius: 14, padding: 14, marginBottom: 16,
   },
   birthdayTitle: { color: colors.pink, fontWeight: '900', fontSize: 13, textAlign: 'right' },
+  birthdayList: { marginTop: 6, gap: 3 },
+  birthdayListItem: { color: colors.white, fontSize: 12, textAlign: 'right' },
   birthdayHint: { color: colors.muted, fontSize: 11, marginTop: 4, textAlign: 'right' },
 
   quickRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },

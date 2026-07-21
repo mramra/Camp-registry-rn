@@ -170,6 +170,14 @@ export default function FamilyPortalScreen({ navigation }) {
             <Text style={styles.title}>بوابة الأسرة</Text>
             <Text style={styles.subtitle}>استعلم عن بياناتك ومستجدات أسرتك</Text>
 
+            <View style={styles.welcomeBox}>
+              <Text style={styles.welcomeText}>
+                👋 هاي صفحة خاصة بأسرتك بس. أدخل رقم هويتك وجوالك المسجَّلين
+                لتشوف بيانات أسرتك، تكمّل أي نقص، أو تتواصل مباشرة مع إدارة
+                المخيم. بياناتك محمية ولا يشوفها غير المخيم اللي تتبعله.
+              </Text>
+            </View>
+
             <Text style={styles.label}>رقم هوية رب الأسرة *</Text>
             <TextInput
               value={nationalId}
@@ -303,12 +311,16 @@ export default function FamilyPortalScreen({ navigation }) {
                     aidHistory.map((h) => {
                       const typeIcon = { food: '🍚', shelter: '🏠', hygiene: '🧼', financial: '💵' }[h.dist_rounds?.type] || '📦';
                       return (
-                        <View key={h.id} style={styles.memberRow}>
-                          <Text style={styles.memberId}>{typeIcon}</Text>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.memberName}>{h.dist_rounds?.name || 'جولة توزيع'}</Text>
+                        <View key={h.id} style={styles.memberCard}>
+                          <View style={styles.memberAvatar}>
+                            <Text style={styles.memberAvatarText}>{typeIcon}</Text>
                           </View>
-                          <Text style={styles.memberDob}>{formatDate(h.dist_rounds?.round_date || h.received_at)}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.memberCardName}>{h.dist_rounds?.name || 'جولة توزيع'}</Text>
+                            <View style={styles.memberMetaRow}>
+                              <Text style={styles.memberMetaText}>📅 {formatDate(h.dist_rounds?.round_date || h.received_at)}</Text>
+                            </View>
+                          </View>
                         </View>
                       );
                     })
@@ -464,6 +476,11 @@ const styles = StyleSheet.create({
   iconEmoji: { fontSize: 30 },
   title: { color: colors.white, fontWeight: '900', fontSize: 20, textAlign: 'center', marginBottom: 4 },
   subtitle: { color: colors.muted, fontSize: 12, textAlign: 'center', marginBottom: 24 },
+  welcomeBox: {
+    backgroundColor: 'rgba(59,130,246,0.1)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.25)',
+    borderRadius: 12, padding: 12, marginTop: -12, marginBottom: 20,
+  },
+  welcomeText: { color: colors.white, fontSize: 12, lineHeight: 19, textAlign: 'right' },
   label: { color: colors.muted, fontSize: 12, fontWeight: 'bold', marginBottom: 6, textAlign: 'right' },
 
   input: {

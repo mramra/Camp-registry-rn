@@ -576,6 +576,7 @@ export default function FamilyFormScreen() {
           </View>
 
           <SelectField
+            wheel
             label="الحالة الاجتماعية"
             value={headMarital}
             options={maritalOptions}
@@ -586,13 +587,13 @@ export default function FamilyFormScreen() {
           <Text style={styles.fieldLabel}>تاريخ الميلاد</Text>
           <View style={styles.row}>
             <View style={styles.thirdInput}>
-              <SelectField value={dobDay ? String(dobDay) : null} options={days} onSelect={(v) => setDobDay(Number(v))} placeholder="اليوم" large />
+              <SelectField wheel value={dobDay ? String(dobDay) : null} options={days} onSelect={(v) => setDobDay(Number(v))} placeholder="اليوم" />
             </View>
             <View style={styles.thirdInput}>
-              <SelectField value={dobMonth ? MONTHS[dobMonth - 1] : null} options={MONTHS} onSelect={(v) => setDobMonth(MONTHS.indexOf(v) + 1)} placeholder="الشهر" large />
+              <SelectField wheel value={dobMonth ? MONTHS[dobMonth - 1] : null} options={MONTHS} onSelect={(v) => setDobMonth(MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
             </View>
             <View style={styles.thirdInput}>
-              <SelectField value={dobYear ? String(dobYear) : null} options={years} onSelect={(v) => setDobYear(Number(v))} placeholder="السنة" large />
+              <SelectField wheel value={dobYear ? String(dobYear) : null} options={years} onSelect={(v) => setDobYear(Number(v))} placeholder="السنة" />
             </View>
           </View>
           {!!errors.dob && <Text style={styles.errorText}>{errors.dob}</Text>}
@@ -615,6 +616,7 @@ export default function FamilyFormScreen() {
             </View>
           ) : (
             <SelectField
+            wheel
               value={camps.find((c) => c.id === campId)?.name}
               options={camps.map((c) => ({ value: c.id, label: c.name }))}
               onSelect={setCampId}
@@ -624,6 +626,7 @@ export default function FamilyFormScreen() {
           )}
           <FormInput label="رقم الخيمة" value={tent} onChangeText={setTent} />
           <SelectField
+            wheel
             label="المنطقة الأصلية"
             value={originalAddress}
             options={REGIONS}
@@ -633,6 +636,7 @@ export default function FamilyFormScreen() {
           <FormInput label="تفاصيل العنوان" value={addressDetails} onChangeText={setAddressDetails} />
 
           <SelectField
+            wheel
             label="حالة النزوح"
             value={displacementStatus}
             options={DISPLACEMENT_STATUS_OPTIONS}
@@ -641,6 +645,7 @@ export default function FamilyFormScreen() {
           />
           <FormInput label="السكن الحالي (وصف)" value={currentAddress} onChangeText={setCurrentAddress} />
           <SelectField
+            wheel
             label="محافظة السكن الحالي"
             value={governorateCurrent}
             options={REGIONS}
@@ -648,6 +653,7 @@ export default function FamilyFormScreen() {
             placeholder="اختر المحافظة"
           />
           <SelectField
+            wheel
             label="نوع المسكن"
             value={housingType}
             options={HOUSING_TYPE_OPTIONS}
@@ -655,6 +661,7 @@ export default function FamilyFormScreen() {
             placeholder="اختر نوع المسكن"
           />
           <SelectField
+            wheel
             label="حالة المسكن"
             value={housingCondition}
             options={HOUSING_CONDITION_OPTIONS}
@@ -662,6 +669,7 @@ export default function FamilyFormScreen() {
             placeholder="اختر حالة المسكن"
           />
           <SelectField
+            wheel
             label="مصدر دخل رب الأسرة"
             value={incomeSource}
             options={INCOME_SOURCE_OPTIONS}
@@ -694,10 +702,10 @@ export default function FamilyFormScreen() {
 
                 <View style={styles.row}>
                   <View style={styles.halfInput}>
-                    <SelectField value={m.gender} options={['ذكر', 'أنثى']} onSelect={(v) => updateMember(m.localId, 'gender', v)} placeholder="الجنس" />
+                    <SelectField wheel value={m.gender} options={['ذكر', 'أنثى']} onSelect={(v) => updateMember(m.localId, 'gender', v)} placeholder="الجنس" />
                   </View>
                   <View style={styles.halfInput}>
-                    <SelectField value={m.relation} options={relations} onSelect={(v) => updateMember(m.localId, 'relation', v)} placeholder="صلة القرابة" />
+                    <SelectField wheel value={m.relation} options={relations} onSelect={(v) => updateMember(m.localId, 'relation', v)} placeholder="صلة القرابة" />
                   </View>
                 </View>
 
@@ -718,17 +726,18 @@ export default function FamilyFormScreen() {
                 <Text style={styles.fieldLabel}>تاريخ الميلاد</Text>
                 <View style={styles.row}>
                   <View style={styles.thirdInput}>
-                    <SelectField value={m.day ? String(m.day) : null} options={days} onSelect={(v) => updateMember(m.localId, 'day', Number(v))} placeholder="اليوم" large />
+                    <SelectField wheel value={m.day ? String(m.day) : null} options={days} onSelect={(v) => updateMember(m.localId, 'day', Number(v))} placeholder="اليوم" />
                   </View>
                   <View style={styles.thirdInput}>
-                    <SelectField value={m.month ? MONTHS[m.month - 1] : null} options={MONTHS} onSelect={(v) => updateMember(m.localId, 'month', MONTHS.indexOf(v) + 1)} placeholder="الشهر" large />
+                    <SelectField wheel value={m.month ? MONTHS[m.month - 1] : null} options={MONTHS} onSelect={(v) => updateMember(m.localId, 'month', MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
                   </View>
                   <View style={styles.thirdInput}>
-                    <SelectField value={m.year ? String(m.year) : null} options={years} onSelect={(v) => updateMember(m.localId, 'year', Number(v))} placeholder="السنة" large />
+                    <SelectField wheel value={m.year ? String(m.year) : null} options={years} onSelect={(v) => updateMember(m.localId, 'year', Number(v))} placeholder="السنة" />
                   </View>
                 </View>
 
                 <SelectField
+            wheel
                   label="الحالة الصحية"
                   value={HEALTH_OPTIONS.find((h) => h.v === m.health)?.label}
                   options={HEALTH_OPTIONS.map((h) => ({ value: h.v, label: h.label }))}

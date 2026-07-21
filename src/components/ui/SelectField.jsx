@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import BottomSheetModal from './BottomSheetModal';
+import WheelPicker from './WheelPicker';
 import colors from '../../theme/colors';
 
 /**
  * حقل اختيار من قائمة (بديل <select> على الويب) — يفتح ورقة سفلية
  * بالخيارات. label اختياري يظهر فوق الحقل بنفس نمط باقي حقول النماذج.
+ *
+ * wheel: لو true، الورقة السفلية تعرض عجلة اختيار حقيقية بأسلوب آيفون
+ * (WheelPicker) بدل قائمة عادية -- طلب مباشر لكل حقول نموذج الأسرة.
  */
-export default function SelectField({ label, value, placeholder = 'اختر', options, onSelect, error, large }) {
+export default function SelectField({ label, value, placeholder = 'اختر', options, onSelect, error, large, wheel }) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -23,22 +27,26 @@ export default function SelectField({ label, value, placeholder = 'اختر', op
       {!!error && <Text style={styles.errorText}>{error}</Text>}
 
       <BottomSheetModal visible={visible} onClose={() => setVisible(false)} title={label || placeholder}>
-        {options.map((opt) => {
-          const optValue = typeof opt === 'string' ? opt : opt.value;
-          const optLabel = typeof opt === 'string' ? opt : opt.label;
-          return (
-            <Pressable
-              key={optValue}
-              style={[styles.option, large && styles.optionLarge]}
-              onPress={() => {
-                onSelect(optValue);
-                setVisible(false);
-              }}
-            >
-              <Text style={[styles.optionText, large && styles.optionTextLarge]}>{optLabel}</Text>
-            </Pressable>
-          );
-        })}
+        {wheel ? (
+          <WheelPicker options={options} value={value} onChange={onSelect} />
+        ) : (
+          options.map((opt) => {
+            const optValue = typeof opt === 'string' ? opt : opt.value;
+            const optLabel = typeof opt === 'string' ? opt : opt.label;
+            return (
+              <Pressable
+                key={optValue}
+                style={[styles.option, large && styles.optionLarge]}
+                onPress={() => {
+                  onSelect(optValue);
+                  setVisible(false);
+                }}
+              >
+                <Text style={[styles.optionText, large && styles.optionTextLarge]}>{optLabel}</Text>
+              </Pressable>
+            );
+          })
+        )}
       </BottomSheetModal>
     </View>
   );

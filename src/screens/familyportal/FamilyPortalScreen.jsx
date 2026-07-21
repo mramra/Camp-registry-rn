@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { formatDate } from '../../lib/utils';
+import { calcAge } from '../../lib/helpers';
 import { MARITAL_BY_GENDER, HOUSING_TYPE_OPTIONS } from '../../lib/formOptions';
 import colors from '../../theme/colors';
 
@@ -262,18 +263,35 @@ export default function FamilyPortalScreen({ navigation }) {
                 {members.length > 0 && (
                   <View style={styles.infoCard}>
                     <Text style={styles.infoCardTitle}>👨‍👩‍👧‍👦 أفراد الأسرة ({members.length})</Text>
-                    {members.map((m) => (
-                      <View key={m.id} style={styles.memberRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.memberName}>{m.name}</Text>
-                          {!!m.national_id && <Text style={styles.memberId}>🪪 {m.national_id}</Text>}
+                    {members.map((m) => {
+                      const age = calcAge(m.dob);
+                      const avatar = m.gender === 'أنثى' ? '👧' : '👦';
+                      return (
+                        <View key={m.id} style={styles.memberCard}>
+                          <View style={styles.memberAvatar}>
+                            <Text style={styles.memberAvatarText}>{avatar}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <View style={styles.memberTopRow}>
+                              <Text style={styles.memberCardName}>{m.name}</Text>
+                              {!!m.relation && (
+                                <View style={styles.relationBadge}>
+                                  <Text style={styles.relationBadgeText}>{m.relation}</Text>
+                                </View>
+                              )}
+                            </View>
+                            <View style={styles.memberMetaRow}>
+                              {!!m.dob && (
+                                <Text style={styles.memberMetaText}>
+                                  🎂 {m.dob}{age != null ? ` (${age} سنة)` : ''}
+                                </Text>
+                              )}
+                              {!!m.national_id && <Text style={styles.memberMetaText}>🪪 {m.national_id}</Text>}
+                            </View>
+                          </View>
                         </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={styles.memberRelation}>{m.relation || '—'}</Text>
-                          {!!m.dob && <Text style={styles.memberDob}>{m.dob}</Text>}
-                        </View>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 )}
 
@@ -499,6 +517,22 @@ const styles = StyleSheet.create({
   memberId: { color: colors.muted, fontSize: 9, marginTop: 2 },
   memberRelation: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
   memberDob: { color: colors.muted, fontSize: 9, marginTop: 2 },
+
+  memberCard: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 10,
+    backgroundColor: colors.surface, borderRadius: 12, padding: 10, marginBottom: 8,
+  },
+  memberAvatar: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface2,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  memberAvatarText: { fontSize: 18 },
+  memberTopRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 },
+  memberCardName: { color: colors.white, fontSize: 14, fontWeight: '900', textAlign: 'right' },
+  relationBadge: { backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  relationBadgeText: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
+  memberMetaRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginTop: 4 },
+  memberMetaText: { color: colors.muted, fontSize: 11, textAlign: 'right' },
   noAidText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
 
   chatBox: { marginBottom: 12 },

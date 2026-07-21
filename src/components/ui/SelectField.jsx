@@ -7,7 +7,7 @@ import colors from '../../theme/colors';
  * حقل اختيار من قائمة (بديل <select> على الويب) — يفتح ورقة سفلية
  * بالخيارات. label اختياري يظهر فوق الحقل بنفس نمط باقي حقول النماذج.
  */
-export default function SelectField({ label, value, placeholder = 'اختر', options, onSelect, error }) {
+export default function SelectField({ label, value, placeholder = 'اختر', options, onSelect, error, large }) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -29,13 +29,13 @@ export default function SelectField({ label, value, placeholder = 'اختر', op
           return (
             <Pressable
               key={optValue}
-              style={styles.option}
+              style={[styles.option, large && styles.optionLarge]}
               onPress={() => {
                 onSelect(optValue);
                 setVisible(false);
               }}
             >
-              <Text style={styles.optionText}>{optLabel}</Text>
+              <Text style={[styles.optionText, large && styles.optionTextLarge]}>{optLabel}</Text>
             </Pressable>
           );
         })}
@@ -65,4 +65,8 @@ const styles = StyleSheet.create({
   errorText: { color: colors.red, fontSize: 11, marginTop: 4, textAlign: 'right' },
   option: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   optionText: { color: colors.white, fontSize: 13, textAlign: 'right' },
+  // حجم أكبر ومتوسط -- لقوائم اليوم/الشهر/السنة بتاريخ الميلاد تحديداً
+  // (طلب مباشر: كانت أسماء الأشهر صغيرة وصعبة القراءة بالقائمة المنسدلة)
+  optionLarge: { paddingVertical: 16 },
+  optionTextLarge: { fontSize: 17, fontWeight: '600' },
 });

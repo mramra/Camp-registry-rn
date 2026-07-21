@@ -586,13 +586,13 @@ export default function FamilyFormScreen() {
           <Text style={styles.fieldLabel}>تاريخ الميلاد</Text>
           <View style={styles.row}>
             <View style={styles.thirdInput}>
-              <SelectField value={dobDay ? String(dobDay) : null} options={days} onSelect={(v) => setDobDay(Number(v))} placeholder="اليوم" />
+              <SelectField value={dobDay ? String(dobDay) : null} options={days} onSelect={(v) => setDobDay(Number(v))} placeholder="اليوم" large />
             </View>
             <View style={styles.thirdInput}>
-              <SelectField value={dobMonth ? MONTHS[dobMonth - 1] : null} options={MONTHS} onSelect={(v) => setDobMonth(MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
+              <SelectField value={dobMonth ? MONTHS[dobMonth - 1] : null} options={MONTHS} onSelect={(v) => setDobMonth(MONTHS.indexOf(v) + 1)} placeholder="الشهر" large />
             </View>
             <View style={styles.thirdInput}>
-              <SelectField value={dobYear ? String(dobYear) : null} options={years} onSelect={(v) => setDobYear(Number(v))} placeholder="السنة" />
+              <SelectField value={dobYear ? String(dobYear) : null} options={years} onSelect={(v) => setDobYear(Number(v))} placeholder="السنة" large />
             </View>
           </View>
           {!!errors.dob && <Text style={styles.errorText}>{errors.dob}</Text>}
@@ -718,13 +718,13 @@ export default function FamilyFormScreen() {
                 <Text style={styles.fieldLabel}>تاريخ الميلاد</Text>
                 <View style={styles.row}>
                   <View style={styles.thirdInput}>
-                    <SelectField value={m.day ? String(m.day) : null} options={days} onSelect={(v) => updateMember(m.localId, 'day', Number(v))} placeholder="اليوم" />
+                    <SelectField value={m.day ? String(m.day) : null} options={days} onSelect={(v) => updateMember(m.localId, 'day', Number(v))} placeholder="اليوم" large />
                   </View>
                   <View style={styles.thirdInput}>
-                    <SelectField value={m.month ? MONTHS[m.month - 1] : null} options={MONTHS} onSelect={(v) => updateMember(m.localId, 'month', MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
+                    <SelectField value={m.month ? MONTHS[m.month - 1] : null} options={MONTHS} onSelect={(v) => updateMember(m.localId, 'month', MONTHS.indexOf(v) + 1)} placeholder="الشهر" large />
                   </View>
                   <View style={styles.thirdInput}>
-                    <SelectField value={m.year ? String(m.year) : null} options={years} onSelect={(v) => updateMember(m.localId, 'year', Number(v))} placeholder="السنة" />
+                    <SelectField value={m.year ? String(m.year) : null} options={years} onSelect={(v) => updateMember(m.localId, 'year', Number(v))} placeholder="السنة" large />
                   </View>
                 </View>
 

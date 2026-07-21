@@ -11,7 +11,7 @@ import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
-import FilterChip from '../../components/ui/FilterChip';
+import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
 
 // فُصلت هذه الشاشة عن "كل الأسر" (طلب مباشر) لتقليل عدد الفلاتر بالصفحة
@@ -204,12 +204,14 @@ export default function DataQualityScreen() {
                 </Pressable>
               ))}
             </View>
-            <View style={styles.chipsWrap}>
-              <FilterChip label="كل المخيمات" selected={!filterCamp} onPress={() => setFilterCamp('')} />
-              {camps.map((c) => (
-                <FilterChip key={c.id} label={c.name} selected={filterCamp === c.id} onPress={() => setFilterCamp(c.id)} />
-              ))}
-            </View>
+            <SelectField
+              wheel
+              label="المخيم"
+              value={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
+              options={[{ value: '', label: 'كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))]}
+              onSelect={setFilterCamp}
+              placeholder="كل المخيمات"
+            />
           </View>
         }
         ListEmptyComponent={<EmptyState icon="✅" title="لا توجد مشاكل بيانات" subtitle="كل الأسر بهذا الفلتر مكتملة وغير مكررة" />}
@@ -239,7 +241,7 @@ const getStyles = () =>
     statCount: { color: colors.white, fontWeight: '900', fontSize: 15, marginTop: 2 },
     statLabel: { color: colors.muted, fontSize: 9, marginTop: 2, textAlign: 'center' },
 
-    chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+
 
     card: { flexDirection: 'row-reverse', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, marginBottom: 8, overflow: 'hidden' },
     sideBar: { width: 5 },

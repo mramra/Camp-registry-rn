@@ -36,6 +36,7 @@ import AlertsScreen from '../screens/alerts/AlertsScreen';
 import DevicesScreen from '../screens/devices/DevicesScreen';
 import AnalysisScreen from '../screens/analysis/AnalysisScreen';
 import CampCompareScreen from '../screens/campcompare/CampCompareScreen';
+import DataQualityScreen from '../screens/dataquality/DataQualityScreen';
 import NeedsReportScreen from '../screens/needsreport/NeedsReportScreen';
 import SecurityAuditScreen from '../screens/diagnostics/SecurityAuditScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
@@ -205,6 +206,7 @@ const RootNavigator = () => {
             <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'إدارة الأجهزة' }} />
             <Stack.Screen name="Analysis" component={AnalysisScreen} options={{ title: 'لوحة الإحصائيات' }} />
             <Stack.Screen name="CampCompare" component={CampCompareScreen} options={{ title: 'مقارنة المخيمات' }} />
+            <Stack.Screen name="DataQuality" component={DataQualityScreen} options={{ title: 'جودة البيانات' }} />
             <Stack.Screen name="NeedsReport" component={NeedsReportScreen} options={{ title: 'تقرير الاحتياجات' }} />
             <Stack.Screen name="SecurityAudit" component={SecurityAuditScreen} options={{ title: 'الفحص الأمني' }} />
             <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'الإعدادات' }} />

@@ -68,6 +68,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
       title: '👨‍👩‍👧 الأسر',
       items: [
         { icon: '👨‍👩‍👧‍👦', label: 'كل الأسر', screen: 'FamiliesList', pageKey: 'families' },
+        { icon: '🔍', label: 'جودة البيانات (نواقص وتكرارات)', screen: 'DataQuality', pageKey: 'families' },
         { icon: '🔍', label: 'البحث الذكي', screen: 'SmartSearch', pageKey: 'families' },
         { icon: '💬', label: 'رسائل بوابة الأسرة', screen: 'PortalMessages', pageKey: 'families' },
         { icon: '🚶', label: 'حركات الأسر', screen: 'Movements', pageKey: 'movements' },

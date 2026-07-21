@@ -29,14 +29,6 @@ import colors from '../../theme/colors';
 
 
 // ── فلاتر ثابتة (نفس النسخة الأصلية) ──────────────────────
-const MISS_OPTIONS = [
-  { key: '', icon: '👥', label: 'الكل' },
-  { key: 'incomplete', icon: '⚠️', label: 'ناقص' },
-  { key: 'dup_id', icon: '🔁', label: 'هوية مكررة' },
-  { key: 'dup_phone', icon: '📞', label: 'جوال مكرر' },
-  { key: 'vulnerable', icon: '🆘', label: 'الأشد ضعفاً' },
-];
-
 const APPROVAL_OPTIONS = [
   { key: '', icon: '👥', label: 'الكل' },
   { key: 'approved', icon: '✅', label: 'مكتمل' },
@@ -63,7 +55,6 @@ export default function FamiliesListScreen() {
 
   const [search, setSearch] = useState('');
   const [filterCamp, setFilterCamp] = useState('');
-  const [filterMiss, setFilterMiss] = useState('');
   const [filterApproval, setFilterApproval] = useState('approved');
   const [filterGender, setFilterGender] = useState('');
   const [ageMin, setAgeMin] = useState('');
@@ -201,10 +192,6 @@ export default function FamiliesListScreen() {
       rejected: base.filter((f) => f.review_status === 'rejected').length,
       male: base.filter((f) => f.head_gender === 'ذكر').length,
       female: base.filter((f) => f.head_gender === 'أنثى').length,
-      vulnerable: base.filter((f) => {
-        const t = getVulnerabilityScore(f, membersByFamily[f.id]).tier;
-        return t === 'high' || t === 'critical';
-      }).length,
     };
   }, [families, filterCamp, membersByFamily, dupIdSet, dupPhoneSet]);
 
@@ -217,15 +204,6 @@ export default function FamiliesListScreen() {
     if (filterCamp) list = list.filter((f) => f.camp_id === filterCamp);
     if (filterGender) list = list.filter((f) => f.head_gender === filterGender);
     if (filterApproval) list = list.filter((f) => (f.review_status || 'approved') === filterApproval);
-    if (filterMiss === 'incomplete') list = list.filter((f) => isIncomplete(f, membersByFamily[f.id]));
-    if (filterMiss === 'dup_id') list = list.filter((f) => dupIdSet.has(f.id));
-    if (filterMiss === 'dup_phone') list = list.filter((f) => dupPhoneSet.has(f.id));
-    if (filterMiss === 'vulnerable') {
-      list = list.filter((f) => {
-        const t = getVulnerabilityScore(f, membersByFamily[f.id]).tier;
-        return t === 'high' || t === 'critical';
-      });
-    }
 
     if (ageMin || ageMax) {
       list = list.filter((f) => {
@@ -244,29 +222,13 @@ export default function FamiliesListScreen() {
       );
     }
 
-    if (filterMiss === 'incomplete') {
-      list.sort(
-        (a, b) =>
-          checkFamilyIssues(b, membersByFamily[b.id]).length -
-          checkFamilyIssues(a, membersByFamily[a.id]).length
-      );
-    } else if (filterMiss === 'vulnerable') {
-      list.sort(
-        (a, b) =>
-          getVulnerabilityScore(b, membersByFamily[b.id]).score -
-          getVulnerabilityScore(a, membersByFamily[a.id]).score
-      );
-    } else {
-      list.sort(
-        (a, b) => getMembers(allMembers, b).length - getMembers(allMembers, a).length
-      );
-    }
+    list.sort((a, b) => getMembers(allMembers, b).length - getMembers(allMembers, a).length);
 
     return list;
-  }, [families, membersByFamily, dupIdSet, dupPhoneSet, filterCamp, filterGender, filterApproval, filterMiss, ageMin, ageMax, search, allMembers]);
+  }, [families, membersByFamily, filterCamp, filterGender, filterApproval, ageMin, ageMax, search, allMembers]);
 
   const hasFilter =
-    !!filterCamp || !!filterMiss || !!filterGender || !!ageMin || !!ageMax || !!search || filterApproval !== 'approved';
+    !!filterCamp || !!filterGender || !!ageMin || !!ageMax || !!search || filterApproval !== 'approved';
 
   const resetFilters = () => {
     setFilterCamp('');
@@ -395,22 +357,16 @@ export default function FamiliesListScreen() {
               )}
             </View>
 
-            {/* فلتر جودة البيانات */}
-            <View style={styles.categoryGrid}>
-              {MISS_OPTIONS.map((o) => (
-                <Pressable
-                  key={o.key || 'all'}
-                  onPress={() => setFilterMiss(o.key)}
-                  style={[styles.categoryCell, filterMiss === o.key && styles.categoryCellActive]}
-                >
-                  <Text style={styles.categoryIcon}>{o.icon}</Text>
-                  <Text style={[styles.categoryCount, filterMiss === o.key && styles.categoryCountActive]}>
-                    {o.key ? counts[o.key] : counts.all}
-                  </Text>
-                  <Text style={styles.categoryLabel}>{o.label}</Text>
-                </Pressable>
-              ))}
-            </View>
+            {/* جودة البيانات صارت شاشة منفصلة (تقليل عدد الفلاتر هنا) --
+                هذا بانر بسيط للتنقل إليها بدل شبكة فلاتر كاملة */}
+            {(counts.incomplete + counts.dup_id + counts.dup_phone) > 0 && (
+              <Pressable style={styles.dataQualityBanner} onPress={() => navigation.navigate('DataQuality')}>
+                <Text style={styles.dataQualityBannerText}>
+                  ⚠️ {counts.incomplete + counts.dup_id + counts.dup_phone} مشكلة بيانات (نواقص/تكرارات) — اضغط للمراجعة
+                </Text>
+                <Text style={styles.dataQualityBannerArrow}>‹</Text>
+              </Pressable>
+            )}
 
             {/* فلتر حالة المراجعة */}
             <View style={styles.categoryGrid}>
@@ -527,6 +483,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  dataQualityBanner: {
+    flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.35)',
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
+  },
+  dataQualityBannerText: { color: colors.red, fontSize: 12, fontWeight: 'bold', flex: 1, textAlign: 'right' },
+  dataQualityBannerArrow: { color: colors.red, fontSize: 20, fontWeight: '900', marginLeft: 6 },
+
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   categoryCell: {
     flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,

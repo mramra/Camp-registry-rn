@@ -7,7 +7,8 @@ import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
 import {
   getFamilyCategories, getOrphanCount, getVulnerabilityScore, hasHealthData,
-  CATEGORY_LABELS, VULNERABILITY_TIER_LABELS, buildCampExportBanner,
+  CATEGORY_LABELS, VULNERABILITY_TIER_LABELS, VULNERABILITY_TIER_KEYS, buildCampExportBanner,
+  HEALTH_FIELD_MAP,
 } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
@@ -28,18 +29,19 @@ import colors from '../../theme/colors';
 const CATEGORY_KEYS = ['martyr', 'captive', 'no_provider', 'large'];
 const CATEGORY_COLOR = { martyr: colors.purple, captive: colors.blue, no_provider: colors.red, large: colors.green };
 
-const TIER_KEYS = ['critical', 'high', 'medium', 'low'];
 const TIER_COLOR = { critical: colors.red, high: colors.orange, medium: colors.accent, low: colors.green };
 
-// نفس خريطة حقول الحالة الصحية المستخدمة بشاشة "سجل الحالات الصحية" —
-// موحّدة عبر الأسرة (head_*) والأفراد (mField)، عشان لا يختلف تعريف
-// "أسرة فيها حالة صحية" بين الشاشتين.
-const HEALTH_TYPES = [
-  { key: 'chronic', label: '💊 مزمن', fField: 'head_chronic_diseases', mField: 'chronic_diseases' },
-  { key: 'disability', label: '♿ إعاقة', fField: 'head_disabilities', mField: 'disabilities' },
-  { key: 'injury', label: '🩹 إصابة', fField: 'head_injuries', mField: 'injuries' },
-  { key: 'needs', label: '🦽 احتياج', fField: 'head_needs', mField: 'needs' },
-];
+// تسميات قصيرة بإيموجي خاصة بهذه الشاشة (بطاقات مضغوطة)، لكن الحقول
+// الفعلية (fField/mField) تُشتق من HEALTH_FIELD_MAP المركزية بـhelpers.js
+// -- نفس المصدر المستخدم بشاشة "سجل الحالات الصحية"، عشان لا يختلف
+// تعريف "أسرة فيها حالة صحية" بين الشاشتين.
+const HEALTH_TYPE_SHORT_LABEL = { chronic: '💊 مزمن', disability: '♿ إعاقة', injury: '🩹 إصابة', needs: '🦽 احتياج' };
+const HEALTH_TYPES = Object.keys(HEALTH_FIELD_MAP).map((key) => ({
+  key,
+  label: HEALTH_TYPE_SHORT_LABEL[key] || HEALTH_FIELD_MAP[key].label,
+  fField: HEALTH_FIELD_MAP[key].fField,
+  mField: HEALTH_FIELD_MAP[key].mField,
+}));
 
 function familyHasHealthType(type, family, members) {
   const def = HEALTH_TYPES.find((h) => h.key === type);
@@ -246,7 +248,7 @@ export default function NeedsReportScreen() {
             {/* درجة الضعف */}
             <Text style={styles.sectionLabel}>درجة الضعف:</Text>
             <View style={styles.chipsWrap}>
-              {TIER_KEYS.map((t) => (
+              {VULNERABILITY_TIER_KEYS.map((t) => (
                 <FilterChip
                   key={t}
                   label={VULNERABILITY_TIER_LABELS[t]}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, callAdminAPI } from '../../lib/supabase';
+import { ROLE_LABELS_PLAIN } from '../../lib/permissions';
 import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
@@ -17,12 +18,6 @@ const TABLE_AR = {
   family_history: 'سجل التغييرات/الموافقات',
   camp_dist_families: 'سجل الاستلام',
   org_members: 'المستخدمون',
-};
-
-const ROLE_AR = {
-  super_admin: 'مدير إيواء',
-  camp_delegate: 'مندوب مخيم',
-  assistant: 'مساعد',
 };
 
 export default function SecurityAuditScreen() {
@@ -108,7 +103,7 @@ export default function SecurityAuditScreen() {
                   <View>
                     <Text style={styles.memberName}>{r.member}</Text>
                     <Text style={styles.memberMeta}>
-                      {ROLE_AR[r.role] || r.role}
+                      {ROLE_LABELS_PLAIN[r.role] || r.role}
                       {r.camp_id ? ` — ${campName(r.camp_id)}` : ''}
                     </Text>
                   </View>

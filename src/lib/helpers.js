@@ -165,6 +165,23 @@ export const VULNERABILITY_TIER_LABELS = {
   low: '🟢 منخفضة',
 };
 
+/** ترتيب مستويات درجة الضعف الأربعة -- كان مكرَّراً حرفياً بشاشتي
+ * NeedsReportScreen وDistributionReceiveScreen. */
+export const VULNERABILITY_TIER_KEYS = ['critical', 'high', 'medium', 'low'];
+
+/** الحقول الأساسية المطلوبة لاعتبار سجل الأسرة "مكتمل الحد الأدنى" --
+ * كانت مكرَّرة حرفياً بشاشتي CampCompareScreen وAnalysisScreen. */
+export const REQUIRED_FAMILY_FIELDS = ['head_name', 'head_id', 'phone1', 'camp_id'];
+
+/** خريطة حقول الحالة الصحية (رب الأسرة + الأفراد) لكل نوع -- كانت مكرَّرة
+ * بشكلين مختلفين قليلاً بشاشتي HealthRecordsScreen وNeedsReportScreen. */
+export const HEALTH_FIELD_MAP = {
+  chronic: { fField: 'head_chronic_diseases', mField: 'chronic_diseases', label: 'أمراض مزمنة' },
+  disability: { fField: 'head_disabilities', mField: 'disabilities', label: 'إعاقة' },
+  injury: { fField: 'head_injuries', mField: 'injuries', label: 'إصابة' },
+  needs: { fField: 'head_needs', mField: 'needs', label: 'احتياج صحي' },
+};
+
 export function getOrphanCount(family, members) {
   return isNoProviderFamily(family, members) ? (members || []).length : 0;
 }

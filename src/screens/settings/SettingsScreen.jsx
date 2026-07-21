@@ -5,19 +5,13 @@ import NetInfo from '@react-native-community/netinfo';
 import * as Updates from 'expo-updates';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { ROLE_LABELS_PLAIN } from '../../lib/permissions';
 import { showToast } from '../../utils/toast';
 import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import FormSection from '../../components/ui/FormSection';
 import FormInput from '../../components/ui/FormInput';
 import colors from '../../theme/colors';
-
-const ROLE_AR = {
-  platform_owner: 'مالك المنصة',
-  super_admin: 'مدير الإيواء',
-  camp_delegate: 'مندوب مخيم',
-  assistant: 'مساعد',
-};
 
 export default function SettingsScreen() {
   const { profile, logout, isOwner, refreshProfile } = useAuth();
@@ -78,7 +72,7 @@ export default function SettingsScreen() {
     ['الاسم', profile?.full_name],
     ['رقم الهوية', profile?.national_id],
     ['الجوال', profile?.phone],
-    ['الدور', ROLE_AR[profile?.role] || profile?.role],
+    ['الدور', ROLE_LABELS_PLAIN[profile?.role] || profile?.role],
   ];
 
   return (

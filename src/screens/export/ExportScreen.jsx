@@ -21,8 +21,8 @@ import colors from '../../theme/colors';
 export default function ExportScreen() {
   const { profile, orgId } = useAuth();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
-  const canExport = hasPermission(profile, 'reports');
-  const canImport = hasPermission(profile, 'write');
+  const canExport = hasPermission(profile, 'export');
+  const canImport = hasPermission(profile, 'import');
 
   const [camps, setCamps] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]);

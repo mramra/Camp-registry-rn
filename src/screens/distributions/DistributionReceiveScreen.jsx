@@ -18,7 +18,7 @@ import { showError, showSuccess } from '../../utils/toast';
 import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
-import { buildCampExportBanner, naturalCompare, getVulnerabilityScore, VULNERABILITY_TIER_LABELS } from '../../lib/helpers';
+import { buildCampExportBanner, naturalCompare, getVulnerabilityScore, VULNERABILITY_TIER_LABELS, VULNERABILITY_TIER_KEYS } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
@@ -35,7 +35,6 @@ const SORT_OPTIONS = [
   { value: 'alpha', label: '🔤 أبجدي' },
 ];
 
-const TIER_KEYS = ['critical', 'high', 'medium', 'low'];
 const TIER_COLOR = { critical: colors.red, high: colors.orange, medium: colors.accent, low: colors.green };
 
 /**
@@ -451,7 +450,7 @@ export default function DistributionReceiveScreen() {
                 التوزيع على الاحتياج الفعلي، لا فقط عدد الأفراد. */}
             <Text style={styles.tierLabel}>🎯 درجة الضعف:</Text>
             <View style={styles.tierRow}>
-              {TIER_KEYS.map((t) => (
+              {VULNERABILITY_TIER_KEYS.map((t) => (
                 <FilterChip
                   key={t}
                   label={VULNERABILITY_TIER_LABELS[t]}

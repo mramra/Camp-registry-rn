@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE } from '../../lib/helpers';
+import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE, REQUIRED_FAMILY_FIELDS } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -29,7 +29,6 @@ const TABS = [
   { key: 'camps', label: '🏕️ مخيمات' },
 ];
 
-const REQUIRED_FIELDS = ['head_name', 'head_id', 'phone1', 'camp_id'];
 
 function StatBar({ label, count, total, color, onPress }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
@@ -260,7 +259,7 @@ export default function AnalysisScreen() {
     });
     const orphans = fams.reduce((sum, f) => sum + getOrphanCount(f, memsByFam[f.id]), 0);
 
-    const incomplete = fams.filter((f) => REQUIRED_FIELDS.some((k) => !f[k]?.toString().trim())).length;
+    const incomplete = fams.filter((f) => REQUIRED_FAMILY_FIELDS.some((k) => !f[k]?.toString().trim())).length;
 
     const orgWorkingAge = allPersons.filter((p) => {
       const a = calcAge(p.personDob);

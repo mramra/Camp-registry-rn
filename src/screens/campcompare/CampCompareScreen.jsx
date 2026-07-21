@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, supabase } from '../../lib/supabase';
-import { naturalCompare, getVulnerabilityScore } from '../../lib/helpers';
+import { naturalCompare, getVulnerabilityScore, REQUIRED_FAMILY_FIELDS } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -14,7 +14,6 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import colors from '../../theme/colors';
 
-const REQUIRED_FIELDS = ['head_name', 'head_id', 'phone1', 'camp_id'];
 
 export default function CampCompareScreen() {
   const { orgId, profile } = useAuth();
@@ -53,7 +52,7 @@ export default function CampCompareScreen() {
 
       const campIncomplete = {};
       families.forEach((f) => {
-        if (REQUIRED_FIELDS.some((k) => !f[k]?.toString().trim())) {
+        if (REQUIRED_FAMILY_FIELDS.some((k) => !f[k]?.toString().trim())) {
           campIncomplete[f.camp_id] = (campIncomplete[f.camp_id] || 0) + 1;
         }
       });

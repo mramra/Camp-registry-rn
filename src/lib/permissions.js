@@ -30,6 +30,18 @@ export function hasPermission(profile, action) {
     case 'reports':
       return ['platform_owner', 'super_admin', 'camp_delegate'].includes(role);
 
+    // كانت غائبتين كلياً رغم وجود عمودي can_export/can_import المخصَّصين
+    // بجدول org_members -- التصدير كان يُقاس بصلاحية 'reports' العامة
+    // (تمنع أي مساعد حتى لو مُنح can_export=true صراحة)، والاستيراد
+    // كان يُقاس بصلاحية 'write' (can_add) بدل can_import المخصَّصة له.
+    case 'export':
+      if (role === 'assistant') return profile.can_export === true;
+      return ['platform_owner', 'super_admin', 'camp_delegate'].includes(role);
+
+    case 'import':
+      if (role === 'assistant') return profile.can_import === true;
+      return ['platform_owner', 'super_admin', 'camp_delegate'].includes(role);
+
     default:
       return false;
   }
@@ -181,6 +193,15 @@ export const ROLE_LABELS = {
   super_admin: '🔴 مدير الإيواء',
   camp_delegate: '🟠 مندوب المخيم',
   assistant: '🟡 مساعد',
+};
+
+/** نفس الأدوار بدون إيموجي -- كانت مكرَّرة محلياً بشكلين مختلفين قليلاً
+ * (اختلاف كلمة واحدة) بشاشتي الإعدادات والفحص الأمني. */
+export const ROLE_LABELS_PLAIN = {
+  platform_owner: 'مالك المنصة',
+  super_admin: 'مدير الإيواء',
+  camp_delegate: 'مندوب مخيم',
+  assistant: 'مساعد',
 };
 
 export function canUserReviewRequest(profile, requesterUser) {

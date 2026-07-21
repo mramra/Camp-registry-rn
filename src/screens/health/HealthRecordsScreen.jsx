@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { naturalCompare, normalizeHealthValue, buildCampExportBanner, calcAge } from '../../lib/helpers';
+import { naturalCompare, normalizeHealthValue, buildCampExportBanner, calcAge, HEALTH_FIELD_MAP } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -44,13 +44,6 @@ const HEALTH_TYPES = [
   { key: 'injury', label: 'إصابات', icon: '🩹' },
   { key: 'needs', label: 'احتياجات صحية', icon: '🦽' },
 ];
-
-const FIELD_MAP = {
-  chronic: { fField: 'head_chronic_diseases', mField: 'chronic_diseases', label: 'أمراض مزمنة' },
-  disability: { fField: 'head_disabilities', mField: 'disabilities', label: 'إعاقة' },
-  injury: { fField: 'head_injuries', mField: 'injuries', label: 'إصابة' },
-  needs: { fField: 'head_needs', mField: 'needs', label: 'احتياج صحي' },
-};
 
 export default function HealthRecordsScreen() {
   const navigation = useNavigation();
@@ -125,11 +118,11 @@ export default function HealthRecordsScreen() {
 
   const allRecords = useMemo(() => {
     const records = [];
-    const allKeys = Object.keys(FIELD_MAP);
+    const allKeys = Object.keys(HEALTH_FIELD_MAP);
 
     families.forEach((f) => {
       allKeys.forEach((key) => {
-        const raw = f[FIELD_MAP[key].fField];
+        const raw = f[HEALTH_FIELD_MAP[key].fField];
         const val = normalizeHealthValue(raw);
         if (val) {
           records.push({
@@ -139,7 +132,7 @@ export default function HealthRecordsScreen() {
             national_id: f.head_id || '',
             dob: f.head_dob || '',
             role: 'رب الأسرة',
-            healthType: FIELD_MAP[key].label,
+            healthType: HEALTH_FIELD_MAP[key].label,
             key,
             val,
             headName: f.head_name || '',
@@ -157,7 +150,7 @@ export default function HealthRecordsScreen() {
     members.forEach((m) => {
       const f = famMap[m.family_id] || {};
       allKeys.forEach((key) => {
-        const raw = m[FIELD_MAP[key].mField];
+        const raw = m[HEALTH_FIELD_MAP[key].mField];
         const val = normalizeHealthValue(raw);
         if (val) {
           records.push({
@@ -167,7 +160,7 @@ export default function HealthRecordsScreen() {
             national_id: m.national_id || '',
             dob: m.dob || '',
             role: m.relation || 'فرد',
-            healthType: FIELD_MAP[key].label,
+            healthType: HEALTH_FIELD_MAP[key].label,
             key,
             val,
             headName: f.head_name || '',
@@ -193,7 +186,7 @@ export default function HealthRecordsScreen() {
   );
   const typeCounts = useMemo(() => {
     const counts = { all: campRecords.length };
-    Object.keys(FIELD_MAP).forEach((key) => {
+    Object.keys(HEALTH_FIELD_MAP).forEach((key) => {
       counts[key] = campRecords.filter((r) => r.key === key).length;
     });
     return counts;

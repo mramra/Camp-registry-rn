@@ -18,9 +18,11 @@ import {
   createFamily,
   updateFamily,
   saveFamilyMembers,
+  recordApprovalRequest,
+  logFamilyActivity,
   supabase,
 } from '../../lib/supabase';
-import { luhnCheck, validateName, validateDob } from '../../lib/helpers';
+import { luhnCheck, validateName, validateDob, isExemptFromApproval, diffFamilyFields } from '../../lib/helpers';
 import {
   RELATION_BY_GENDER,
   ALL_RELATIONS,
@@ -78,7 +80,7 @@ export default function FamilyFormScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const familyId = route.params?.familyId || null;
-  const { orgId, user } = useAuth();
+  const { orgId, user, profile } = useAuth();
 
   const [camps, setCamps] = useState([]);
   const [existingFamily, setExistingFamily] = useState(null);
@@ -375,12 +377,19 @@ export default function FamilyFormScreen() {
 
       let result;
       let finalId = familyId;
+      // نظام موافقة platform_owner: من ليس معفى (bypass_approval أو
+      // platform_owner) يحتاج مراجعة على كل إضافة/تعديل -- الأسرة تُحفظ
+      // فوراً (البيانات لا تُحجب) لكن تُسجَّل "قيد المراجعة" ويُنشأ طلب
+      // بجدول family_history يظهر لمن يملك صلاحية المراجعة.
+      const exempt = isExemptFromApproval(profile);
+      const actorId = user?.id || null;
+      const actorName = profile?.full_name || '—';
       if (familyId) {
         result = await updateFamily(familyId, payload);
       } else {
         result = await createFamily({
           ...payload,
-          review_status: 'approved',
+          review_status: exempt ? 'approved' : 'pending',
           pending_delete: false,
           created_by: user?.id || null,
         });
@@ -415,24 +424,78 @@ export default function FamilyFormScreen() {
         showError('تم حفظ الأسرة، لكن حدث خطأ بحفظ الأفراد: ' + memErr.message);
       }
 
-      if (!familyId) {
+      // سجل النشاط الفعلي (family_activity_log) -- مستقل عن نظام الموافقة،
+      // يُسجَّل دايماً بغض النظر عن دور المستخدم. لا يعيق الحفظ لو فشل.
+      const fieldChanges = familyId
+        ? diffFamilyFields(existingFamily, payload, { camp_id: (id) => camps.find((c) => c.id === id)?.name || id })
+        : null;
+      logFamilyActivity({
+        orgId,
+        familyId: finalId,
+        familyName: payload.head_name,
+        membersCount: members.length,
+        action: familyId ? 'update' : 'insert',
+        actorId,
+        actorName,
+        changes: fieldChanges,
+      });
+
+      // طلب المراجعة -- فقط لمن ليس معفى. الحفظ الفعلي تم فوق بالفعل
+      // (البيانات لا تُحجب عن صاحبها لحين المراجعة)، هذا فقط يُنشئ سجل
+      // "قيد المراجعة" يظهر لمن يملك صلاحية اعتماد الطلبات.
+      if (!exempt) {
         try {
-          await supabase.from('family_movements').insert([
-            {
-              family_id: finalId,
-              org_id: orgId,
-              type: 'entry',
-              to_camp: campId,
-              date: new Date().toISOString().slice(0, 10),
-              created_by: user?.id || null,
-            },
-          ]);
+          await recordApprovalRequest({
+            orgId,
+            familyId: finalId,
+            action: familyId ? 'update' : 'insert',
+            oldData: familyId ? existingFamily : null,
+            newData: payload,
+            changes: fieldChanges,
+            actorId,
+            actorName,
+            actorRole: profile?.role || null,
+          });
+        } catch (reqErr) {
+          console.warn('[recordApprovalRequest]', reqErr.message);
+        }
+      }
+
+      if (!familyId) {
+        const movementData = {
+          family_id: finalId,
+          org_id: orgId,
+          type: 'entry',
+          to_camp: campId,
+          date: new Date().toISOString().slice(0, 10),
+          created_by: user?.id || null,
+        };
+        try {
+          if (exempt) {
+            await supabase.from('family_movements').insert([movementData]);
+          } else {
+            await recordApprovalRequest({
+              orgId,
+              familyId: finalId,
+              action: 'movement_entry',
+              oldData: null,
+              newData: movementData,
+              changes: null,
+              actorId,
+              actorName,
+              actorRole: profile?.role || null,
+            });
+          }
         } catch {
           // حركة الدخول التلقائية غير حرجة — تجاهل الفشل بصمت
         }
       }
 
-      showSuccess(familyId ? 'تم تحديث بيانات الأسرة' : 'تم إضافة الأسرة بنجاح');
+      showSuccess(
+        exempt
+          ? familyId ? 'تم تحديث بيانات الأسرة' : 'تم إضافة الأسرة بنجاح'
+          : familyId ? 'تم حفظ التعديل — بانتظار مراجعة مسؤولك' : 'تم إضافة الأسرة — بانتظار مراجعة مسؤولك'
+      );
       navigation.goBack();
     } catch (e) {
       showError('حدث خطأ غير متوقع: ' + e.message);

@@ -1,6 +1,37 @@
 // helpers.js — منطق الأسر المشترك (منقول من camp-registry-react/src/lib/helpers.js)
 // نفس المنطق تماماً — لا يعتمد على DOM، فقابل للنقل حرفياً بين الويب والموبايل.
 
+import { TRACKED_FIELDS } from './formOptions';
+
+/** هل هذا المستخدم معفى من نظام موافقة platform_owner (تنفيذ فوري بدون
+ * مراجعة)؟ -- منقولة حرفياً من الويب (camp-registry-react/src/lib/db.js). */
+export function isExemptFromApproval(profile) {
+  if (!profile) return false;
+  return profile.role === 'platform_owner' || profile.bypass_approval === true;
+}
+
+/** يحسب الفروقات بين نسخة قديمة وجديدة من بيانات الأسرة، بس للحقول
+ * المتتبَّعة بـTRACKED_FIELDS -- تُستخدم لعرض "قبل/بعد" بشاشتي الطلبات
+ * المعلقة وسجل النشاط. valueResolvers اختياري لتحويل قيمة خام (مثل
+ * camp_id) لاسم مقروء بدل المعرّف الخام. */
+export function diffFamilyFields(oldData, newData, valueResolvers = {}) {
+  const changes = {};
+  for (const field of Object.keys(TRACKED_FIELDS)) {
+    const oldRaw = oldData?.[field] ?? null;
+    const newRaw = newData?.[field] ?? null;
+    const oldStr = oldRaw === null || oldRaw === '' ? null : String(oldRaw);
+    const newStr = newRaw === null || newRaw === '' ? null : String(newRaw);
+    if (oldStr !== newStr) {
+      const resolve = valueResolvers[field];
+      changes[field] = {
+        old: resolve && oldStr ? resolve(oldStr) : oldStr,
+        new: resolve && newStr ? resolve(newStr) : newStr,
+      };
+    }
+  }
+  return changes;
+}
+
 export function calcAge(dob) {
   if (!dob) return null;
   const b = new Date(dob);

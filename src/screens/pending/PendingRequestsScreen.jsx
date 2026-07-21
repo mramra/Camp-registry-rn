@@ -174,6 +174,31 @@ export default function PendingRequestsScreen() {
           </View>
         )}
 
+        {(req.action === 'insert' || req.action === 'update') && (() => {
+          const changeEntries = req.changes && typeof req.changes === 'object' ? Object.entries(req.changes) : [];
+          if (changeEntries.length === 0) return null;
+          return (
+            <View style={{ marginTop: 4, marginBottom: 8 }}>
+              <Text style={styles.changesTitle}>التغييرات ({changeEntries.length})</Text>
+              {changeEntries.map(([field, val]) => (
+                <View key={field} style={styles.changeCard}>
+                  <Text style={styles.changeField}>{FIELD_LABEL[field] || field}</Text>
+                  <View style={styles.changeValuesRow}>
+                    <View style={styles.changeOld}>
+                      <Text style={styles.changeOldLabel}>القديم</Text>
+                      <Text style={styles.changeOldValue}>{val?.old || '(فارغ)'}</Text>
+                    </View>
+                    <View style={styles.changeNew}>
+                      <Text style={styles.changeNewLabel}>الجديد</Text>
+                      <Text style={styles.changeNewValue}>{val?.new || '(فارغ)'}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          );
+        })()}
+
         {isPortalRequest && req.changes?.type === 'missing_data' && (
           <View style={styles.detailBox}>
             <Text style={styles.detailText}>📋 استكمال بيانات ناقصة — سيُطبَّق مباشرة عند الموافقة:</Text>
@@ -313,6 +338,17 @@ const styles = StyleSheet.create({
 
   detailBox: { backgroundColor: colors.surface2, borderRadius: 12, padding: 10, marginBottom: 8 },
   detailText: { color: colors.muted, fontSize: 11, textAlign: 'right', marginBottom: 2 },
+
+  changesTitle: { color: colors.accent, fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 6 },
+  changeCard: { backgroundColor: colors.surface2, borderRadius: 10, padding: 8, marginBottom: 6 },
+  changeField: { color: colors.white, fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 4 },
+  changeValuesRow: { flexDirection: 'row-reverse', gap: 8 },
+  changeOld: { flex: 1, backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: 6 },
+  changeOldLabel: { color: colors.red, fontSize: 9, textAlign: 'right', marginBottom: 2 },
+  changeOldValue: { color: colors.white, fontSize: 11, textAlign: 'right' },
+  changeNew: { flex: 1, backgroundColor: 'rgba(16,185,129,0.1)', borderRadius: 8, padding: 6 },
+  changeNewLabel: { color: colors.green, fontSize: 9, textAlign: 'right', marginBottom: 2 },
+  changeNewValue: { color: colors.white, fontSize: 11, textAlign: 'right' },
 
   warnBox: { backgroundColor: 'rgba(239,68,68,0.08)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)', borderRadius: 12, padding: 10, marginBottom: 8 },
   warnText: { color: colors.muted, fontSize: 10, textAlign: 'right' },

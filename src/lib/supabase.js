@@ -767,6 +767,27 @@ export default supabase;
 // كل الدوال تأخذ orgId صراحة (بدل ثابت عام ORG_ID بالأصل، لأن هذا
 // المشروع يمرّر orgId من AuthContext بكل مكان بدل ثابت واحد).
 
+/** يسجّل عملية على أسرة بجدول family_activity_log -- لا يرمي استثناء
+ * أبداً (التسجيل لا يجب أن يفشل عملية الحفظ الأساسية). منقولة حرفياً
+ * من الويب؛ كانت مفقودة كلياً بـRN رغم أن ActivityLogScreen جاهزة
+ * لعرض بياناتها بالضبط (بما فيها شكل changes: {field:{old,new}}). */
+export const logFamilyActivity = async ({ orgId, familyId, familyName, membersCount, action, actorId, actorName, changes }) => {
+  try {
+    await supabase.from('family_activity_log').insert({
+      org_id: orgId,
+      family_id: familyId || null,
+      family_name: familyName || '—',
+      members_count: membersCount || 0,
+      action,
+      actor_id: actorId || null,
+      actor_name: actorName || '—',
+      changes: changes && Object.keys(changes).length ? changes : null,
+    });
+  } catch (e) {
+    console.warn('[logFamilyActivity]', e.message);
+  }
+};
+
 export const recordApprovalRequest = async ({
   orgId, familyId, action, oldData, newData, changes, actorId, actorName, actorRole,
 }) => {

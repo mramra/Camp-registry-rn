@@ -118,7 +118,7 @@ export default function FamilyPortalScreen({ navigation }) {
       const fields = {};
       filled.forEach((d) => {
         const raw = missingValues[d.key].trim();
-        fields[d.key] = d.key === 'phone2' && whatsappPrefix && whatsappPrefix !== 'بدون'
+        fields[d.key] = d.key === 'phone2' && whatsappPrefix
           ? whatsappPrefix + raw
           : raw;
       });
@@ -398,14 +398,14 @@ export default function FamilyPortalScreen({ navigation }) {
                             ) : d.kind === 'whatsapp' ? (
                               <View>
                                 <View style={styles.maritalRow}>
-                                  {['بدون', '972', '970'].map((opt) => (
+                                  {['972', '970'].map((opt) => (
                                     <Pressable
                                       key={opt}
                                       onPress={() => setWhatsappPrefix((v) => (v === opt ? '' : opt))}
                                       style={[styles.maritalChip, whatsappPrefix === opt && styles.maritalChipActive]}
                                     >
                                       <Text style={[styles.maritalChipText, whatsappPrefix === opt && styles.maritalChipTextActive]}>
-                                        {opt === 'بدون' ? 'بدون مقدمة' : opt}
+                                        {opt}
                                       </Text>
                                     </Pressable>
                                   ))}

@@ -405,7 +405,7 @@ export default function FamilyFormScreen() {
         head_name: headName.trim(),
         head_id: headId.trim(),
         phone1: phone1.trim() || null,
-        phone2: (whatsappPrefix && whatsappPrefix !== 'بدون' ? whatsappPrefix : '') + phone2.trim() || null,
+        phone2: (whatsappPrefix || '') + phone2.trim() || null,
         head_gender: headGender || null,
         head_marital: headMarital || null,
         head_dob: dobStr,
@@ -618,7 +618,7 @@ export default function FamilyFormScreen() {
               <SelectField
                 wheel
                 value={whatsappPrefix}
-                options={['بدون', '972', '970']}
+                options={['972', '970']}
                 onSelect={setWhatsappPrefix}
                 placeholder="مقدمة"
               />

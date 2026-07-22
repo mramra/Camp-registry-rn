@@ -57,6 +57,7 @@ export default function FamilyPortalScreen({ navigation }) {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [missingValues, setMissingValues] = useState({});
+  const [whatsappPrefix, setWhatsappPrefix] = useState('');
   const [missingSending, setMissingSending] = useState(false);
   const [missingSent, setMissingSent] = useState(false);
   const [urgentOpen, setUrgentOpen] = useState(false);
@@ -104,7 +105,7 @@ export default function FamilyPortalScreen({ navigation }) {
         !family.housing_type?.trim() && { key: 'housing_type', label: '🏘️ نوع المسكن', kind: 'housing' },
         !family.wallet_type?.trim() && { key: 'wallet_type', label: '💳 نوع المحفظة الإلكترونية', kind: 'wallet' },
         !family.wallet_phone?.trim() && { key: 'wallet_phone', label: '💳 رقم جوال المحفظة', kind: 'phone' },
-        !family.phone2?.trim() && { key: 'phone2', label: '📱 رقم واتساب', kind: 'phone' },
+        !family.phone2?.trim() && { key: 'phone2', label: '📱 رقم واتساب', kind: 'whatsapp' },
       ].filter(Boolean)
     : [];
 
@@ -115,7 +116,12 @@ export default function FamilyPortalScreen({ navigation }) {
     setError('');
     try {
       const fields = {};
-      filled.forEach((d) => { fields[d.key] = missingValues[d.key].trim(); });
+      filled.forEach((d) => {
+        const raw = missingValues[d.key].trim();
+        fields[d.key] = d.key === 'phone2' && whatsappPrefix && whatsappPrefix !== 'بدون'
+          ? whatsappPrefix + raw
+          : raw;
+      });
       await callFamilyPortalAPI('submitMissingData', { nationalId, phone, familyId: family.id, fields });
       setMissingSent(true);
       setMissingValues({});
@@ -388,6 +394,31 @@ export default function FamilyPortalScreen({ navigation }) {
                                     </Text>
                                   </Pressable>
                                 ))}
+                              </View>
+                            ) : d.kind === 'whatsapp' ? (
+                              <View>
+                                <View style={styles.maritalRow}>
+                                  {['بدون', '972', '970'].map((opt) => (
+                                    <Pressable
+                                      key={opt}
+                                      onPress={() => setWhatsappPrefix((v) => (v === opt ? '' : opt))}
+                                      style={[styles.maritalChip, whatsappPrefix === opt && styles.maritalChipActive]}
+                                    >
+                                      <Text style={[styles.maritalChipText, whatsappPrefix === opt && styles.maritalChipTextActive]}>
+                                        {opt === 'بدون' ? 'بدون مقدمة' : opt}
+                                      </Text>
+                                    </Pressable>
+                                  ))}
+                                </View>
+                                <TextInput
+                                  value={missingValues[d.key] || ''}
+                                  onChangeText={(v) => setMissingValues((prev) => ({ ...prev, [d.key]: v }))}
+                                  placeholder="05xxxxxxxx"
+                                  placeholderTextColor={colors.muted}
+                                  keyboardType="phone-pad"
+                                  editable={!missingSending}
+                                  style={styles.input}
+                                />
                               </View>
                             ) : (
                               <TextInput

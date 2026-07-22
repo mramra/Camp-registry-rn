@@ -102,6 +102,9 @@ export default function FamilyPortalScreen({ navigation }) {
         !family.head_marital?.trim() && { key: 'head_marital', label: '💍 الحالة الاجتماعية', kind: 'marital' },
         !family.address?.trim() && { key: 'address', label: '🏠 السكن الحالي (وصف)', kind: 'text' },
         !family.housing_type?.trim() && { key: 'housing_type', label: '🏘️ نوع المسكن', kind: 'housing' },
+        !family.wallet_type?.trim() && { key: 'wallet_type', label: '💳 نوع المحفظة الإلكترونية', kind: 'wallet' },
+        !family.wallet_phone?.trim() && { key: 'wallet_phone', label: '💳 رقم جوال المحفظة', kind: 'phone' },
+        !family.phone2?.trim() && { key: 'phone2', label: '📱 رقم واتساب', kind: 'phone' },
       ].filter(Boolean)
     : [];
 
@@ -258,6 +261,7 @@ export default function FamilyPortalScreen({ navigation }) {
                   {[
                     ['اسم رب الأسرة', family.head_name],
                     ['رقم الهوية', family.head_id],
+                    ['رقم الجوال', family.phone1],
                     ['المخيم', family.camps?.name || '—'],
                     ['الخيمة', family.tent || '—'],
                   ].map(([k, v]) => (
@@ -288,13 +292,13 @@ export default function FamilyPortalScreen({ navigation }) {
                                 </View>
                               )}
                             </View>
-                            <View style={styles.memberMetaRow}>
-                              {!!m.dob && (
-                                <Text style={styles.memberMetaText}>
-                                  🎂 {m.dob}{age != null ? ` (${age} سنة)` : ''}
-                                </Text>
-                              )}
-                              {!!m.national_id && <Text style={styles.memberMetaText}>🪪 {m.national_id}</Text>}
+                            <View style={styles.memberMetaCol}>
+                              <Text style={styles.memberMetaTextBold}>
+                                🎂 تاريخ الميلاد: {m.dob ? `${m.dob}${age != null ? ` (${age} سنة)` : ''}` : '—'}
+                              </Text>
+                              <Text style={styles.memberMetaTextBold}>
+                                🪪 رقم الهوية: {m.national_id || '—'}
+                              </Text>
                             </View>
                           </View>
                         </View>
@@ -360,6 +364,20 @@ export default function FamilyPortalScreen({ navigation }) {
                             ) : d.kind === 'housing' ? (
                               <View style={styles.maritalRow}>
                                 {HOUSING_TYPE_OPTIONS.map((opt) => (
+                                  <Pressable
+                                    key={opt}
+                                    onPress={() => setMissingValues((v) => ({ ...v, [d.key]: opt }))}
+                                    style={[styles.maritalChip, missingValues[d.key] === opt && styles.maritalChipActive]}
+                                  >
+                                    <Text style={[styles.maritalChipText, missingValues[d.key] === opt && styles.maritalChipTextActive]}>
+                                      {opt}
+                                    </Text>
+                                  </Pressable>
+                                ))}
+                              </View>
+                            ) : d.kind === 'wallet' ? (
+                              <View style={styles.maritalRow}>
+                                {['PalPay', 'JawwalPay'].map((opt) => (
                                   <Pressable
                                     key={opt}
                                     onPress={() => setMissingValues((v) => ({ ...v, [d.key]: opt }))}
@@ -550,6 +568,8 @@ const styles = StyleSheet.create({
   relationBadgeText: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
   memberMetaRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginTop: 4 },
   memberMetaText: { color: colors.muted, fontSize: 11, textAlign: 'right' },
+  memberMetaCol: { marginTop: 6, gap: 3 },
+  memberMetaTextBold: { color: colors.white, fontSize: 13, fontWeight: '600', textAlign: 'right' },
   noAidText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 8 },
 
   chatBox: { marginBottom: 12 },

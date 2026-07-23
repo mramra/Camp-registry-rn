@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { checkFamilyIssues, isIncomplete } from '../../lib/helpers';
+import { checkFamilyIssues, isIncomplete, hasMissingDob } from '../../lib/helpers';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
@@ -21,6 +21,7 @@ import colors from '../../theme/colors';
 const ISSUE_OPTIONS = [
   { key: '', icon: '👥', label: 'الكل' },
   { key: 'incomplete', icon: '⚠️', label: 'ناقص' },
+  { key: 'dob', icon: '🎂', label: 'تاريخ ميلاد ناقص' },
   { key: 'dup_id', icon: '🔁', label: 'هوية مكررة' },
   { key: 'dup_phone', icon: '📞', label: 'جوال مكرر' },
 ];
@@ -120,15 +121,19 @@ export default function DataQualityScreen() {
     return {
       all: base.length,
       incomplete: base.filter((f) => isIncomplete(f, membersByFamily[f.id])).length,
+      dob: base.filter((f) => hasMissingDob(f, membersByFamily[f.id])).length,
       dup_id: base.filter((f) => dupIdSet.has(f.id)).length,
       dup_phone: base.filter((f) => dupPhoneSet.has(f.id)).length,
     };
   }, [families, filterCamp, membersByFamily, dupIdSet, dupPhoneSet]);
 
   const filtered = useMemo(() => {
-    let list = families.filter((f) => isIncomplete(f, membersByFamily[f.id]) || dupIdSet.has(f.id) || dupPhoneSet.has(f.id));
+    let list = families.filter(
+      (f) => isIncomplete(f, membersByFamily[f.id]) || hasMissingDob(f, membersByFamily[f.id]) || dupIdSet.has(f.id) || dupPhoneSet.has(f.id)
+    );
     if (filterCamp) list = list.filter((f) => f.camp_id === filterCamp);
     if (filterIssue === 'incomplete') list = list.filter((f) => isIncomplete(f, membersByFamily[f.id]));
+    else if (filterIssue === 'dob') list = list.filter((f) => hasMissingDob(f, membersByFamily[f.id]));
     else if (filterIssue === 'dup_id') list = list.filter((f) => dupIdSet.has(f.id));
     else if (filterIssue === 'dup_phone') list = list.filter((f) => dupPhoneSet.has(f.id));
 
@@ -151,6 +156,7 @@ export default function DataQualityScreen() {
     const issues = checkFamilyIssues(f, membersByFamily[f.id]);
     const isDupId = dupIdSet.has(f.id);
     const isDupPhone = dupPhoneSet.has(f.id);
+    const missingDob = hasMissingDob(f, membersByFamily[f.id]);
     const barColor = isDupId ? colors.purple : isDupPhone ? colors.blue : colors.red;
     return (
       <Pressable style={styles.card} onPress={() => navigation.push('FamilyDetail', { familyId: f.id })}>
@@ -163,6 +169,7 @@ export default function DataQualityScreen() {
           <View style={styles.tagsRow}>
             {isDupId && <Text style={styles.tagDupId}>🔁 هوية مكررة</Text>}
             {isDupPhone && <Text style={styles.tagDupPhone}>📞 جوال مكرر</Text>}
+            {missingDob && <Text style={styles.tagDob}>🎂 تاريخ ميلاد ناقص</Text>}
             {issues.length > 0 && <Text style={styles.tagIncomplete}>⚠️ {issues.length} نقص</Text>}
           </View>
           {issues.length > 0 && (
@@ -212,6 +219,20 @@ export default function DataQualityScreen() {
               onSelect={setFilterCamp}
               placeholder="كل المخيمات"
             />
+            {filterIssue === 'dob' && filtered.length > 0 && (
+              <Pressable
+                style={styles.smsBtn}
+                onPress={() =>
+                  navigation.navigate('SMS', {
+                    preselectFamilyIds: filtered.map((f) => f.id),
+                    presetMessage:
+                      'السلام عليكم، برجاء استكمال تاريخ الميلاد الناقص لأفراد أسرتكم عبر بوابة الأسرة (رابط التطبيق) — يساعدنا هذا بخدمتكم بشكل أفضل. شكراً لتعاونكم.',
+                  })
+                }
+              >
+                <Text style={styles.smsBtnText}>📩 إرسال رسالة لهذه الأسر ({filtered.length})</Text>
+              </Pressable>
+            )}
           </View>
         }
         ListEmptyComponent={<EmptyState icon="✅" title="لا توجد مشاكل بيانات" subtitle="كل الأسر بهذا الفلتر مكتملة وغير مكررة" />}
@@ -250,6 +271,12 @@ const getStyles = () =>
     tagsRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, paddingHorizontal: 12, marginTop: 6 },
     tagDupId: { color: colors.purple, fontSize: 10, fontWeight: 'bold' },
     tagDupPhone: { color: colors.blue, fontSize: 10, fontWeight: 'bold' },
+    tagDob: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
+    smsBtn: {
+      backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: colors.accent,
+      borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 12,
+    },
+    smsBtnText: { color: colors.accent, fontWeight: '900', fontSize: 13 },
     tagIncomplete: { color: colors.red, fontSize: 10, fontWeight: 'bold' },
     issuesText: { color: colors.muted, fontSize: 10, textAlign: 'right', paddingHorizontal: 12, paddingBottom: 12, marginTop: 4, lineHeight: 15 },
   });

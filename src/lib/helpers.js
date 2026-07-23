@@ -217,6 +217,14 @@ export function isAgeInRange(dob, min, max) {
 }
 
 /** يرجع قائمة نصية بكل النواقص في بيانات أسرة معيّنة (فاضية = بيانات كاملة) */
+/** هل ينقص تاريخ ميلاد رب الأسرة أو أي فرد بالأسرة؟ -- checkFamilyIssues
+ * تفحص رب الأسرة بس؛ هذي تفحص الأفراد كمان (اكتُشفت الحاجة أثناء تدقيق
+ * كشف BLDA لمخيم السلام الأولمبي). */
+export function hasMissingDob(family, members) {
+  if (!family?.head_dob) return true;
+  return (members || []).some((m) => !m.dob);
+}
+
 export function checkFamilyIssues(f, members) {
   const issues = [];
   const mems = members || [];

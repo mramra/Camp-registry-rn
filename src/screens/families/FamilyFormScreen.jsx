@@ -22,6 +22,10 @@ import {
   supabase,
 } from '../../lib/supabase';
 import { luhnCheck, validateName, validateDob, isExemptFromApproval, diffFamilyFields } from '../../lib/helpers';
+
+// رقم جوال فلسطيني صحيح: 10 خانات، يبدأ بـ059 أو 056 -- يمنع أخطاء الإدخال
+// العشوائية برقم المحفظة/الواتساب (طلب مباشر)
+const PALESTINIAN_PHONE_RE = /^(059|056)\d{7}$/;
 import {
   RELATION_BY_GENDER,
   ALL_RELATIONS,
@@ -224,6 +228,7 @@ export default function FamilyFormScreen() {
         setHeadId(data.head_id || '');
         setPhone1(data.phone1 || '');
         setPhone2(data.phone2 || '');
+        setWhatsappPrefix(data.whatsapp_prefix || '');
         setHeadGender(data.head_gender || '');
         setHeadMarital(data.head_marital || '');
         const d = splitDob(data.head_dob);
@@ -333,6 +338,13 @@ export default function FamilyFormScreen() {
     const dobErr = validateDob(joinDob(dobDay, dobMonth, dobYear));
     if (dobErr) e.dob = dobErr;
 
+    if (phone2.trim() && !PALESTINIAN_PHONE_RE.test(phone2.trim())) {
+      e.phone2 = 'رقم غير صحيح -- يجب أن يبدأ بـ059 أو 056 ويكون 10 خانات';
+    }
+    if (walletPhone.trim() && !PALESTINIAN_PHONE_RE.test(walletPhone.trim())) {
+      e.walletPhone = 'رقم غير صحيح -- يجب أن يبدأ بـ059 أو 056 ويكون 10 خانات';
+    }
+
     if (!campId) e.campId = 'اختر المخيم';
 
     members.forEach((m, i) => {
@@ -405,7 +417,8 @@ export default function FamilyFormScreen() {
         head_name: headName.trim(),
         head_id: headId.trim(),
         phone1: phone1.trim() || null,
-        phone2: (whatsappPrefix || '') + phone2.trim() || null,
+        phone2: phone2.trim() || null,
+        whatsapp_prefix: whatsappPrefix || null,
         head_gender: headGender || null,
         head_marital: headMarital || null,
         head_dob: dobStr,
@@ -629,6 +642,7 @@ export default function FamilyFormScreen() {
               onChangeText={setPhone2}
               keyboardType="phone-pad"
               style={{ flex: 2 }}
+              error={errors.phone2}
             />
           </View>
 
@@ -765,6 +779,7 @@ export default function FamilyFormScreen() {
               value={walletPhone}
               onChangeText={setWalletPhone}
               keyboardType="phone-pad"
+              error={errors.walletPhone}
             />
           )}
         </FormSection>

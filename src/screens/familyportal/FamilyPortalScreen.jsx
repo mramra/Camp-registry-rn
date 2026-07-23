@@ -18,6 +18,8 @@ import colors from '../../theme/colors';
 // نفس معرّف المنظمة الثابت المستخدم بالنسخة الأصلية لبوابة الأسرة العامة
 const ORG_ID = 'ddc8abe7-518f-40a4-8c3b-ee03bb0f47d5';
 const FUNCTION_URL = 'https://ojclpkenecicujkqhhlu.supabase.co/functions/v1/family-portal';
+// رقم جوال فلسطيني صحيح: 10 خانات، يبدأ بـ059 أو 056
+const PALESTINIAN_PHONE_RE = /^(059|056)\d{7}$/;
 const ANON_KEY = 'sb_publishable_d6q8hoDDcohuZFHk3jxI7g_IBWWCmNu';
 
 /**
@@ -112,16 +114,22 @@ export default function FamilyPortalScreen({ navigation }) {
   const handleSubmitMissing = async () => {
     const filled = missingFieldDefs.filter((d) => (missingValues[d.key] || '').trim());
     if (!filled.length) return setError('عبّي حقل واحد على الأقل قبل الإرسال');
+
+    // فحص صيغة أرقام الجوال (059/056 + 10 خانات) قبل الإرسال -- تفادي
+    // أخطاء الإدخال العشوائية (طلب مباشر)
+    const phoneFields = filled.filter((d) => d.key === 'wallet_phone' || d.key === 'phone2');
+    for (const d of phoneFields) {
+      if (!PALESTINIAN_PHONE_RE.test(missingValues[d.key].trim())) {
+        return setError(`${d.label}: رقم غير صحيح -- يجب أن يبدأ بـ059 أو 056 ويكون 10 خانات`);
+      }
+    }
+
     setMissingSending(true);
     setError('');
     try {
       const fields = {};
-      filled.forEach((d) => {
-        const raw = missingValues[d.key].trim();
-        fields[d.key] = d.key === 'phone2' && whatsappPrefix
-          ? whatsappPrefix + raw
-          : raw;
-      });
+      filled.forEach((d) => { fields[d.key] = missingValues[d.key].trim(); });
+      if (whatsappPrefix && (missingValues.phone2 || '').trim()) fields.whatsapp_prefix = whatsappPrefix;
       await callFamilyPortalAPI('submitMissingData', { nationalId, phone, familyId: family.id, fields });
       setMissingSent(true);
       setMissingValues({});

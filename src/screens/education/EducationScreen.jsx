@@ -7,20 +7,38 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
-import { showError } from '../../utils/toast';
+import { showError, showSuccess } from '../../utils/toast';
+import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { formatDateTime } from '../../lib/utils';
 import {
-  calcAge, getStageGroup, getGradeDelay, getExpectedGrade, STAGE_ICONS, buildCampExportBanner,
+  calcAge, getStageGroup, getGradeDelay, getExpectedGrade, STAGE_ICONS, buildCampExportBanner, naturalCompare,
 } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
-import ExportButton from '../../components/ui/ExportButton';
+import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import colors from '../../theme/colors';
 
 const ADULT_STAGES = ['دبلوم', 'بكالوريوس', 'ماجستير', 'دكتوراه'];
+
+// حقول تصدير كشف الحالة الدراسية القابلة للتخصيص -- الثمانية الحالية
+// مفعّلة افتراضياً بنفس الترتيب والقيم السابقة، وثلاثة حقول اختيارية
+// إضافية (جوال رب الأسرة، المخيم، رقم الخيمة) لمن يحتاجها.
+const EDU_FIELD_DEFS = [
+  { key: 'name', label: 'اسم الطالب', order: 1 },
+  { key: 'national_id', label: 'رقم الهوية', order: 2 },
+  { key: 'dob', label: 'تاريخ الميلاد', order: 3 },
+  { key: 'age', label: 'العمر', order: 4 },
+  { key: 'head_name', label: 'اسم رب الأسرة', order: 5 },
+  { key: 'head_id', label: 'رقم هوية رب الأسرة', order: 6 },
+  { key: 'grade', label: 'المرحلة / المؤهل', order: 7 },
+  { key: 'delay', label: 'متأخر دراسياً', order: 8 },
+  { key: 'head_phone', label: 'رقم جوال رب الأسرة', order: 0 },
+  { key: 'camp_name', label: 'المخيم', order: 0 },
+  { key: 'tent', label: 'رقم الخيمة', order: 0 },
+];
 
 export default function EducationScreen() {
   const navigation = useNavigation();
@@ -40,6 +58,8 @@ export default function EducationScreen() {
   const [stageFilter, setStageFilter] = useState('');
   const [search, setSearch] = useState('');
   const [offlineInfo, setOfflineInfo] = useState(null);
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
+  const [eduFields, setEduFields] = useState(EDU_FIELD_DEFS);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
@@ -169,6 +189,42 @@ export default function EducationScreen() {
     return byStage.filter((p) => (p.name || '').toLowerCase().includes(q) || (p.national_id || '').includes(q));
   }, [byStage, search]);
 
+  const handleCustomExport = async () => {
+    const selected = orderedSelected(eduFields);
+    if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
+    try {
+      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
+      const sorted = [...filtered].sort((a, b) => naturalCompare(a.name, b.name));
+      const rows = sorted.map((p) => {
+        const f = famMap[p.family_id] || {};
+        const all = {
+          name: p.name || '',
+          national_id: p.national_id || '',
+          dob: p.dob || '',
+          age: p.age ?? '',
+          head_name: f.head_name || '',
+          head_id: f.head_id || '',
+          grade: p.specificGrade || p.stage || '',
+          delay: p.delay > 0 ? `نعم (${p.delay} صف)` : 'لا',
+          head_phone: f.phone1 || '',
+          camp_name: campMap[f.camp_id] || '',
+          tent: f.tent || '',
+        };
+        const row = {};
+        selected.forEach((def) => { row[def.label] = all[def.key]; });
+        return row;
+      });
+      const fileName = stageFilter ? `طلاب_${stageFilter}` : 'طلاب_الكل';
+      await (banner
+        ? exportXLSXMultiSheetWithBanners([{ name: 'الحالة الدراسية', banner, rows }], fileName)
+        : exportXLSX(rows, 'الحالة الدراسية', fileName));
+      showSuccess('تم تجهيز الملف للمشاركة/الحفظ');
+      setFieldPickerOpen(false);
+    } catch (e) {
+      showError('تعذّر التصدير: ' + e.message);
+    }
+  };
+
   const styles = getStyles();
 
   if (loading) {
@@ -239,32 +295,9 @@ export default function EducationScreen() {
                 onPress={() => setCampPickerVisible(true)}
               />
               {canExport && (
-                <ExportButton
-                  label="📊 تصدير الكشف"
-                  getRows={() => {
-                    const sorted = [...filtered].sort((a, b) => (b.dob || '').localeCompare(a.dob || ''));
-                    return sorted.map((p) => {
-                      const f = famMap[p.family_id] || {};
-                      return {
-                        'اسم الطالب': p.name || '',
-                        'رقم الهوية': p.national_id || '',
-                        'تاريخ الميلاد': p.dob || '',
-                        'العمر': p.age ?? '',
-                        'اسم رب الأسرة': f.head_name || '',
-                        'رقم هوية رب الأسرة': f.head_id || '',
-                        'المرحلة / المؤهل': p.specificGrade || p.stage || '',
-                        'متأخر دراسياً': p.delay > 0 ? `نعم (${p.delay} صف)` : 'لا',
-                      };
-                    });
-                  }}
-                  sheetName="الحالة الدراسية"
-                  fileName={stageFilter ? `طلاب_${stageFilter}` : 'طلاب_الكل'}
-                  getBanner={() => {
-                    if (!filterCamp || !showBanner) return null;
-                    const camp = camps.find((c) => c.id === filterCamp);
-                    return buildCampExportBanner(camp, orgMembers);
-                  }}
-                />
+                <Pressable style={styles.exportBtn} onPress={() => setFieldPickerOpen(true)}>
+                  <Text style={styles.exportBtnText}>📤 تصدير الكشف</Text>
+                </Pressable>
               )}
             </View>
 
@@ -320,6 +353,13 @@ export default function EducationScreen() {
           </Pressable>
         ))}
       </BottomSheetModal>
+
+      <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
+        <FieldPicker title="📋 حقول كشف الحالة الدراسية" cols={eduFields} onChange={setEduFields} startOpen />
+        <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
+          <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(eduFields).length} حقل)</Text>
+        </Pressable>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -336,6 +376,13 @@ const getStyles = () =>
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
+    exportBtn: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent, borderRadius: 10,
+      paddingHorizontal: 10, paddingVertical: 7, minWidth: 40, alignItems: 'center', justifyContent: 'center',
+    },
+    exportBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 12 },
+    customExportBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
+    customExportBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },
 
     ageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
     ageBox: {

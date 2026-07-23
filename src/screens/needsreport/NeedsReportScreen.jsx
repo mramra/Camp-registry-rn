@@ -10,7 +10,8 @@ import {
   CATEGORY_LABELS, VULNERABILITY_TIER_LABELS, VULNERABILITY_TIER_KEYS, buildCampExportBanner,
   HEALTH_FIELD_MAP,
 } from '../../lib/helpers';
-import { showError } from '../../utils/toast';
+import { showError, showSuccess } from '../../utils/toast';
+import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
@@ -18,7 +19,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
-import ExportButton from '../../components/ui/ExportButton';
+import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import colors from '../../theme/colors';
 
@@ -50,6 +51,24 @@ function familyHasHealthType(type, family, members) {
   return (members || []).some((m) => hasHealthData(m[def.mField]));
 }
 
+// حقول تصدير تقرير الاحتياجات القابلة للتخصيص -- الثلاثة عشر حقلاً
+// الحالية كلها مفعّلة افتراضياً (كانت كلها إجبارية سابقاً بلا استثناء).
+const NEEDS_FIELD_DEFS = [
+  { key: 'number', label: '#', order: 1 },
+  { key: 'head_name', label: 'اسم رب الأسرة', order: 2 },
+  { key: 'head_id', label: 'رقم الهوية', order: 3 },
+  { key: 'phone', label: 'الجوال', order: 4 },
+  { key: 'camp_name', label: 'المخيم', order: 5 },
+  { key: 'member_count', label: 'عدد الأفراد', order: 6 },
+  { key: 'categories', label: 'الفئات', order: 7 },
+  { key: 'vulnerability', label: 'درجة الضعف', order: 8 },
+  { key: 'vuln_score', label: 'نقاط الضعف', order: 9 },
+  { key: 'orphans', label: 'الأيتام', order: 10 },
+  { key: 'disabilities', label: 'إعاقات', order: 11 },
+  { key: 'chronic', label: 'أمراض مزمنة', order: 12 },
+  { key: 'elderly', label: 'كبار السن', order: 13 },
+];
+
 export default function NeedsReportScreen() {
   const navigation = useNavigation();
   const { orgId, profile } = useAuth();
@@ -69,6 +88,8 @@ export default function NeedsReportScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
+  const [needsFields, setNeedsFields] = useState(NEEDS_FIELD_DEFS);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
@@ -152,6 +173,42 @@ export default function NeedsReportScreen() {
       // الأشد احتياجاً أولاً -- هذا هو الغرض الأساسي من التقرير
       .sort((a, b) => b.vuln.score - a.vuln.score);
   }, [families, memsByFamily, filterCamp, filterCategory, filterTier, filterHealth, search]);
+
+  const handleCustomExport = async () => {
+    const selected = orderedSelected(needsFields);
+    if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
+    try {
+      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
+      const rows = filtered.map(({ family: f, vuln, cats }, i) => {
+        const all = {
+          number: i + 1,
+          head_name: f.head_name || '',
+          head_id: f.head_id || '',
+          phone: f.phone1 || '',
+          camp_name: campMap[f.camp_id] || '',
+          member_count: (memsByFamily[f.id] || []).length + 1,
+          categories: cats.filter((c) => c !== 'normal').map((c) => CATEGORY_LABELS[c] || c).join(' | '),
+          vulnerability: VULNERABILITY_TIER_LABELS[vuln.tier],
+          vuln_score: vuln.score,
+          orphans: getOrphanCount(f, memsByFamily[f.id]),
+          disabilities: vuln.disabilityCount,
+          chronic: vuln.chronicCount,
+          elderly: vuln.elderlyCount,
+        };
+        const row = {};
+        selected.forEach((def) => { row[def.label] = all[def.key]; });
+        return row;
+      });
+      const fileName = `تقرير_الاحتياجات_${new Date().toISOString().slice(0, 10)}`;
+      await (banner
+        ? exportXLSXMultiSheetWithBanners([{ name: 'تقرير الاحتياجات', banner, rows }], fileName)
+        : exportXLSX(rows, 'تقرير الاحتياجات', fileName));
+      showSuccess('تم تجهيز الملف للمشاركة/الحفظ');
+      setFieldPickerOpen(false);
+    } catch (e) {
+      showError('تعذّر التصدير: ' + e.message);
+    }
+  };
 
   const styles = getStyles();
 
@@ -277,32 +334,9 @@ export default function NeedsReportScreen() {
                 selected={!!filterCamp}
                 onPress={() => setCampPickerVisible(true)}
               />
-              <ExportButton
-                label="📊 تصدير التقرير"
-                getRows={() =>
-                  filtered.map(({ family: f, vuln, cats }, i) => ({
-                    '#': i + 1,
-                    'اسم رب الأسرة': f.head_name || '',
-                    'رقم الهوية': f.head_id || '',
-                    'الجوال': f.phone1 || '',
-                    'المخيم': campMap[f.camp_id] || '',
-                    'عدد الأفراد': (memsByFamily[f.id] || []).length + 1,
-                    'الفئات': cats.filter((c) => c !== 'normal').map((c) => CATEGORY_LABELS[c] || c).join(' | '),
-                    'درجة الضعف': VULNERABILITY_TIER_LABELS[vuln.tier],
-                    'نقاط الضعف': vuln.score,
-                    'الأيتام': getOrphanCount(f, memsByFamily[f.id]),
-                    'إعاقات': vuln.disabilityCount,
-                    'أمراض مزمنة': vuln.chronicCount,
-                    'كبار السن': vuln.elderlyCount,
-                  }))
-                }
-                sheetName="تقرير الاحتياجات"
-                fileName={`تقرير_الاحتياجات_${new Date().toISOString().slice(0, 10)}`}
-                getBanner={() => {
-                  if (!filterCamp || !showBanner) return null;
-                  return buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers);
-                }}
-              />
+              <Pressable style={styles.exportBtn} onPress={() => setFieldPickerOpen(true)}>
+                <Text style={styles.exportBtnText}>📤 تصدير التقرير</Text>
+              </Pressable>
             </View>
 
             <CampDelegatePanel
@@ -334,6 +368,13 @@ export default function NeedsReportScreen() {
           </Pressable>
         ))}
       </BottomSheetModal>
+
+      <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
+        <FieldPicker title="📋 حقول تقرير الاحتياجات" cols={needsFields} onChange={setNeedsFields} startOpen />
+        <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
+          <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(needsFields).length} حقل)</Text>
+        </Pressable>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -361,6 +402,13 @@ const getStyles = () =>
     sectionLabel: { color: colors.muted, fontSize: 11, fontWeight: 'bold', textAlign: 'right', marginBottom: 6, marginTop: 2 },
     chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
+    exportBtn: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent, borderRadius: 10,
+      paddingHorizontal: 10, paddingVertical: 7, minWidth: 40, alignItems: 'center', justifyContent: 'center',
+    },
+    exportBtnText: { color: colors.accent, fontWeight: 'bold', fontSize: 12 },
+    customExportBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
+    customExportBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },
 
     searchInput: {
       backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,

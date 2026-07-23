@@ -68,6 +68,7 @@ export const PAGE_REGISTRY = {
   camps: { label: '🏕️ المخيمات' },
   movements: { label: '🔄 حركات الأسر' },
   distributions: { label: '📦 التوزيعات' },
+  lists: { label: '📋 القوائم' },
   activity_log: { label: '📝 آخر التعديلات على الأسر' },
   women: { label: '👩 النساء' },
   men: { label: '👨 الرجال' },
@@ -135,21 +136,21 @@ const LEGACY_PAGE_KEY_MAP = {
 const DEFAULT_ROLE_ACCESS = {
   platform_owner: () => true,
   super_admin: {
-    dashboard: true, families: true, camps: true, movements: true, distributions: true, activity_log: true,
+    dashboard: true, families: true, camps: true, movements: true, distributions: true, lists: true, activity_log: true,
     women: true, men: true, children: true, health_records: true, education_status: true,
     analysis: true, camp_compare: true, needs_report: true, export: true,
     users: true, audit: true, alerts: true, data: false, diagnostics: true, security_audit: false,
     devices: true, sms: true, settings: true, subscription: true, help: true, page_permissions: false, pending_requests: true,
   },
   camp_delegate: {
-    dashboard: true, families: true, camps: true, movements: true, distributions: true, activity_log: true,
+    dashboard: true, families: true, camps: true, movements: true, distributions: true, lists: true, activity_log: true,
     women: true, men: true, children: true, health_records: true, education_status: true,
     analysis: true, camp_compare: true, needs_report: true, export: true,
     users: true, audit: true, alerts: true, data: false, diagnostics: true, security_audit: false,
     devices: true, sms: true, settings: true, subscription: true, help: true, page_permissions: false, pending_requests: true,
   },
   assistant: {
-    dashboard: true, families: false, camps: false, movements: false, distributions: false, activity_log: false,
+    dashboard: true, families: false, camps: false, movements: false, distributions: false, lists: false, activity_log: false,
     women: false, men: false, children: false, health_records: false, education_status: false,
     analysis: false, camp_compare: false, needs_report: false, export: false,
     users: false, audit: false, alerts: false, data: false, diagnostics: false, security_audit: false,

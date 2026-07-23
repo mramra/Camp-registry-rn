@@ -1071,3 +1071,94 @@ export const fetchPendingDevicesCount = async (orgId) => {
     return 0;
   }
 };
+
+// ── القوائم المعتمدة (org_lists / org_list_families) ─────
+// قائمة دائمة باسم مؤسسة مانحة (مثلاً "أكتد")، تُضاف عليها أسر باستمرار.
+// الأسرة ممكن تكون بأكثر من قائمة بنفس الوقت. لا مفهوم "دفعة/جولة" هنا،
+// ولا حالة (نشط/منتهي) -- فقط قائمة + أعضاء، بنفس بساطة نظام الجولات
+// المبسّط بعد إعادة تصميم التوزيعات.
+
+export const fetchOrgLists = async (orgId) => {
+  const { data, error } = await supabase
+    .from('org_lists')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('_deleted', false)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+};
+
+export const createOrgList = async (listData) => {
+  try {
+    const { data, error } = await supabase.from('org_lists').insert([listData]).select();
+    if (error) throw error;
+    return { success: true, data: data[0] };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+export const updateOrgList = async (listId, updates) => {
+  try {
+    const { error } = await supabase.from('org_lists').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', listId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/** حذف قائمة نهائياً — يحذف معها كل عضوياتها (org_list_families) تلقائياً
+ * عبر ON DELETE CASCADE بقاعدة البيانات، بلا حاجة لحذف يدوي منفصل. */
+export const deleteOrgList = async (listId) => {
+  try {
+    const { error } = await supabase.from('org_lists').delete().eq('id', listId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+/** عدد الأسر بكل قائمة بالمنظمة -- خريطة list_id → عدد، لعرضها مباشرة
+ * على بطاقة كل قائمة بدون استعلام منفصل لكل قائمة. */
+export const fetchOrgListFamilyCounts = async (orgId) => {
+  try {
+    const { data, error } = await supabase.from('org_list_families').select('list_id').eq('org_id', orgId);
+    if (error) throw error;
+    const counts = {};
+    (data || []).forEach((r) => {
+      counts[r.list_id] = (counts[r.list_id] || 0) + 1;
+    });
+    return counts;
+  } catch (err) {
+    console.error('[fetchOrgListFamilyCounts]', err.message);
+    return {};
+  }
+};
+
+export const fetchOrgListFamilyIds = async (listId) => {
+  const { data, error } = await supabase
+    .from('org_list_families')
+    .select('family_id')
+    .eq('list_id', listId);
+  if (error) throw error;
+  return new Set((data || []).map((r) => r.family_id));
+};
+
+export const addFamilyToList = async (listId, orgId, familyId) => {
+  const { error } = await supabase.from('org_list_families').insert([
+    { list_id: listId, org_id: orgId, family_id: familyId, added_at: new Date().toISOString() },
+  ]);
+  if (error) throw error;
+};
+
+export const removeFamilyFromList = async (listId, familyId) => {
+  const { error } = await supabase
+    .from('org_list_families')
+    .delete()
+    .eq('list_id', listId)
+    .eq('family_id', familyId);
+  if (error) throw error;
+};

@@ -24,6 +24,8 @@ import UserFormScreen from '../screens/users/UserFormScreen';
 import MovementsScreen from '../screens/movements/MovementsScreen';
 import DistributionsScreen from '../screens/distributions/DistributionsScreen';
 import DistributionReceiveScreen from '../screens/distributions/DistributionReceiveScreen';
+import ListsScreen from '../screens/lists/ListsScreen';
+import ListDetailScreen from '../screens/lists/ListDetailScreen';
 import PermissionsAdminScreen from '../screens/permissions/PermissionsAdminScreen';
 import ChildrenScreen from '../screens/children/ChildrenScreen';
 import WomenScreen from '../screens/women/WomenScreen';
@@ -186,6 +188,10 @@ const RootNavigator = () => {
             {/* التوزيعات — منقولة بالكامل */}
             <Stack.Screen name="Distributions" component={DistributionsScreen} options={{ title: 'التوزيعات' }} />
             <Stack.Screen name="DistributionReceive" component={DistributionReceiveScreen} options={{ title: 'تسجيل الاستلام' }} />
+
+            {/* القوائم — قوائم الأسر المعتمدة لدى المؤسسات المانحة */}
+            <Stack.Screen name="Lists" component={ListsScreen} options={{ title: 'القوائم' }} />
+            <Stack.Screen name="ListDetail" component={ListDetailScreen} options={{ title: 'تفاصيل القائمة' }} />
 
             {/* إدارة الصلاحيات — منقولة بالكامل */}
             <Stack.Screen name="PermissionsAdmin" component={PermissionsAdminScreen} options={{ title: 'إدارة الصلاحيات' }} />

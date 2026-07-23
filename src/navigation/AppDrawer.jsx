@@ -73,6 +73,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         { icon: '💬', label: 'رسائل بوابة الأسرة', screen: 'PortalMessages', pageKey: 'families' },
         { icon: '🚶', label: 'حركات الأسر', screen: 'Movements', pageKey: 'movements' },
         { icon: '📦', label: 'التوزيعات', screen: 'Distributions', pageKey: 'distributions' },
+        { icon: '📋', label: 'القوائم', screen: 'Lists', pageKey: 'lists' },
         { icon: '💬', label: 'الرسائل', screen: 'SMS', pageKey: 'sms' },
         { icon: '📝', label: 'آخر التعديلات على الأسر', screen: 'ActivityLog', pageKey: 'activity_log' },
         ...(isOwner ? [{ icon: '🚪', label: 'الأسر الخارجة', screen: 'ExitedFamilies' }] : []),

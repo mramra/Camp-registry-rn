@@ -26,6 +26,8 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import SelectField from '../../components/ui/SelectField';
 import Badge from '../../components/ui/Badge';
+import BottomSheetModal from '../../components/ui/BottomSheetModal';
+import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import colors from '../../theme/colors';
 
 const SORT_OPTIONS = [
@@ -36,6 +38,20 @@ const SORT_OPTIONS = [
 ];
 
 const TIER_COLOR = { critical: colors.red, high: colors.orange, medium: colors.accent, low: colors.green };
+
+// حقول تصدير كشف الاستلام القابلة للتخصيص عبر FieldPicker (نفس نمط
+// الأطفال/النساء/الرجال/القوائم) -- الثمانية الحالية مفعّلة افتراضياً
+// بنفس الترتيب المعمول به سابقاً، بدون أي تغيير بالقيم الفعلية.
+const DIST_FIELD_DEFS = [
+  { key: 'number', label: '#', order: 1 },
+  { key: 'camp', label: 'المخيم', order: 2 },
+  { key: 'head_name', label: 'اسم رب الأسرة', order: 3 },
+  { key: 'head_id', label: 'رقم الهوية', order: 4 },
+  { key: 'tent', label: 'رقم الخيمة', order: 5 },
+  { key: 'member_count', label: 'عدد الأفراد', order: 6 },
+  { key: 'vulnerability', label: 'درجة الضعف', order: 7 },
+  { key: 'phone', label: 'الجوال', order: 8 },
+];
 
 /**
  * شاشة جولة توزيع واحدة — تُفتح مباشرة من قائمة الجولات (بدون أي شاشة
@@ -276,18 +292,25 @@ export default function DistributionReceiveScreen() {
   };
 
   const [exporting, setExporting] = useState(false);
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
+  const [distFields, setDistFields] = useState(DIST_FIELD_DEFS);
 
-  /** يبني صفوف أسرة واحدة لملف التصدير (اسم، هوية، مخيم، خيمة، عدد أفراد، جوال) */
-  const buildExportRow = (f, i) => ({
-    '#': i + 1,
-    'المخيم': campMap[f.camp_id] || '—',
-    'اسم رب الأسرة': f.head_name || '',
-    'رقم الهوية': f.head_id || '',
-    'رقم الخيمة': f.tent || '',
-    'عدد الأفراد': 1 + (membersByFamily[f.id]?.length || 0),
-    'درجة الضعف': VULNERABILITY_TIER_LABELS[getVulnerabilityScore(f, membersByFamily[f.id]).tier],
-    'الجوال': f.phone1 || '',
-  });
+  /** يبني صف أسرة واحدة لملف التصدير حسب الحقول المحددة وترتيبها فقط */
+  const buildExportRow = (f, i, cols) => {
+    const all = {
+      number: i + 1,
+      camp: campMap[f.camp_id] || '—',
+      head_name: f.head_name || '',
+      head_id: f.head_id || '',
+      tent: f.tent || '',
+      member_count: 1 + (membersByFamily[f.id]?.length || 0),
+      vulnerability: VULNERABILITY_TIER_LABELS[getVulnerabilityScore(f, membersByFamily[f.id]).tier],
+      phone: f.phone1 || '',
+    };
+    const row = {};
+    cols.forEach((c) => { row[c.label] = all[c.key]; });
+    return row;
+  };
 
   /** ترتيب الأسر حسب المخيم (تجميعي)، ثم رقم الخيمة (عددياً، والي بدون
    * رقم خيمة يروح بآخر القائمة دايماً)، ثم الاسم -- لكل من ورقتي الاستلام */
@@ -306,10 +329,15 @@ export default function DistributionReceiveScreen() {
     });
 
   const handleExport = async () => {
+    const cols = orderedSelected(distFields);
+    if (cols.length === 0) {
+      showError('اختر حقلاً واحداً على الأقل للتصدير');
+      return;
+    }
     setExporting(true);
     try {
       const received = sortByCamp(families.filter((f) => receivedIds.has(f.id)));
-      const rows = received.map(buildExportRow);
+      const rows = received.map((f, i) => buildExportRow(f, i, cols));
       const fileName = `تقرير_استلام_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`;
 
       if (round?.camp_id && showBanner) {
@@ -392,7 +420,7 @@ export default function DistributionReceiveScreen() {
               subtitle={<Text style={styles.headerSubtitle}>{receivedIds.size} استلم من أصل {families.length}</Text>}
             />
 
-            <PrimaryButton label="📤 تصدير الكشف" onPress={handleExport} loading={exporting} />
+            <PrimaryButton label="📤 تصدير الكشف" onPress={() => setFieldPickerOpen(true)} loading={exporting} />
 
             <CampDelegatePanel
               camp={camps.find((c) => c.id === round?.camp_id)}
@@ -497,6 +525,16 @@ export default function DistributionReceiveScreen() {
           </Pressable>
         </View>
       )}
+
+      <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
+        <FieldPicker title="📋 حقول كشف الاستلام" cols={distFields} onChange={setDistFields} startOpen />
+        <Pressable
+          style={styles.customExportBtn}
+          onPress={() => { setFieldPickerOpen(false); handleExport(); }}
+        >
+          <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(distFields).length} حقل)</Text>
+        </Pressable>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -562,4 +600,6 @@ const styles = StyleSheet.create({
   bulkBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 },
   disabled: { opacity: 0.6 },
   bulkBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
+  customExportBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
+  customExportBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },
 });

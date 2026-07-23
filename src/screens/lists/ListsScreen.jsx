@@ -4,13 +4,26 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { fetchOrgLists, fetchOrgListFamilyCounts, createOrgList, updateOrgList, deleteOrgList } from '../../lib/supabase';
 import { formatDate } from '../../lib/utils';
+import { exportXLSX } from '../../lib/excelIO';
+import { naturalCompare } from '../../lib/helpers';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import EmptyState from '../../components/ui/EmptyState';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FormInput from '../../components/ui/FormInput';
+import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import colors from '../../theme/colors';
+
+// حقول تصدير كشف القوائم نفسها (سطر لكل قائمة، وليس لكل أسرة -- تصدير
+// أسر قائمة واحدة موجود بشاشة تفاصيل القائمة). الأربعة الأساسية مفعّلة
+// افتراضياً بالترتيب المطلوب.
+const LISTS_FIELD_DEFS = [
+  { key: 'name', label: 'اسم القائمة (المؤسسة)', order: 1 },
+  { key: 'family_count', label: 'عدد الأسر', order: 2 },
+  { key: 'created_at', label: 'تاريخ الإنشاء', order: 3 },
+  { key: 'notes', label: 'ملاحظات', order: 4 },
+];
 
 /**
  * قائمة "القوائم المعتمدة" — كل قائمة تمثّل أسماء أُسر معتمدة لدى مؤسسة
@@ -32,6 +45,9 @@ export default function ListsScreen() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [editingListId, setEditingListId] = useState(null); // null = إضافة جديدة، وإلا تعديل اسم
+  const [exporting, setExporting] = useState(false);
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
+  const [listsFields, setListsFields] = useState(LISTS_FIELD_DEFS);
 
   const loadData = useCallback(async () => {
     if (!orgId) return;
@@ -124,6 +140,37 @@ export default function ListsScreen() {
     );
   };
 
+  const buildExportRow = (l, i, cols) => {
+    const all = {
+      name: l.name || '',
+      family_count: counts[l.id] || 0,
+      created_at: formatDate(l.created_at),
+      notes: l.notes || '',
+    };
+    const row = { '#': i + 1 };
+    cols.forEach((c) => { row[c.label] = all[c.key]; });
+    return row;
+  };
+
+  const handleExport = async () => {
+    const cols = orderedSelected(listsFields);
+    if (cols.length === 0) {
+      showError('اختر حقلاً واحداً على الأقل للتصدير');
+      return;
+    }
+    setExporting(true);
+    try {
+      const sorted = [...filtered].sort((a, b) => naturalCompare(a.name, b.name));
+      const rows = sorted.map((l, i) => buildExportRow(l, i, cols));
+      await exportXLSX(rows, 'القوائم', 'كشف_القوائم_المعتمدة');
+      showSuccess('تم تصدير كشف القوائم');
+    } catch (e) {
+      showError('فشل التصدير: ' + e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const renderList = ({ item: l }) => (
     <Pressable style={styles.card} onPress={() => navigation.push('ListDetail', { list: l })}>
       <View style={{ flex: 1 }}>
@@ -173,6 +220,10 @@ export default function ListsScreen() {
 
             {canWrite && <PrimaryButton label="➕ قائمة جديدة" onPress={openAddForm} />}
 
+            <Pressable style={[styles.exportBtn, exporting && styles.disabled]} onPress={() => setFieldPickerOpen(true)} disabled={exporting || lists.length === 0}>
+              {exporting ? <ActivityIndicator color="#000" /> : <Text style={styles.exportBtnText}>📤 تصدير كشف القوائم (Excel)</Text>}
+            </Pressable>
+
             <TextInput
               value={search}
               onChangeText={setSearch}
@@ -203,6 +254,16 @@ export default function ListsScreen() {
           </Pressable>
         </View>
       </BottomSheetModal>
+
+      <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
+        <FieldPicker title="📋 حقول كشف القوائم" cols={listsFields} onChange={setListsFields} startOpen />
+        <Pressable
+          style={styles.customExportBtn}
+          onPress={() => { setFieldPickerOpen(false); handleExport(); }}
+        >
+          <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(listsFields).length} حقل)</Text>
+        </Pressable>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -217,6 +278,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 10,
   },
+
+  exportBtn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: 10 },
+  exportBtnText: { color: colors.accent, fontWeight: '900', fontSize: 13 },
+  customExportBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
+  customExportBtnText: { color: '#000', fontWeight: '900', fontSize: 13 },
 
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRightColor: colors.accent, borderRadius: 12, padding: 14, marginBottom: 8 },
   listName: { color: colors.white, fontWeight: 'bold', fontSize: 14, textAlign: 'right' },

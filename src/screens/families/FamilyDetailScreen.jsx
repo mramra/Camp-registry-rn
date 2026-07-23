@@ -260,8 +260,10 @@ export default function FamilyDetailScreen() {
   const infoRows = [
     ['رقم الهوية', family.head_id],
     ['الجوال', family.phone1],
+    ['مقدمة واتساب', family.whatsapp_prefix],
     ['رقم واتساب', family.phone2],
     ['المحفظة الإلكترونية', family.wallet_type],
+    ['رقم جوال المحفظة', family.wallet_phone],
     ['الجنس', family.head_gender],
     ['الحالة الاجتماعية', family.head_marital],
     ['المخيم', campName],

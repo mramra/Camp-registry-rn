@@ -276,6 +276,9 @@ export default function FamilyPortalScreen({ navigation }) {
                     ['اسم رب الأسرة', family.head_name],
                     ['رقم الهوية', family.head_id],
                     ['رقم الجوال', family.phone1],
+                    ['رقم واتساب', family.phone2 ? `${family.whatsapp_prefix || ''}${family.phone2}` : null],
+                    ['المحفظة الإلكترونية', family.wallet_type],
+                    ['رقم جوال المحفظة', family.wallet_phone],
                     ['المخيم', family.camps?.name || '—'],
                     ['الخيمة', family.tent || '—'],
                   ].map(([k, v]) => (

@@ -18,6 +18,17 @@ import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import { showToast } from '../../utils/toast';
 import colors from '../../theme/colors';
 
+// حقول تصدير كشف "الأسر الناقصة" القابلة للتخصيص -- الستة الحالية
+// كلها مفعّلة افتراضياً بنفس الترتيب والقيم السابقة.
+const MISSING_FIELD_DEFS = [
+  { key: 'number', label: '#', order: 1 },
+  { key: 'head_name', label: 'اسم رب الأسرة', order: 2 },
+  { key: 'head_id', label: 'رقم الهوية', order: 3 },
+  { key: 'phone', label: 'رقم الجوال', order: 4 },
+  { key: 'camp_name', label: 'المخيم', order: 5 },
+  { key: 'missing_list', label: 'النواقص', order: 6 },
+];
+
 export default function ExportScreen() {
   const { profile, orgId } = useAuth();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
@@ -37,6 +48,7 @@ export default function ExportScreen() {
   // اختيار الحقول — التصدير السريع
   const [famCols, setFamCols] = useState(() => FAM_COLS.map((c) => ({ ...c, order: 0 })));
   const [memCols, setMemCols] = useState(() => MEM_COLS.map((c) => ({ ...c, order: 0 })));
+  const [missingCols, setMissingCols] = useState(MISSING_FIELD_DEFS);
 
   // ── التصدير المخصص ──
   const [allFamilies, setAllFamilies] = useState([]);
@@ -207,16 +219,26 @@ export default function ExportScreen() {
 
   const exportMissing = async () => {
     if (!canExport) return showToast('لا تملك صلاحية التصدير', 'error');
+    const selectedCols = orderedSelected(missingCols);
+    if (!selectedCols.length) return showToast('اختر حقلاً واحداً على الأقل', 'error');
     setLoading(true);
     try {
       const data = await getFullData();
       const missing = data.filter((f) => !f.head_name || !f.head_id || !f.phone1 || !f.camp_id);
       if (!missing.length) return showToast('لا توجد بيانات ناقصة', 'success');
-      const rows = missing.map((f, i) => ({
-        '#': i + 1, 'اسم رب الأسرة': f.head_name || '—', 'رقم الهوية': f.head_id || '—',
-        'رقم الجوال': f.phone1 || '—', 'المخيم': f.camps?.name || '—',
-        'النواقص': [!f.head_name && 'الاسم', !f.head_id && 'الهوية', !f.phone1 && 'الجوال', !f.camp_id && 'المخيم'].filter(Boolean).join(' + '),
-      }));
+      const rows = missing.map((f, i) => {
+        const all = {
+          number: i + 1,
+          head_name: f.head_name || '—',
+          head_id: f.head_id || '—',
+          phone: f.phone1 || '—',
+          camp_name: f.camps?.name || '—',
+          missing_list: [!f.head_name && 'الاسم', !f.head_id && 'الهوية', !f.phone1 && 'الجوال', !f.camp_id && 'المخيم'].filter(Boolean).join(' + '),
+        };
+        const row = {};
+        selectedCols.forEach((col) => { row[col.label] = all[col.key]; });
+        return row;
+      });
       const campInfo = getCampInfo(filterCamp);
       const banner = buildBannerLines(campInfo);
       if (banner) {
@@ -664,6 +686,7 @@ export default function ExportScreen() {
                 <Pressable style={styles.btnPrimary} onPress={exportFamilies} disabled={loading}>
                   <Text style={styles.btnPrimaryText}>👨‍👩‍👧 تصدير كشف رباب الأسر</Text>
                 </Pressable>
+                <FieldPicker title="⚠️ حقول الأسر الناقصة" cols={missingCols} onChange={setMissingCols} />
                 <Pressable style={styles.btnRed} onPress={exportMissing} disabled={loading}>
                   <Text style={styles.btnRedText}>⚠️ الأسر الناقصة</Text>
                 </Pressable>

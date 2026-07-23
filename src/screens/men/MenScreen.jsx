@@ -6,17 +6,16 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
 import { calcAge, naturalCompare, normalizeHealthValue, buildCampExportBanner } from '../../lib/helpers';
-import { showError } from '../../utils/toast';
+import { showError, showSuccess } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
-import ExportButton from '../../components/ui/ExportButton';
 import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
-import { exportXLSX } from '../../lib/excelIO';
+import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import colors from '../../theme/colors';
 
 const MEN_FIELD_DEFS = [
@@ -200,6 +199,7 @@ export default function MenScreen() {
     const selected = orderedSelected(menFields);
     if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
     try {
+      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
       const rows = menData.map((w, i) => {
         const row = {};
         selected.forEach((def) => {
@@ -224,7 +224,10 @@ export default function MenScreen() {
         });
         return row;
       });
-      await exportXLSX(rows, 'الرجال', 'كشف_الرجال_مخصص');
+      await (banner
+        ? exportXLSXMultiSheetWithBanners([{ name: 'الرجال', banner, rows }], 'كشف_الرجال')
+        : exportXLSX(rows, 'الرجال', 'كشف_الرجال'));
+      showSuccess('تم تجهيز الملف للمشاركة/الحفظ');
       setFieldPickerOpen(false);
     } catch (e) {
       showError('تعذّر التصدير: ' + e.message);
@@ -291,28 +294,9 @@ export default function MenScreen() {
                 onPress={() => setCampPickerVisible(true)}
               />
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <ExportButton
-                  label="📊 تصدير الكشف"
-                  getRows={() =>
-                    menData.map((w, i) => ({
-                      '#': i + 1,
-                      'الخيمة': w.tent,
-                      'الاسم': w.name,
-                      'العمر': w.age ?? '',
-                      'الصلة': w.type,
-                      'الحالة الاجتماعية': w.marital,
-                      'أمراض مزمنة': w.chronic,
-                      'المخيم': w.camp,
-                    }))
-                  }
-                  sheetName="الرجال"
-                  fileName="سجل_الرجال"
-                  getBanner={() => {
-                    if (!filterCamp || !showBanner) return null;
-                    const camp = camps.find((c) => c.id === filterCamp);
-                    return buildCampExportBanner(camp, orgMembers);
-                  }}
-                />
+                <Pressable style={styles.smsBtn} onPress={() => setFieldPickerOpen(true)}>
+                  <Text style={styles.smsBtnText}>📤 تصدير الكشف</Text>
+                </Pressable>
                 <Pressable
                   style={styles.smsBtn}
                   onPress={() => {
@@ -323,9 +307,6 @@ export default function MenScreen() {
                   }}
                 >
                   <Text style={styles.smsBtnText}>📤 SMS</Text>
-                </Pressable>
-                <Pressable style={styles.smsBtn} onPress={() => setFieldPickerOpen(true)}>
-                  <Text style={styles.smsBtnText}>⚙️ تخصيص الحقول</Text>
                 </Pressable>
               </View>
             </View>

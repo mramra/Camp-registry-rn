@@ -6,17 +6,16 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
 import { calcAge, naturalCompare, normalizeHealthValue, buildCampExportBanner, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing } from '../../lib/helpers';
-import { showError } from '../../utils/toast';
+import { showError, showSuccess } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
-import ExportButton from '../../components/ui/ExportButton';
 import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
-import { exportXLSX } from '../../lib/excelIO';
+import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import colors from '../../theme/colors';
 
 // حقول تصدير كشف النساء القابلة للتخصيص بالنقر (ترقيم = ترتيب الأعمدة).
@@ -227,6 +226,7 @@ export default function WomenScreen() {
     const selected = orderedSelected(womenFields);
     if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
     try {
+      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
       const rows = womenData.map((w, i) => {
         const row = {};
         selected.forEach((def) => {
@@ -254,7 +254,10 @@ export default function WomenScreen() {
         });
         return row;
       });
-      await exportXLSX(rows, 'النساء', 'كشف_النساء_مخصص');
+      await (banner
+        ? exportXLSXMultiSheetWithBanners([{ name: 'النساء', banner, rows }], 'كشف_النساء')
+        : exportXLSX(rows, 'النساء', 'كشف_النساء'));
+      showSuccess('تم تجهيز الملف للمشاركة/الحفظ');
       setFieldPickerOpen(false);
     } catch (e) {
       showError('تعذّر التصدير: ' + e.message);
@@ -325,31 +328,9 @@ export default function WomenScreen() {
                 onPress={() => setCampPickerVisible(true)}
               />
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <ExportButton
-                  label="📊 تصدير الكشف"
-                  getRows={() =>
-                    womenData.map((w, i) => ({
-                      '#': i + 1,
-                      'الخيمة': w.tent,
-                      'الاسم': w.name,
-                      'العمر': w.age ?? '',
-                      'الصلة': w.type,
-                      'الحالة الاجتماعية': w.marital,
-                      'الوضع': w.status,
-                      'مرضعة؟': w.isNursing ? 'نعم' : 'لا',
-                      'عدد أفراد الأسرة': w.familySize,
-                      'أمراض مزمنة': w.chronic,
-                      'المخيم': w.camp,
-                    }))
-                  }
-                  getBanner={() => {
-                    if (!filterCamp || !showBanner) return null;
-                    const camp = camps.find((c) => c.id === filterCamp);
-                    return buildCampExportBanner(camp, orgMembers);
-                  }}
-                  sheetName="النساء"
-                  fileName="سجل_النساء"
-                />
+                <Pressable style={styles.smsBtn} onPress={() => setFieldPickerOpen(true)}>
+                  <Text style={styles.smsBtnText}>📤 تصدير الكشف</Text>
+                </Pressable>
                 <Pressable
                   style={styles.smsBtn}
                   onPress={() => {
@@ -360,9 +341,6 @@ export default function WomenScreen() {
                   }}
                 >
                   <Text style={styles.smsBtnText}>📤 SMS</Text>
-                </Pressable>
-                <Pressable style={styles.smsBtn} onPress={() => setFieldPickerOpen(true)}>
-                  <Text style={styles.smsBtnText}>⚙️ تخصيص الحقول</Text>
                 </Pressable>
               </View>
             </View>

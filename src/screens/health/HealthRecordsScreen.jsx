@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
 import { naturalCompare, normalizeHealthValue, buildCampExportBanner, calcAge, HEALTH_FIELD_MAP } from '../../lib/helpers';
-import { showError } from '../../utils/toast';
+import { showError, showSuccess } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
@@ -14,10 +14,9 @@ import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
-import ExportButton from '../../components/ui/ExportButton';
 import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
-import { exportXLSX } from '../../lib/excelIO';
+import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import colors from '../../theme/colors';
 
 const HEALTH_FIELD_DEFS = [
@@ -203,6 +202,7 @@ export default function HealthRecordsScreen() {
     const selected = orderedSelected(healthFields);
     if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
     try {
+      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
       const rows = healthData.map((r, i) => {
         const row = {};
         selected.forEach((def) => {
@@ -225,7 +225,10 @@ export default function HealthRecordsScreen() {
         });
         return row;
       });
-      await exportXLSX(rows, 'الصحة', 'كشف_الصحة_مخصص');
+      await (banner
+        ? exportXLSXMultiSheetWithBanners([{ name: 'الصحة', banner, rows }], 'كشف_الصحة')
+        : exportXLSX(rows, 'الصحة', 'كشف_الصحة'));
+      showSuccess('تم تجهيز الملف للمشاركة/الحفظ');
       setFieldPickerOpen(false);
     } catch (e) {
       showError('تعذّر التصدير: ' + e.message);
@@ -287,27 +290,9 @@ export default function HealthRecordsScreen() {
                 onPress={() => setCampPickerVisible(true)}
               />
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <ExportButton
-                  label="📊 تصدير الكشف"
-                  getRows={() =>
-                    healthData.map((r, i) => ({
-                      '#': i + 1,
-                      'الخيمة': r.tent,
-                      'الاسم': r.name,
-                      'الصلة': r.role,
-                      'النوع': r.healthType,
-                      'الحالة': r.val,
-                      'المخيم': r.camp,
-                    }))
-                  }
-                  sheetName="الصحة"
-                  fileName="سجل_الصحة"
-                  getBanner={() => {
-                    if (!filterCamp || !showBanner) return null;
-                    const camp = camps.find((c) => c.id === filterCamp);
-                    return buildCampExportBanner(camp, orgMembers);
-                  }}
-                />
+                <Pressable style={styles.smsBtn} onPress={() => setFieldPickerOpen(true)}>
+                  <Text style={styles.smsBtnText}>📤 تصدير الكشف</Text>
+                </Pressable>
                 <Pressable
                   style={styles.smsBtn}
                   onPress={() => {
@@ -318,9 +303,6 @@ export default function HealthRecordsScreen() {
                   }}
                 >
                   <Text style={styles.smsBtnText}>📤 SMS</Text>
-                </Pressable>
-                <Pressable style={styles.smsBtn} onPress={() => setFieldPickerOpen(true)}>
-                  <Text style={styles.smsBtnText}>⚙️ تخصيص الحقول</Text>
                 </Pressable>
               </View>
             </View>

@@ -13,7 +13,7 @@ import {
 } from '../../lib/supabase';
 import { showError, showSuccess } from '../../utils/toast';
 import { exportXLSX } from '../../lib/excelIO';
-import { naturalCompare } from '../../lib/helpers';
+import { naturalCompare, VALID_MOTHER_RELATIONS, getVulnerabilityScore, VULNERABILITY_TIER_LABELS } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
@@ -27,9 +27,12 @@ import colors from '../../theme/colors';
 const LIST_FIELD_DEFS = [
   { key: 'head_name', label: 'اسم رب الأسرة', order: 1 },
   { key: 'head_id', label: 'رقم الهوية', order: 2 },
-  { key: 'phone1', label: 'رقم الهاتف', order: 3 },
-  { key: 'member_count', label: 'عدد الأفراد', order: 4 },
+  { key: 'phone1', label: 'رقم التواصل', order: 3 },
+  { key: 'member_count', label: 'عدد أفراد الأسرة', order: 4 },
   { key: 'tent', label: 'رقم الخيمة/المأوى', order: 5 },
+  { key: 'wife_name', label: 'اسم الزوجة', order: 6 },
+  { key: 'wife_id', label: 'هوية الزوجة', order: 7 },
+  { key: 'marital_status', label: 'الحالة الاجتماعية', order: 8 },
   { key: 'camp_name', label: 'المخيم', order: 0 },
   { key: 'vulnerability', label: 'درجة الضعف', order: 0 },
 ];
@@ -172,14 +175,23 @@ export default function ListDetailScreen() {
   };
 
   const buildExportRow = (f, i, cols) => {
-    const memberCount = 1 + (membersByFamily[f.id]?.length || 0);
+    const mems = membersByFamily[f.id] || [];
+    const memberCount = 1 + mems.length;
+    // الزوجة — أول عضو بصلة "زوجة/زوجة ثانية/.../أم" (نفس منطق استخراج
+    // الأم بشاشة سجل الأطفال). حالات تعدد الزوجات تُخزَّن كسجلات منفصلة
+    // فتُؤخذ الزوجة الأولى المسجَّلة فقط هون.
+    const wife = mems.find((m) => VALID_MOTHER_RELATIONS.includes(m.relation || ''));
     const all = {
       head_name: f.head_name || '',
       head_id: f.head_id || '',
       phone1: f.phone1 || '',
       member_count: memberCount,
       tent: f.tent || '',
+      wife_name: wife?.name || '',
+      wife_id: wife?.national_id || '',
+      marital_status: f.head_marital || '',
       camp_name: campMap[f.camp_id] || '—',
+      vulnerability: VULNERABILITY_TIER_LABELS[getVulnerabilityScore(f, mems).tier],
     };
     const row = { '#': i + 1 };
     cols.forEach((c) => { row[c.label] = all[c.key]; });

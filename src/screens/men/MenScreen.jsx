@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { calcAge, naturalCompare, normalizeHealthValue, buildCampExportBanner } from '../../lib/helpers';
+import { calcAge, naturalCompare, normalizeHealthValue } from '../../lib/helpers';
 import { showError, showSuccess } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -48,6 +48,7 @@ export default function MenScreen() {
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
   const [showBanner, setShowBanner] = useState(true);
+  const [bannerLines, setBannerLines] = useState(null);
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
   const [menFields, setMenFields] = useState(() => MEN_FIELD_DEFS.map((f) => ({ ...f })));
   const [campPickerVisible, setCampPickerVisible] = useState(false);
@@ -199,7 +200,7 @@ export default function MenScreen() {
     const selected = orderedSelected(menFields);
     if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
     try {
-      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
+      const banner = bannerLines;
       const rows = menData.map((w, i) => {
         const row = {};
         selected.forEach((def) => {
@@ -312,10 +313,13 @@ export default function MenScreen() {
             </View>
 
             <CampDelegatePanel
-              camp={camps.find((c) => c.id === filterCamp)}
+              profile={profile}
+              camps={camps}
+              filterCamp={filterCamp}
               orgMembers={orgMembers}
               showBanner={showBanner}
               onToggleBanner={setShowBanner}
+              onBannerLinesChange={setBannerLines}
             />
 
             <View style={styles.categoryGrid}>

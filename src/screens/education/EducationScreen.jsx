@@ -11,7 +11,7 @@ import { showError, showSuccess } from '../../utils/toast';
 import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { formatDateTime } from '../../lib/utils';
 import {
-  calcAge, getStageGroup, getGradeDelay, getExpectedGrade, STAGE_ICONS, buildCampExportBanner, naturalCompare,
+  calcAge, getStageGroup, getGradeDelay, getExpectedGrade, STAGE_ICONS, naturalCompare,
 } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
@@ -55,6 +55,7 @@ export default function EducationScreen() {
   const [filterCamp, setFilterCamp] = useState('');
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [showBanner, setShowBanner] = useState(true);
+  const [bannerLines, setBannerLines] = useState(null);
   const [stageFilter, setStageFilter] = useState('');
   const [search, setSearch] = useState('');
   const [offlineInfo, setOfflineInfo] = useState(null);
@@ -193,7 +194,7 @@ export default function EducationScreen() {
     const selected = orderedSelected(eduFields);
     if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
     try {
-      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
+      const banner = bannerLines;
       const sorted = [...filtered].sort((a, b) => naturalCompare(a.name, b.name));
       const rows = sorted.map((p) => {
         const f = famMap[p.family_id] || {};
@@ -302,10 +303,13 @@ export default function EducationScreen() {
             </View>
 
             <CampDelegatePanel
-              camp={camps.find((c) => c.id === filterCamp)}
+              profile={profile}
+              camps={camps}
+              filterCamp={filterCamp}
               orgMembers={orgMembers}
               showBanner={showBanner}
               onToggleBanner={setShowBanner}
+              onBannerLinesChange={setBannerLines}
             />
 
             <View style={styles.ageGrid}>

@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX, exportCampTemplateReport } from '../../lib/excelIO';
-import { calcAge, isAgeInRange, buildCampExportBanner, getCampDelegateInfo, normalizeHealthValue, naturalCompare } from '../../lib/helpers';
+import { calcAge, isAgeInRange, getCampDelegateInfo, normalizeHealthValue, naturalCompare } from '../../lib/helpers';
 import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
@@ -39,6 +39,8 @@ export default function ExportScreen() {
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
   const [showBanner, setShowBanner] = useState(true);
+  const [bannerLines, setBannerLines] = useState(null);
+  const [cxBannerLines, setCxBannerLines] = useState(null);
   const [loading, setLoading] = useState(false);
   const [mainTab, setMainTab] = useState('quickFam'); // quickFam | quickMem | customFam | customMem | import
   const [importPreview, setImportPreview] = useState(null);
@@ -127,15 +129,6 @@ export default function ExportScreen() {
     return camps.find((c) => c.id === campId) || null;
   };
 
-  // بانر حقيقي (صفين مدمجين بأعلى الملف) -- يستخدم الدالة المركزية
-  // buildCampExportBanner (بملف helpers.js) بدل منطق محلي مكرر، عشان
-  // البانر يطلع نفسه بالضبط بكل شاشات التصدير (اسم مخيم + مندوب + جوال +
-  // إحداثيات) بلا أي فرق أو نسيان حقل بينها.
-  const buildBannerLines = (camp, enabled = showBanner) => {
-    if (!enabled || !camp) return null;
-    return buildCampExportBanner(camp, orgMembers);
-  };
-
   // بدل إعادة الطلب من السيرفر كل مرة، نفلتر من allFamilies المحمّلة أصلاً
   // (بواسطة loadMeta) — هذا يخلي التصدير السريع يشتغل حتى بدون اتصال، طالما
   // الشاشة فُتحت أونلاين قبل مرة بنفس الجلسة أو فيه نسخة محفوظة محلياً.
@@ -163,7 +156,7 @@ export default function ExportScreen() {
         });
         return row;
       });
-      const banner = buildBannerLines(campInfo);
+      const banner = bannerLines;
       const sheetName = (campInfo?.name || 'كل المخيمات').slice(0, 31);
       const fname = `كشف_الأسر_${campInfo?.name || 'كل_المخيمات'}`;
       if (banner) {
@@ -201,7 +194,7 @@ export default function ExportScreen() {
           rows.push(row);
         });
       });
-      const banner = buildBannerLines(campInfo);
+      const banner = bannerLines;
       const sheetName = (campInfo?.name || 'كل المخيمات').slice(0, 31);
       const fname = `كشف_الأفراد_${campInfo?.name || 'كل_المخيمات'}`;
       if (banner) {
@@ -240,7 +233,7 @@ export default function ExportScreen() {
         return row;
       });
       const campInfo = getCampInfo(filterCamp);
-      const banner = buildBannerLines(campInfo);
+      const banner = bannerLines;
       if (banner) {
         await exportXLSXMultiSheetWithBanners([{ name: 'الأسر الناقصة', banner, rows }], 'الأسر_الناقصة');
       } else {
@@ -466,7 +459,6 @@ export default function ExportScreen() {
     if (!cols.length || !cxSelected.size) return showToast('اختر حقولاً وعناصر أولاً', 'error');
     setLoading(true);
     try {
-      const showBnr = !!cxCamp;
       let rows = [];
       if (!isMem) {
         const selFams = cxFilteredFams.filter((f) => cxSelected.has(f.id));
@@ -496,8 +488,7 @@ export default function ExportScreen() {
           return row;
         });
       }
-      const cxCampInfo = showBnr ? getCampInfo(cxCamp) : null;
-      const banner = buildBannerLines(cxCampInfo, showBnr);
+      const banner = cxBannerLines;
       const sheetName = (cxSheetName.slice(0, 31) || 'كشف مخصص');
       const fname = cxSheetName || 'كشف_مخصص';
       if (banner) {
@@ -650,10 +641,13 @@ export default function ExportScreen() {
               onSelect={setFilterCamp}
             />
             <CampDelegatePanel
-              camp={getCampInfo(filterCamp)}
+              profile={profile}
+              camps={camps}
+              filterCamp={filterCamp}
               orgMembers={orgMembers}
               showBanner={showBanner}
               onToggleBanner={setShowBanner}
+              onBannerLinesChange={setBannerLines}
             />
           </>
         )}
@@ -730,10 +724,13 @@ export default function ExportScreen() {
               onSelect={(v) => { setCxCamp(v); setCxSelected(new Set()); }}
             />
             <CampDelegatePanel
-              camp={getCampInfo(cxCamp)}
+              profile={profile}
+              camps={camps}
+              filterCamp={cxCamp}
               orgMembers={orgMembers}
               showBanner={showBanner}
               onToggleBanner={setShowBanner}
+              onBannerLinesChange={setCxBannerLines}
             />
 
             {cxMode === 'members' && (

@@ -514,6 +514,39 @@ export function buildCampExportBanner(camp, orgMembers) {
 }
 
 /**
+ * بانر التصدير النهائي حسب دور المستخدم المصدِّر (وليس فقط حسب المخيم
+ * المفلتَر بالبيانات) -- طلب صريح:
+ * - المندوب/المساعد: بانر شخصي دائم باسمه هو، يظهر بكل تصدير يسويه بغض
+ *   النظر لو اختار مخيمه بالفلتر أو "كل المخيمات" (أصلاً محصور بمخيمه
+ *   وحده، فـ"كل المخيمات" بالنسبة له هو نفسه مخيمه).
+ * - مالك المنصة/مدير الإيواء: بانر المخيم اللي يختاره صراحة (bannerCamp)
+ *   من قائمة مخيماته المرئية -- منفصل تماماً عن فلتر عرض البيانات، فيقدر
+ *   يصدّر "كل المخيمات" ويحدد بانر مخيم معيّن لو حاب، أو يلغي البانر.
+ */
+export function getExportBannerLines(profile, bannerCamp, orgMembers) {
+  if (!profile) return null;
+
+  if (profile.role === 'camp_delegate' || profile.role === 'assistant') {
+    const roleLabel = profile.role === 'camp_delegate' ? 'المندوب' : 'المساعد';
+    const rawName = bannerCamp?.name;
+    const displayName = rawName ? (rawName.trim().startsWith('مخيم') ? rawName : `مخيم ${rawName}`) : null;
+    const coords = bannerCamp?.latitude && bannerCamp?.longitude ? `${bannerCamp.latitude}, ${bannerCamp.longitude}` : null;
+    const infoLine = [
+      `👤 ${roleLabel}: ${profile.full_name || '—'}`,
+      `📱 ${profile.phone || '—'}`,
+      coords ? `📍 ${coords}` : null,
+    ].filter(Boolean).join('   ');
+    return [
+      { text: displayName ? `🏕️ ${displayName}` : '🏕️ كشف بيانات', size: 18 },
+      { text: infoLine, size: 11 },
+    ];
+  }
+
+  // مالك المنصة / مدير الإيواء -- بانر المخيم المختار صراحة فقط، وإلا بلا بانر
+  return buildCampExportBanner(bannerCamp, orgMembers);
+}
+
+/**
  * قيم الحالات الصحية تختلف شكلها فعلياً حسب الجدول (تأكدنا من db.js الأصلي):
  * - family_members.disabilities/injuries/chronic_diseases: مصفوفة Postgres حقيقية
  *   (JS array فعلي عبر REST مباشرة)

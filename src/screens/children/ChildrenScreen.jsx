@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { calcAge, naturalCompare, buildCampExportBanner, isInfantAge, INFANT_MAX_AGE, VALID_MOTHER_RELATIONS, normalizeHealthValue } from '../../lib/helpers';
+import { calcAge, naturalCompare, isInfantAge, INFANT_MAX_AGE, VALID_MOTHER_RELATIONS, normalizeHealthValue } from '../../lib/helpers';
 import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { showError, showSuccess } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
@@ -58,6 +58,7 @@ export default function ChildrenScreen() {
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
   const [showBanner, setShowBanner] = useState(true);
+  const [bannerLines, setBannerLines] = useState(null);
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
   const [childFields, setChildFields] = useState(() => CHILD_FIELD_DEFS.map((f) => ({ ...f })));
   const [campPickerVisible, setCampPickerVisible] = useState(false);
@@ -174,7 +175,7 @@ export default function ChildrenScreen() {
     const selected = orderedSelected(childFields);
     if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
     try {
-      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
+      const banner = bannerLines;
       // الترتيب حسب رقم الخيمة داخلياً فقط -- بدون أي عمود مخصَّص لها
       // بالجدول الناتج (حسب طلب محمود صراحة)
       const sorted = [...childrenData].sort((a, b) => naturalCompare(a.tent, b.tent));
@@ -289,10 +290,13 @@ export default function ChildrenScreen() {
             </View>
 
             <CampDelegatePanel
-              camp={camps.find((c) => c.id === filterCamp)}
+              profile={profile}
+              camps={camps}
+              filterCamp={filterCamp}
               orgMembers={orgMembers}
               showBanner={showBanner}
               onToggleBanner={setShowBanner}
+              onBannerLinesChange={setBannerLines}
             />
 
             <View style={styles.ageGrid}>

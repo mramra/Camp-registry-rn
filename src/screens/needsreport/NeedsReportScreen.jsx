@@ -7,7 +7,7 @@ import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
 import {
   getFamilyCategories, getOrphanCount, getVulnerabilityScore, hasHealthData,
-  CATEGORY_LABELS, VULNERABILITY_TIER_LABELS, VULNERABILITY_TIER_KEYS, buildCampExportBanner,
+  CATEGORY_LABELS, VULNERABILITY_TIER_LABELS, VULNERABILITY_TIER_KEYS,
   HEALTH_FIELD_MAP,
 } from '../../lib/helpers';
 import { showError, showSuccess } from '../../utils/toast';
@@ -79,6 +79,7 @@ export default function NeedsReportScreen() {
   const [camps, setCamps] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]);
   const [showBanner, setShowBanner] = useState(true);
+  const [bannerLines, setBannerLines] = useState(null);
   const [filterCamp, setFilterCamp] = useState('');
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
@@ -178,7 +179,7 @@ export default function NeedsReportScreen() {
     const selected = orderedSelected(needsFields);
     if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
     try {
-      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
+      const banner = bannerLines;
       const rows = filtered.map(({ family: f, vuln, cats }, i) => {
         const all = {
           number: i + 1,
@@ -340,10 +341,13 @@ export default function NeedsReportScreen() {
             </View>
 
             <CampDelegatePanel
-              camp={camps.find((c) => c.id === filterCamp)}
+              profile={profile}
+              camps={camps}
+              filterCamp={filterCamp}
               orgMembers={orgMembers}
               showBanner={showBanner}
               onToggleBanner={setShowBanner}
+              onBannerLinesChange={setBannerLines}
             />
 
             <TextInput

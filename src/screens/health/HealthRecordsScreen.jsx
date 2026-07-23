@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchOrgMembers } from '../../lib/supabase';
-import { naturalCompare, normalizeHealthValue, buildCampExportBanner, calcAge, HEALTH_FIELD_MAP } from '../../lib/helpers';
+import { naturalCompare, normalizeHealthValue, calcAge, HEALTH_FIELD_MAP } from '../../lib/helpers';
 import { showError, showSuccess } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -55,6 +55,7 @@ export default function HealthRecordsScreen() {
   const [orgMembers, setOrgMembers] = useState([]);
   const [filterCamp, setFilterCamp] = useState('');
   const [showBanner, setShowBanner] = useState(true);
+  const [bannerLines, setBannerLines] = useState(null);
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
   const [healthFields, setHealthFields] = useState(() => HEALTH_FIELD_DEFS.map((f) => ({ ...f })));
   const [campPickerVisible, setCampPickerVisible] = useState(false);
@@ -202,7 +203,7 @@ export default function HealthRecordsScreen() {
     const selected = orderedSelected(healthFields);
     if (!selected.length) return showError('اختر حقلاً واحداً على الأقل');
     try {
-      const banner = filterCamp && showBanner ? buildCampExportBanner(camps.find((c) => c.id === filterCamp), orgMembers) : null;
+      const banner = bannerLines;
       const rows = healthData.map((r, i) => {
         const row = {};
         selected.forEach((def) => {
@@ -308,10 +309,13 @@ export default function HealthRecordsScreen() {
             </View>
 
             <CampDelegatePanel
-              camp={camps.find((c) => c.id === filterCamp)}
+              profile={profile}
+              camps={camps}
+              filterCamp={filterCamp}
               orgMembers={orgMembers}
               showBanner={showBanner}
               onToggleBanner={setShowBanner}
+              onBannerLinesChange={setBannerLines}
             />
 
             <View style={styles.categoryGrid}>

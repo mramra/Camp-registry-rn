@@ -18,7 +18,7 @@ import { showError, showSuccess } from '../../utils/toast';
 import { exportXLSX, exportXLSXMultiSheetWithBanners } from '../../lib/excelIO';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
-import { buildCampExportBanner, naturalCompare, getVulnerabilityScore, VULNERABILITY_TIER_LABELS, VULNERABILITY_TIER_KEYS } from '../../lib/helpers';
+import { naturalCompare, getVulnerabilityScore, VULNERABILITY_TIER_LABELS, VULNERABILITY_TIER_KEYS } from '../../lib/helpers';
 import PageHeader from '../../components/ui/PageHeader';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
@@ -71,6 +71,7 @@ export default function DistributionReceiveScreen() {
   const [camps, setCamps] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]);
   const [showBanner, setShowBanner] = useState(true);
+  const [bannerLines, setBannerLines] = useState(null);
   const [otherRounds, setOtherRounds] = useState([]);
   const [receivedIds, setReceivedIds] = useState(new Set());
   const [otherRoundReceivedIds, setOtherRoundReceivedIds] = useState(null);
@@ -340,14 +341,10 @@ export default function DistributionReceiveScreen() {
       const rows = received.map((f, i) => buildExportRow(f, i, cols));
       const fileName = `تقرير_استلام_${(round?.name || 'جولة_توزيع').replace(/\s+/g, '_')}`;
 
-      if (round?.camp_id && showBanner) {
-        // الجولة عندها مخيم بانر محدّد وقت الإنشاء -- بانر مبني بالدالة
-        // المركزية buildCampExportBanner (نفسها المستخدمة بكل شاشات التصدير)
-        // بدل منطق محلي كان أضعف (ما يرجع لمدير الفرع الأب لو المخيم فرعي
-        // بلا مندوب خاص فيه، عكس الدالة المركزية).
-        const bannerCamp = camps.find((c) => c.id === round.camp_id);
-        const bannerLines = buildCampExportBanner(bannerCamp, orgMembers);
-
+      if (bannerLines) {
+        // بانر جاهز من CampDelegatePanel -- شخصي دائم لو المصدِّر مندوب/مساعد،
+        // أو بانر المخيم اللي اختاره صراحة لو مالك منصة/مدير إيواء (منفصل
+        // عن مخيم الجولة نفسه، لا يعتمد عليه حصراً كالسابق).
         await exportXLSXMultiSheetWithBanners(
           [{ name: 'استلموا', banner: bannerLines, rows }],
           fileName
@@ -423,10 +420,13 @@ export default function DistributionReceiveScreen() {
             <PrimaryButton label="📤 تصدير الكشف" onPress={() => setFieldPickerOpen(true)} loading={exporting} />
 
             <CampDelegatePanel
-              camp={camps.find((c) => c.id === round?.camp_id)}
+              profile={profile}
+              camps={camps}
+              filterCamp={round?.camp_id}
               orgMembers={orgMembers}
               showBanner={showBanner}
               onToggleBanner={setShowBanner}
+              onBannerLinesChange={setBannerLines}
             />
 
             {!!offlineInfo && (

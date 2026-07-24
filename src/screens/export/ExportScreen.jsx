@@ -554,7 +554,7 @@ export default function ExportScreen() {
       if (!fams.length) return showToast('لا توجد أسر بهذا المخيم', 'error');
 
       const totalIndividuals = fams.reduce((sum, f) => sum + (f.family_members?.length || 0) + 1, 0);
-      const delegate = getCampDelegateInfo(campInfo, orgMembers);
+      const delegate = getCampDelegateInfo(campInfo, orgMembers, camps);
       const statusAr = { active: 'نشط', closed: 'مغلق', suspended: 'موقوف' }[campInfo.status] || campInfo.status || '—';
       const coords = campInfo.latitude && campInfo.longitude ? `${campInfo.latitude}, ${campInfo.longitude}` : '—';
 

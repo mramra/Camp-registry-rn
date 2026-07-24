@@ -62,20 +62,21 @@ export default function CampDelegatePanel({
   // مالك المنصة/مدير الإيواء يختار "باسم المندوب" مباشرة وليس باسم
   // المخيم (طلب صريح) -- نفس getCampDelegateInfo المركزية المستخدمة
   // لبناء البانر نفسه، فالاسم المعروض بالمنتقي مطابق دايماً للي رح
-  // يطلع فعلياً بأعلى ملف الإكسل.
-  const bannerDelegate = !isDelegateOrAssistant && bannerCamp ? getCampDelegateInfo(bannerCamp, orgMembers) : null;
+  // يطلع فعلياً بأعلى ملف الإكسل. camps تُمرَّر عشان المخيمات الفرعية
+  // (بلا مندوب خاص فيها أبداً) تورّث مندوب مخيمها الرئيسي تلقائياً.
+  const bannerDelegate = !isDelegateOrAssistant && bannerCamp ? getCampDelegateInfo(bannerCamp, orgMembers, camps) : null;
   const delegateOptions = !isDelegateOrAssistant
     ? (camps || []).map((c) => {
-        const d = getCampDelegateInfo(c, orgMembers);
+        const d = getCampDelegateInfo(c, orgMembers, camps);
         return { value: c.id, label: d?.name ? d.name : `⚠️ بدون مندوب (${c.name})` };
       })
     : [];
 
   useEffect(() => {
-    const lines = showBanner ? getExportBannerLines(profile, bannerCamp, orgMembers) : null;
+    const lines = showBanner ? getExportBannerLines(profile, bannerCamp, orgMembers, camps) : null;
     onBannerLinesChange?.(lines);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, profile?.role, profile?.full_name, profile?.phone, bannerCamp?.id, showBanner, orgMembers]);
+  }, [profile?.id, profile?.role, profile?.full_name, profile?.phone, bannerCamp?.id, showBanner, orgMembers, camps]);
 
   if (!profile) return null;
 

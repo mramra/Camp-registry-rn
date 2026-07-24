@@ -477,16 +477,30 @@ export function isAutoNursing(person, famHasNamedWife, famWithInfant) {
 export const QUALIFICATION_OPTIONS = ['دبلوم', 'بكالوريوس', 'ماجستير', 'دكتوراه'];
 
 /**
- * مندوب المخيم (بالاسم/الجوال) — مفاضلة ثلاثية:
+ * مندوب المخيم (بالاسم/الجوال) — مفاضلة ثلاثية على المخيم نفسه أولاً:
  * 1. عضو منظمة دوره camp_delegate ومربوط بنفس المخيم
  * 2. الشخص المُعرَّف manager_id بالمخيم
  * 3. أي عضو آخر مرتبط بهذا المخيم — احتياط أخير
+ *
+ * المخيمات الفرعية ما يكون إلها مندوب خاص فيها أبداً (قاعدة عمل مؤكدة:
+ * الاختيار يُمنع أصلاً بشاشة إدارة المستخدمين لغير المخيمات الرئيسية) --
+ * فلو المفاضلة الثلاثية فوق ما لقت شي على المخيم نفسه ومعه camps
+ * (قائمة كل المخيمات لحل parent_camp_id)، تُحسب مندوب المخيم الرئيسي
+ * تلقائياً كمندوب الفرع.
  */
-export function getCampDelegateInfo(camp, orgMembers) {
+export function getCampDelegateInfo(camp, orgMembers, camps) {
   if (!camp) return null;
-  let person = (orgMembers || []).find((m) => m.camp_id === camp.id && m.role === 'camp_delegate');
-  if (!person) person = (orgMembers || []).find((m) => m.id === camp.manager_id);
-  if (!person) person = (orgMembers || []).find((m) => m.camp_id === camp.id);
+  const findDirect = (c) => {
+    let person = (orgMembers || []).find((m) => m.camp_id === c.id && m.role === 'camp_delegate');
+    if (!person) person = (orgMembers || []).find((m) => m.id === c.manager_id);
+    if (!person) person = (orgMembers || []).find((m) => m.camp_id === c.id);
+    return person;
+  };
+  let person = findDirect(camp);
+  if (!person && camp.parent_camp_id && camps) {
+    const parent = camps.find((c) => c.id === camp.parent_camp_id);
+    if (parent) person = findDirect(parent);
+  }
   return {
     name: person?.full_name || '',
     phone: person?.phone || person?.national_id || '',
@@ -500,10 +514,12 @@ export function getCampDelegateInfo(camp, orgMembers) {
  * مبسّطة نُسيت منها الإحداثيات لما اتكتبت لاحقاً بشاشات مختلفة).
  * السطر الأول: اسم المخيم (خط كبير). السطر الثاني: المندوب + جواله + الإحداثيات.
  * ترجع null لو ما فيه مخيم (يعني بلا بانر إطلاقاً -- الاستدعاء يتحقق بنفسه).
+ * camps: قائمة كل المخيمات المرئية (اختياري) -- تُمرَّر لـgetCampDelegateInfo
+ * لحل توريث المندوب من المخيم الرئيسي لو camp نفسه فرعي بلا مندوب مباشر.
  */
-export function buildCampExportBanner(camp, orgMembers) {
+export function buildCampExportBanner(camp, orgMembers, camps) {
   if (!camp) return null;
-  const delegate = getCampDelegateInfo(camp, orgMembers);
+  const delegate = getCampDelegateInfo(camp, orgMembers, camps);
   const rawName = camp.name || '—';
   const displayName = rawName.trim().startsWith('مخيم') ? rawName : `مخيم ${rawName}`;
   const coords = camp.latitude && camp.longitude ? `${camp.latitude}, ${camp.longitude}` : 'بلا إحداثيات';
@@ -528,7 +544,7 @@ export function buildCampExportBanner(camp, orgMembers) {
  *   من قائمة مخيماته المرئية -- منفصل تماماً عن فلتر عرض البيانات، فيقدر
  *   يصدّر "كل المخيمات" ويحدد بانر مخيم معيّن لو حاب، أو يلغي البانر.
  */
-export function getExportBannerLines(profile, bannerCamp, orgMembers) {
+export function getExportBannerLines(profile, bannerCamp, orgMembers, camps) {
   if (!profile) return null;
 
   if (profile.role === 'camp_delegate' || profile.role === 'assistant') {
@@ -548,7 +564,7 @@ export function getExportBannerLines(profile, bannerCamp, orgMembers) {
   }
 
   // مالك المنصة / مدير الإيواء -- بانر المخيم المختار صراحة فقط، وإلا بلا بانر
-  return buildCampExportBanner(bannerCamp, orgMembers);
+  return buildCampExportBanner(bannerCamp, orgMembers, camps);
 }
 
 /**

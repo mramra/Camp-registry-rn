@@ -755,11 +755,11 @@ export default function FamilyFormScreen() {
           )}
           <FormInput label="رقم الخيمة" value={tent} onChangeText={setTent} />
           <SelectField
-            label="المنطقة الأصلية"
+            label="المحافظة الأصلية"
             value={originalAddress}
             options={REGIONS}
             onSelect={setOriginalAddress}
-            placeholder="اختر المنطقة"
+            placeholder="اختر المحافظة"
           />
           <FormInput label="تفاصيل العنوان" value={addressDetails} onChangeText={setAddressDetails} />
 

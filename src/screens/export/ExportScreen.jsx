@@ -236,7 +236,8 @@ export default function ExportScreen() {
         if (!f.phone1) reasons.push('الجوال');
         if (!f.phone2) reasons.push('واتساب');
         if (!f.head_dob) reasons.push('تاريخ الميلاد');
-        if (!f.governorate_current) reasons.push('المحافظة');
+        if (!f.original_address) reasons.push('المحافظة الأصلية');
+        if (!f.governorate_current) reasons.push('محافظة السكن الحالي');
         if (!f.camp_id) reasons.push('المخيم');
         return reasons;
       };

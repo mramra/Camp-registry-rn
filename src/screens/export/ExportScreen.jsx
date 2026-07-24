@@ -615,7 +615,7 @@ export default function ExportScreen() {
   };
 
   const campOptions = [{ value: '', label: '🏕️ كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))];
-  const cxCampOptions = [{ value: '', label: '🏕️ كل المخيمات (بدون بانر)' }, ...camps.map((c) => ({ value: c.id, label: c.name }))];
+  const cxCampOptions = [{ value: '', label: '🏕️ كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))];
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -728,7 +728,7 @@ export default function ExportScreen() {
 
             <SelectField
               value={cxCampOptions.find((o) => o.value === cxCamp)?.label}
-              placeholder="🏕️ كل المخيمات (بدون بانر)"
+              placeholder="🏕️ كل المخيمات"
               options={cxCampOptions}
               onSelect={(v) => { setCxCamp(v); setCxSelected(new Set()); }}
             />

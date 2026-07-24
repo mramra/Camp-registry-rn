@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Switch } from 'react-native';
-import { getExportBannerLines } from '../../lib/helpers';
+import { getExportBannerLines, getCampDelegateInfo } from '../../lib/helpers';
 import SelectField from './SelectField';
 import colors from '../../theme/colors';
 
@@ -19,9 +19,11 @@ import colors from '../../theme/colors';
  * - مندوب المخيم / المساعد: بانر شخصي دائم باسمه هو، يظهر دايماً بغض
  *   النظر عن فلتر عرض البيانات (مخيمه المحدد أو "كل المخيمات") -- بلا
  *   أي منتقي مخيم (أصلاً محصور بمخيم واحد).
- * - مالك المنصة / مدير الإيواء: منتقي صريح لأي مخيم من مخيماته المرئية
- *   (props.camps) لاختيار بانر الملف -- منفصل تماماً عن فلتر عرض
- *   البيانات (filterCamp)، يُستخدم فقط لتوليد أول قيمة افتراضية مريحة.
+ * - مالك المنصة / مدير الإيواء: منتقي صريح **باسم المندوب** (وليس باسم
+ *   المخيم) لأي مخيم من مخيماته المرئية (props.camps) لاختيار بانر
+ *   الملف -- منفصل تماماً عن فلتر عرض البيانات (filterCamp)، يُستخدم
+ *   فقط لتوليد أول قيمة افتراضية مريحة. المخيمات بلا مندوب معيَّن تظهر
+ *   بالمنتقي بعلامة تحذير واضحة "⚠️ بدون مندوب (اسم المخيم)".
  *
  * props:
  * - profile: بروفايل المستخدم الحالي (من useAuth)
@@ -57,6 +59,18 @@ export default function CampDelegatePanel({
   const ownCamp = isDelegateOrAssistant ? (camps || []).find((c) => c.id === profile?.camp_id) : null;
   const bannerCamp = isDelegateOrAssistant ? ownCamp : (camps || []).find((c) => c.id === bannerCampId) || null;
 
+  // مالك المنصة/مدير الإيواء يختار "باسم المندوب" مباشرة وليس باسم
+  // المخيم (طلب صريح) -- نفس getCampDelegateInfo المركزية المستخدمة
+  // لبناء البانر نفسه، فالاسم المعروض بالمنتقي مطابق دايماً للي رح
+  // يطلع فعلياً بأعلى ملف الإكسل.
+  const bannerDelegate = !isDelegateOrAssistant && bannerCamp ? getCampDelegateInfo(bannerCamp, orgMembers) : null;
+  const delegateOptions = !isDelegateOrAssistant
+    ? (camps || []).map((c) => {
+        const d = getCampDelegateInfo(c, orgMembers);
+        return { value: c.id, label: d?.name ? d.name : `⚠️ بدون مندوب (${c.name})` };
+      })
+    : [];
+
   useEffect(() => {
     const lines = showBanner ? getExportBannerLines(profile, bannerCamp, orgMembers) : null;
     onBannerLinesChange?.(lines);
@@ -70,7 +84,7 @@ export default function CampDelegatePanel({
     : isDelegateOrAssistant
       ? `باسمك (${profile.full_name || '—'})`
       : bannerCamp
-        ? `مخيم ${bannerCamp.name}`
+        ? (bannerDelegate?.name || `بدون مندوب (${bannerCamp.name})`)
         : 'بدون بانر';
 
   return (
@@ -91,15 +105,17 @@ export default function CampDelegatePanel({
           {isOwnerOrAdmin && (
             <>
               <SelectField
-                label="اختر مخيماً لعرض بياناته بأعلى الملف"
-                value={bannerCamp?.name}
+                label="اختر مندوباً لعرض بيانات مخيمه بأعلى الملف"
+                value={bannerCamp ? (bannerDelegate?.name || `بدون مندوب (${bannerCamp.name})`) : undefined}
                 placeholder="— بدون بانر —"
-                options={[{ value: '', label: '— بدون بانر —' }, ...(camps || []).map((c) => ({ value: c.id, label: c.name }))]}
+                options={[{ value: '', label: '— بدون بانر —' }, ...delegateOptions]}
                 onSelect={setBannerCampId}
               />
               {!!bannerCamp && (
-                <Text style={[styles.delegateNote, styles.delegateOk]}>
-                  🏕️ بانر مخيم "{bannerCamp.name}" مفعّل بأعلى الملف
+                <Text style={[styles.delegateNote, bannerDelegate?.name ? styles.delegateOk : styles.delegateWarn]}>
+                  {bannerDelegate?.name
+                    ? `🏷️ بانر المندوب "${bannerDelegate.name}" (مخيم ${bannerCamp.name}) مفعّل بأعلى الملف`
+                    : `⚠️ مخيم "${bannerCamp.name}" بدون مندوب معيَّن -- سيظهر البانر بدون اسم مندوب`}
                 </Text>
               )}
             </>

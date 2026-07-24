@@ -234,9 +234,14 @@ export function checkFamilyIssues(f, members) {
     issues.push('الاسم غير رباعي');
 
   if (!f.head_id?.trim()) issues.push('رقم الهوية ناقص');
+  else if (!luhnCheck(f.head_id)) issues.push('رقم الهوية غير صحيح');
   if (!f.phone1?.trim()) issues.push('رقم الجوال ناقص');
+  if (!f.phone2?.trim()) issues.push('رقم واتساب ناقص');
   if (!f.head_dob) issues.push('تاريخ الميلاد ناقص');
   if (!f.head_marital?.trim()) issues.push('الحالة الاجتماعية ناقصة');
+  if (!f.camp_id) issues.push('المخيم ناقص');
+  if (!f.original_address?.trim()) issues.push('المحافظة الأصلية ناقصة');
+  if (!f.governorate_current?.trim()) issues.push('محافظة السكن الحالي ناقصة');
 
   const marital = (f.head_marital || '').trim();
   if (marital === 'متزوج' || marital === 'متزوجة') {

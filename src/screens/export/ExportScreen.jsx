@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX, exportCampTemplateReport } from '../../lib/excelIO';
-import { calcAge, isAgeInRange, getCampDelegateInfo, normalizeHealthValue, naturalCompare, validateName, luhnCheck } from '../../lib/helpers';
+import { calcAge, isAgeInRange, getCampDelegateInfo, normalizeHealthValue, naturalCompare, checkFamilyIssues } from '../../lib/helpers';
 import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
@@ -225,24 +225,13 @@ export default function ExportScreen() {
     setLoading(true);
     try {
       const data = await getFullData();
-      // فحص شامل للنواقص -- مركزي بدالة واحدة (getMissingReasons) بدل
-      // شرط طويل مكرر، عشان قائمة "النواقص" بالتصدير والفلترة يستخدموا
-      // نفس المنطق بالضبط بلا احتمال تفاوت بينهم.
-      const getMissingReasons = (f) => {
-        const reasons = [];
-        if (validateName(f.head_name || '')) reasons.push('الاسم رباعي');
-        if (!f.head_id) reasons.push('الهوية');
-        else if (!luhnCheck(f.head_id)) reasons.push('الهوية (غير صحيحة)');
-        if (!f.phone1) reasons.push('الجوال');
-        if (!f.phone2) reasons.push('واتساب');
-        if (!f.head_dob) reasons.push('تاريخ الميلاد');
-        if (!f.original_address) reasons.push('المحافظة الأصلية');
-        if (!f.governorate_current) reasons.push('محافظة السكن الحالي');
-        if (!f.camp_id) reasons.push('المخيم');
-        return reasons;
-      };
+      // نفس دالة كشف النواقص المركزية المستخدمة بشاشة "جودة البيانات"
+      // بالضبط (checkFamilyIssues بـhelpers.js) -- كانت هذي الشاشة تستخدم
+      // نسخة محلية منفصلة بفحوصات مختلفة شوي، فطلع عدد مختلف بين
+      // الشاشتين لنفس المفهوم. صارت الشاشتان تتفقان دائماً على نفس العدد
+      // بالضبط لأنهم يستخدمان نفس المنطق حرفياً.
       const missing = data
-        .map((f) => ({ f, reasons: getMissingReasons(f) }))
+        .map((f) => ({ f, reasons: checkFamilyIssues(f, f.family_members) }))
         .filter((x) => x.reasons.length > 0);
       if (!missing.length) return showToast('لا توجد بيانات ناقصة', 'success');
       const rows = missing.map(({ f, reasons }, i) => {

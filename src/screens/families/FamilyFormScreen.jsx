@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -46,13 +46,68 @@ import FormInput from '../../components/ui/FormInput';
 import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
 
-const MONTHS = [
-  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-];
-
 let localIdSeq = 0;
 const genLocalId = () => `local_${Date.now()}_${localIdSeq++}`;
+
+/**
+ * تاريخ الميلاد كـ3 خانات أرقام (يوم/شهر/سنة) بدل عجلة اختيار --
+ * بديل مقترح بعد ملاحظة إنه السحب على عجلة عمرها ١٠٠+ سنة (بحث عن
+ * سنة الميلاد) أبطأ وأصعب بكثير من الكتابة المباشرة. الكتابة تنتقل
+ * تلقائياً للخانة التالية بمجرد اكتمال أرقامها (يومين ليوم/شهر،
+ * أربعة لسنة) عشان تعبئة سريعة بلوحة مفاتيح رقمية بدون لمس كل خانة.
+ */
+function DobFields({ day, month, year, onChangeDay, onChangeMonth, onChangeYear }) {
+  const monthRef = useRef(null);
+  const yearRef = useRef(null);
+
+  return (
+    <View style={styles.row}>
+      <View style={styles.thirdInput}>
+        <FormInput
+          placeholder="يوم"
+          value={day ? String(day) : ''}
+          onChangeText={(v) => {
+            const digits = v.replace(/\D/g, '').slice(0, 2);
+            onChangeDay(digits ? Number(digits) : null);
+            if (digits.length === 2) monthRef.current?.focus();
+          }}
+          keyboardType="number-pad"
+          maxLength={2}
+          style={{ textAlign: 'center' }}
+        />
+      </View>
+      <View style={styles.thirdInput}>
+        <FormInput
+          ref={monthRef}
+          placeholder="شهر"
+          value={month ? String(month) : ''}
+          onChangeText={(v) => {
+            const digits = v.replace(/\D/g, '').slice(0, 2);
+            onChangeMonth(digits ? Number(digits) : null);
+            if (digits.length === 2) yearRef.current?.focus();
+          }}
+          keyboardType="number-pad"
+          maxLength={2}
+          style={{ textAlign: 'center' }}
+        />
+      </View>
+      <View style={styles.thirdInput}>
+        <FormInput
+          ref={yearRef}
+          placeholder="سنة"
+          value={year ? String(year) : ''}
+          onChangeText={(v) => {
+            const digits = v.replace(/\D/g, '').slice(0, 4);
+            onChangeYear(digits ? Number(digits) : null);
+          }}
+          keyboardType="number-pad"
+          maxLength={4}
+          style={{ textAlign: 'center' }}
+        />
+      </View>
+    </View>
+  );
+}
 
 function splitDob(dob) {
   if (!dob) return { day: null, month: null, year: null };
@@ -123,14 +178,6 @@ export default function FamilyFormScreen() {
   const [members, setMembers] = useState([]);
   const [headHealth, setHeadHealth] = useState(emptyHealthFields());
   const [healthModalFor, setHealthModalFor] = useState(null); // null | 'head' | localId
-
-  const currentYear = new Date().getFullYear();
-  const years = useMemo(() => {
-    const arr = [];
-    for (let y = currentYear; y >= 1900; y--) arr.push(String(y));
-    return arr;
-  }, [currentYear]);
-  const days = useMemo(() => Array.from({ length: 31 }, (_, i) => String(i + 1)), []);
 
   useEffect(() => {
     if (orgId) fetchCamps(orgId).then(setCamps);
@@ -629,7 +676,6 @@ export default function FamilyFormScreen() {
           <View style={styles.row}>
             <View style={styles.thirdInput}>
               <SelectField
-                wheel
                 value={whatsappPrefix}
                 options={['972', '970']}
                 onSelect={setWhatsappPrefix}
@@ -664,7 +710,6 @@ export default function FamilyFormScreen() {
           </View>
 
           <SelectField
-            wheel
             label="الحالة الاجتماعية"
             value={headMarital}
             options={maritalOptions}
@@ -673,17 +718,14 @@ export default function FamilyFormScreen() {
           />
 
           <Text style={styles.fieldLabel}>تاريخ الميلاد</Text>
-          <View style={styles.row}>
-            <View style={styles.thirdInput}>
-              <SelectField wheel value={dobDay ? String(dobDay) : null} options={days} onSelect={(v) => setDobDay(Number(v))} placeholder="اليوم" />
-            </View>
-            <View style={styles.thirdInput}>
-              <SelectField wheel value={dobMonth ? MONTHS[dobMonth - 1] : null} options={MONTHS} onSelect={(v) => setDobMonth(MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
-            </View>
-            <View style={styles.thirdInput}>
-              <SelectField wheel value={dobYear ? String(dobYear) : null} options={years} onSelect={(v) => setDobYear(Number(v))} placeholder="السنة" />
-            </View>
-          </View>
+          <DobFields
+            day={dobDay}
+            month={dobMonth}
+            year={dobYear}
+            onChangeDay={setDobDay}
+            onChangeMonth={setDobMonth}
+            onChangeYear={setDobYear}
+          />
           {!!errors.dob && <Text style={styles.errorText}>{errors.dob}</Text>}
 
           <Pressable style={styles.healthBtn} onPress={() => setHealthModalFor('head')}>
@@ -704,7 +746,6 @@ export default function FamilyFormScreen() {
             </View>
           ) : (
             <SelectField
-            wheel
               value={camps.find((c) => c.id === campId)?.name}
               options={camps.map((c) => ({ value: c.id, label: c.name }))}
               onSelect={setCampId}
@@ -714,7 +755,6 @@ export default function FamilyFormScreen() {
           )}
           <FormInput label="رقم الخيمة" value={tent} onChangeText={setTent} />
           <SelectField
-            wheel
             label="المنطقة الأصلية"
             value={originalAddress}
             options={REGIONS}
@@ -724,7 +764,6 @@ export default function FamilyFormScreen() {
           <FormInput label="تفاصيل العنوان" value={addressDetails} onChangeText={setAddressDetails} />
 
           <SelectField
-            wheel
             label="حالة النزوح"
             value={displacementStatus}
             options={DISPLACEMENT_STATUS_OPTIONS}
@@ -733,7 +772,6 @@ export default function FamilyFormScreen() {
           />
           <FormInput label="السكن الحالي (وصف)" value={currentAddress} onChangeText={setCurrentAddress} />
           <SelectField
-            wheel
             label="محافظة السكن الحالي"
             value={governorateCurrent}
             options={REGIONS}
@@ -741,7 +779,6 @@ export default function FamilyFormScreen() {
             placeholder="اختر المحافظة"
           />
           <SelectField
-            wheel
             label="نوع المسكن"
             value={housingType}
             options={HOUSING_TYPE_OPTIONS}
@@ -749,7 +786,6 @@ export default function FamilyFormScreen() {
             placeholder="اختر نوع المسكن"
           />
           <SelectField
-            wheel
             label="حالة المسكن"
             value={housingCondition}
             options={HOUSING_CONDITION_OPTIONS}
@@ -757,7 +793,6 @@ export default function FamilyFormScreen() {
             placeholder="اختر حالة المسكن"
           />
           <SelectField
-            wheel
             label="مصدر دخل رب الأسرة"
             value={incomeSource}
             options={INCOME_SOURCE_OPTIONS}
@@ -765,7 +800,6 @@ export default function FamilyFormScreen() {
             placeholder="اختر مصدر الدخل"
           />
           <SelectField
-            wheel
             label="💳 محفظة إلكترونية"
             value={walletType}
             options={['بدون', 'PalPay', 'JawwalPay']}
@@ -813,10 +847,20 @@ export default function FamilyFormScreen() {
 
                 <View style={styles.row}>
                   <View style={styles.halfInput}>
-                    <SelectField wheel value={m.gender} options={['ذكر', 'أنثى']} onSelect={(v) => updateMember(m.localId, 'gender', v)} placeholder="الجنس" />
+                    <View style={styles.segmentRow}>
+                      {['ذكر', 'أنثى'].map((g) => (
+                        <Pressable
+                          key={g}
+                          style={[styles.segmentBtn, m.gender === g && styles.segmentBtnActive]}
+                          onPress={() => updateMember(m.localId, 'gender', g)}
+                        >
+                          <Text style={[styles.segmentText, m.gender === g && styles.segmentTextActive]}>{g}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
                   </View>
                   <View style={styles.halfInput}>
-                    <SelectField wheel value={m.relation} options={relations} onSelect={(v) => updateMember(m.localId, 'relation', v)} placeholder="صلة القرابة" />
+                    <SelectField value={m.relation} options={relations} onSelect={(v) => updateMember(m.localId, 'relation', v)} placeholder="صلة القرابة" />
                   </View>
                 </View>
 
@@ -841,20 +885,16 @@ export default function FamilyFormScreen() {
                 )}
 
                 <Text style={styles.fieldLabel}>تاريخ الميلاد</Text>
-                <View style={styles.row}>
-                  <View style={styles.thirdInput}>
-                    <SelectField wheel value={m.day ? String(m.day) : null} options={days} onSelect={(v) => updateMember(m.localId, 'day', Number(v))} placeholder="اليوم" />
-                  </View>
-                  <View style={styles.thirdInput}>
-                    <SelectField wheel value={m.month ? MONTHS[m.month - 1] : null} options={MONTHS} onSelect={(v) => updateMember(m.localId, 'month', MONTHS.indexOf(v) + 1)} placeholder="الشهر" />
-                  </View>
-                  <View style={styles.thirdInput}>
-                    <SelectField wheel value={m.year ? String(m.year) : null} options={years} onSelect={(v) => updateMember(m.localId, 'year', Number(v))} placeholder="السنة" />
-                  </View>
-                </View>
+                <DobFields
+                  day={m.day}
+                  month={m.month}
+                  year={m.year}
+                  onChangeDay={(v) => updateMember(m.localId, 'day', v)}
+                  onChangeMonth={(v) => updateMember(m.localId, 'month', v)}
+                  onChangeYear={(v) => updateMember(m.localId, 'year', v)}
+                />
 
                 <SelectField
-            wheel
                   label="الحالة الصحية"
                   value={HEALTH_OPTIONS.find((h) => h.v === m.health)?.label}
                   options={HEALTH_OPTIONS.map((h) => ({ value: h.v, label: h.label }))}

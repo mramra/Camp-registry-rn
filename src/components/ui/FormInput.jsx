@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import colors from '../../theme/colors';
 
-/** حقل نص موحّد لكل النماذج — تسمية + إدخال + رسالة خطأ اختيارية. */
-export default function FormInput({ label, error, style, ...inputProps }) {
+/** حقل نص موحّد لكل النماذج — تسمية + إدخال + رسالة خطأ اختيارية.
+ * forwardRef عشان حقول متتابعة (مثلاً يوم/شهر/سنة) تقدر تنقل التركيز
+ * تلقائياً للحقل التالي بعد تعبئة الحقل الحالي. */
+const FormInput = forwardRef(({ label, error, style, ...inputProps }, ref) => {
   return (
     <View style={styles.wrap}>
       {!!label && <Text style={styles.label}>{label}</Text>}
       <TextInput
+        ref={ref}
         placeholderTextColor={colors.muted}
         style={[styles.input, error && styles.inputError, style]}
         {...inputProps}
@@ -15,7 +18,9 @@ export default function FormInput({ label, error, style, ...inputProps }) {
       {!!error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
-}
+});
+
+export default FormInput;
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 12, flex: 1 },

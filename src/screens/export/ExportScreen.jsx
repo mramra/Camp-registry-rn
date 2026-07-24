@@ -458,8 +458,8 @@ export default function ExportScreen() {
 
   const switchTab = (tab) => {
     setMainTab(tab);
-    if (tab === 'customFam') { cxSwitchMode('families'); setCxPickerOpen(true); }
-    if (tab === 'customMem') { cxSwitchMode('members'); setCxPickerOpen(true); }
+    if (tab === 'customFam') cxSwitchMode('families');
+    if (tab === 'customMem') cxSwitchMode('members');
   };
 
   const doCustomExport = async () => {
@@ -627,6 +627,7 @@ export default function ExportScreen() {
           {[
             { key: 'quickFam', icon: '👨‍👩‍👧', label: 'سجل أرباب الأسر' },
             { key: 'quickMem', icon: '👤', label: 'سجل أفراد الأسر' },
+            { key: 'missing', icon: '⚠️', label: 'الأسر الناقصة' },
             { key: 'comprehensive', icon: '📊', label: 'كشف شامل' },
             { key: 'customFam', icon: '🎯', label: 'أرباب الأسر مخصص' },
             { key: 'customMem', icon: '🎯', label: 'أفراد الأسر مخصص' },
@@ -642,7 +643,7 @@ export default function ExportScreen() {
           ))}
         </View>
 
-        {(mainTab === 'quickFam' || mainTab === 'quickMem' || mainTab === 'comprehensive') && (
+        {(mainTab === 'quickFam' || mainTab === 'quickMem' || mainTab === 'missing' || mainTab === 'comprehensive') && (
           <SelectField
             value={campOptions.find((o) => o.value === filterCamp)?.label}
             placeholder="🏕️ كل المخيمات"
@@ -674,14 +675,21 @@ export default function ExportScreen() {
         {mainTab === 'quickFam' && (
           <FormSection title="👨‍👩‍👧 سجل أرباب الأسر">
             {canExport ? (
-              <>
-                <Pressable style={styles.btnPrimary} onPress={() => setFamExportOpen(true)} disabled={loading}>
-                  <Text style={styles.btnPrimaryText}>👨‍👩‍👧 تصدير كشف رباب الأسر</Text>
-                </Pressable>
-                <Pressable style={styles.btnRed} onPress={() => setMissingExportOpen(true)} disabled={loading}>
-                  <Text style={styles.btnRedText}>⚠️ الأسر الناقصة</Text>
-                </Pressable>
-              </>
+              <Pressable style={styles.btnPrimary} onPress={() => setFamExportOpen(true)} disabled={loading}>
+                <Text style={styles.btnPrimaryText}>👨‍👩‍👧 تصدير كشف رباب الأسر</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.lockedText}>🔒 لا تملك صلاحية التصدير</Text>
+            )}
+          </FormSection>
+        )}
+
+        {mainTab === 'missing' && (
+          <FormSection title="⚠️ الأسر الناقصة">
+            {canExport ? (
+              <Pressable style={styles.btnRed} onPress={() => setMissingExportOpen(true)} disabled={loading}>
+                <Text style={styles.btnRedText}>⚠️ تصدير الأسر الناقصة</Text>
+              </Pressable>
             ) : (
               <Text style={styles.lockedText}>🔒 لا تملك صلاحية التصدير</Text>
             )}

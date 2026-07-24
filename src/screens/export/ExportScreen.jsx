@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX, exportCampTemplateReport } from '../../lib/excelIO';
-import { calcAge, isAgeInRange, getCampDelegateInfo, normalizeHealthValue, naturalCompare } from '../../lib/helpers';
+import { calcAge, isAgeInRange, getCampDelegateInfo, normalizeHealthValue, naturalCompare, validateName, luhnCheck } from '../../lib/helpers';
 import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
@@ -225,16 +225,33 @@ export default function ExportScreen() {
     setLoading(true);
     try {
       const data = await getFullData();
-      const missing = data.filter((f) => !f.head_name || !f.head_id || !f.phone1 || !f.camp_id);
+      // فحص شامل للنواقص -- مركزي بدالة واحدة (getMissingReasons) بدل
+      // شرط طويل مكرر، عشان قائمة "النواقص" بالتصدير والفلترة يستخدموا
+      // نفس المنطق بالضبط بلا احتمال تفاوت بينهم.
+      const getMissingReasons = (f) => {
+        const reasons = [];
+        if (validateName(f.head_name || '')) reasons.push('الاسم رباعي');
+        if (!f.head_id) reasons.push('الهوية');
+        else if (!luhnCheck(f.head_id)) reasons.push('الهوية (غير صحيحة)');
+        if (!f.phone1) reasons.push('الجوال');
+        if (!f.phone2) reasons.push('واتساب');
+        if (!f.head_dob) reasons.push('تاريخ الميلاد');
+        if (!f.governorate_current) reasons.push('المحافظة');
+        if (!f.camp_id) reasons.push('المخيم');
+        return reasons;
+      };
+      const missing = data
+        .map((f) => ({ f, reasons: getMissingReasons(f) }))
+        .filter((x) => x.reasons.length > 0);
       if (!missing.length) return showToast('لا توجد بيانات ناقصة', 'success');
-      const rows = missing.map((f, i) => {
+      const rows = missing.map(({ f, reasons }, i) => {
         const all = {
           number: i + 1,
           head_name: f.head_name || '—',
           head_id: f.head_id || '—',
           phone: f.phone1 || '—',
           camp_name: f.camps?.name || '—',
-          missing_list: [!f.head_name && 'الاسم', !f.head_id && 'الهوية', !f.phone1 && 'الجوال', !f.camp_id && 'المخيم'].filter(Boolean).join(' + '),
+          missing_list: reasons.join(' + '),
         };
         const row = {};
         selectedCols.forEach((col) => { row[col.label] = all[col.key]; });

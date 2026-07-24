@@ -87,7 +87,7 @@ export default function EducationScreen() {
         Promise.all([
           supabase
             .from('families')
-            .select('id, camp_id, head_name, head_id, head_dob, head_qualification, tent')
+            .select('id, camp_id, head_name, head_id, head_dob, head_qualification, tent, phone1')
             .eq('org_id', orgId)
             .eq('_deleted', false),
           supabase.from('camps').select('*').eq('org_id', orgId),

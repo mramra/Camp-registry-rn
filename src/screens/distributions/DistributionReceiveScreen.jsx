@@ -419,16 +419,6 @@ export default function DistributionReceiveScreen() {
 
             <PrimaryButton label="📤 تصدير الكشف" onPress={() => setFieldPickerOpen(true)} loading={exporting} />
 
-            <CampDelegatePanel
-              profile={profile}
-              camps={camps}
-              filterCamp={round?.camp_id}
-              orgMembers={orgMembers}
-              showBanner={showBanner}
-              onToggleBanner={setShowBanner}
-              onBannerLinesChange={setBannerLines}
-            />
-
             {!!offlineInfo && (
               <View style={styles.offlineBanner}>
                 <Text style={styles.offlineBannerText}>
@@ -528,6 +518,15 @@ export default function DistributionReceiveScreen() {
 
       <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
         <FieldPicker title="📋 حقول كشف الاستلام" cols={distFields} onChange={setDistFields} startOpen />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={round?.camp_id}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setBannerLines}
+        />
         <Pressable
           style={styles.customExportBtn}
           onPress={() => { setFieldPickerOpen(false); handleExport(); }}

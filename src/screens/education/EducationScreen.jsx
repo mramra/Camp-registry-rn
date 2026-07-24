@@ -302,15 +302,6 @@ export default function EducationScreen() {
               )}
             </View>
 
-            <CampDelegatePanel
-              profile={profile}
-              camps={camps}
-              filterCamp={filterCamp}
-              orgMembers={orgMembers}
-              showBanner={showBanner}
-              onToggleBanner={setShowBanner}
-              onBannerLinesChange={setBannerLines}
-            />
 
             <View style={styles.ageGrid}>
               {STAGE_ICONS.map((s) => (
@@ -360,6 +351,15 @@ export default function EducationScreen() {
 
       <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
         <FieldPicker title="📋 حقول كشف الحالة الدراسية" cols={eduFields} onChange={setEduFields} startOpen />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={filterCamp}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setBannerLines}
+        />
         <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
           <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(eduFields).length} حقل)</Text>
         </Pressable>

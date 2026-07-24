@@ -346,15 +346,6 @@ export default function WomenScreen() {
               </View>
             </View>
 
-            <CampDelegatePanel
-              profile={profile}
-              camps={camps}
-              filterCamp={filterCamp}
-              orgMembers={orgMembers}
-              showBanner={showBanner}
-              onToggleBanner={setShowBanner}
-              onBannerLinesChange={setBannerLines}
-            />
 
             <View style={styles.categoryGrid}>
               {[
@@ -463,6 +454,15 @@ export default function WomenScreen() {
 
       <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
         <FieldPicker title="📋 حقول كشف النساء" cols={womenFields} onChange={setWomenFields} startOpen />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={filterCamp}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setBannerLines}
+        />
         <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
           <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(womenFields).length} حقل)</Text>
         </Pressable>

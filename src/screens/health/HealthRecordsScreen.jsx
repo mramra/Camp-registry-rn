@@ -308,15 +308,6 @@ export default function HealthRecordsScreen() {
               </View>
             </View>
 
-            <CampDelegatePanel
-              profile={profile}
-              camps={camps}
-              filterCamp={filterCamp}
-              orgMembers={orgMembers}
-              showBanner={showBanner}
-              onToggleBanner={setShowBanner}
-              onBannerLinesChange={setBannerLines}
-            />
 
             <View style={styles.categoryGrid}>
               {HEALTH_TYPES.map((t) => (
@@ -359,6 +350,15 @@ export default function HealthRecordsScreen() {
 
       <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
         <FieldPicker title="📋 حقول كشف الصحة" cols={healthFields} onChange={setHealthFields} startOpen />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={filterCamp}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setBannerLines}
+        />
         <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
           <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(healthFields).length} حقل)</Text>
         </Pressable>

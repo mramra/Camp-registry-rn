@@ -340,15 +340,6 @@ export default function NeedsReportScreen() {
               </Pressable>
             </View>
 
-            <CampDelegatePanel
-              profile={profile}
-              camps={camps}
-              filterCamp={filterCamp}
-              orgMembers={orgMembers}
-              showBanner={showBanner}
-              onToggleBanner={setShowBanner}
-              onBannerLinesChange={setBannerLines}
-            />
 
             <TextInput
               value={search}
@@ -375,6 +366,15 @@ export default function NeedsReportScreen() {
 
       <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
         <FieldPicker title="📋 حقول تقرير الاحتياجات" cols={needsFields} onChange={setNeedsFields} startOpen />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={filterCamp}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setBannerLines}
+        />
         <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
           <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(needsFields).length} حقل)</Text>
         </Pressable>

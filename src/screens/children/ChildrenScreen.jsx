@@ -289,15 +289,6 @@ export default function ChildrenScreen() {
               </View>
             </View>
 
-            <CampDelegatePanel
-              profile={profile}
-              camps={camps}
-              filterCamp={filterCamp}
-              orgMembers={orgMembers}
-              showBanner={showBanner}
-              onToggleBanner={setShowBanner}
-              onBannerLinesChange={setBannerLines}
-            />
 
             <View style={styles.ageGrid}>
               <Pressable
@@ -374,6 +365,15 @@ export default function ChildrenScreen() {
 
       <BottomSheetModal visible={fieldPickerOpen} onClose={() => setFieldPickerOpen(false)} title="تخصيص حقول التصدير">
         <FieldPicker title="📋 حقول كشف الأطفال" cols={childFields} onChange={setChildFields} startOpen />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={filterCamp}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setBannerLines}
+        />
         <Pressable style={styles.customExportBtn} onPress={handleCustomExport}>
           <Text style={styles.customExportBtnText}>📥 تصدير ({orderedSelected(childFields).length} حقل)</Text>
         </Pressable>

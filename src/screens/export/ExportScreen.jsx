@@ -633,23 +633,12 @@ export default function ExportScreen() {
         </View>
 
         {(mainTab === 'quickFam' || mainTab === 'quickMem' || mainTab === 'comprehensive') && (
-          <>
-            <SelectField
-              value={campOptions.find((o) => o.value === filterCamp)?.label}
-              placeholder="🏕️ كل المخيمات"
-              options={campOptions}
-              onSelect={setFilterCamp}
-            />
-            <CampDelegatePanel
-              profile={profile}
-              camps={camps}
-              filterCamp={filterCamp}
-              orgMembers={orgMembers}
-              showBanner={showBanner}
-              onToggleBanner={setShowBanner}
-              onBannerLinesChange={setBannerLines}
-            />
-          </>
+          <SelectField
+            value={campOptions.find((o) => o.value === filterCamp)?.label}
+            placeholder="🏕️ كل المخيمات"
+            options={campOptions}
+            onSelect={setFilterCamp}
+          />
         )}
 
         {mainTab === 'comprehensive' && (
@@ -677,6 +666,15 @@ export default function ExportScreen() {
             {canExport ? (
               <>
                 <FieldPicker title="📋 حقول رباب الأسر" cols={famCols} onChange={setFamCols} />
+                <CampDelegatePanel
+                  profile={profile}
+                  camps={camps}
+                  filterCamp={filterCamp}
+                  orgMembers={orgMembers}
+                  showBanner={showBanner}
+                  onToggleBanner={setShowBanner}
+                  onBannerLinesChange={setBannerLines}
+                />
                 <Pressable style={styles.btnPrimary} onPress={exportFamilies} disabled={loading}>
                   <Text style={styles.btnPrimaryText}>👨‍👩‍👧 تصدير كشف رباب الأسر</Text>
                 </Pressable>
@@ -696,6 +694,15 @@ export default function ExportScreen() {
             {canExport ? (
               <>
                 <FieldPicker title="📋 حقول الأفراد" cols={memCols} onChange={setMemCols} />
+                <CampDelegatePanel
+                  profile={profile}
+                  camps={camps}
+                  filterCamp={filterCamp}
+                  orgMembers={orgMembers}
+                  showBanner={showBanner}
+                  onToggleBanner={setShowBanner}
+                  onBannerLinesChange={setBannerLines}
+                />
                 <Pressable style={styles.btnBlue} onPress={exportMembers} disabled={loading}>
                   <Text style={styles.btnBlueText}>👤 تصدير كشف أفراد الأسر</Text>
                 </Pressable>
@@ -722,15 +729,6 @@ export default function ExportScreen() {
               placeholder="🏕️ كل المخيمات (بدون بانر)"
               options={cxCampOptions}
               onSelect={(v) => { setCxCamp(v); setCxSelected(new Set()); }}
-            />
-            <CampDelegatePanel
-              profile={profile}
-              camps={camps}
-              filterCamp={cxCamp}
-              orgMembers={orgMembers}
-              showBanner={showBanner}
-              onToggleBanner={setShowBanner}
-              onBannerLinesChange={setCxBannerLines}
             />
 
             {cxMode === 'members' && (
@@ -791,6 +789,15 @@ export default function ExportScreen() {
               title={cxMode === 'families' ? '📋 حقول رباب الأسر (مع الزوجة)' : '📋 حقول الأفراد'}
               cols={cxMode === 'families' ? cxFamCols : cxMemCols}
               onChange={cxMode === 'families' ? setCxFamCols : setCxMemCols}
+            />
+            <CampDelegatePanel
+              profile={profile}
+              camps={camps}
+              filterCamp={cxCamp}
+              orgMembers={orgMembers}
+              showBanner={showBanner}
+              onToggleBanner={setShowBanner}
+              onBannerLinesChange={setCxBannerLines}
             />
 
             <Pressable style={[styles.btnPrimary, cxSelected.size === 0 && styles.btnDisabled]} onPress={doCustomExport} disabled={loading || cxSelected.size === 0}>

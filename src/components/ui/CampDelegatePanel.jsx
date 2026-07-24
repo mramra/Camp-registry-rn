@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Switch } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Switch } from 'react-native';
 import { getExportBannerLines } from '../../lib/helpers';
 import SelectField from './SelectField';
 import colors from '../../theme/colors';
@@ -9,6 +9,11 @@ import colors from '../../theme/colors';
  * بالكامل (اختيار + معاينة + تفعيل/إخفاء) وترجعه جاهزاً للأب عبر
  * onBannerLinesChange، عشان دالة التصدير بكل شاشة تستخدمه مباشرة بدون
  * ما تعيد بناء منطق البانر بنفسها.
+ *
+ * قابلة للطي بنفس أسلوب FieldPicker بالضبط (رأس بعنوان+ملخص+سهم، مطوي
+ * افتراضياً) -- عشان تنضم بصرياً لصندوق اختيار الحقول بدل ما تاخذ مساحة
+ * دائمة منفصلة، خصوصاً بشاشة الاستيراد والتصدير اللي فيها أكثر من زر
+ * تصدير بنفس الصفحة.
  *
  * سلوك حسب الدور (طلب صريح):
  * - مندوب المخيم / المساعد: بانر شخصي دائم باسمه هو، يظهر دايماً بغض
@@ -25,13 +30,15 @@ import colors from '../../theme/colors';
  * - orgMembers: أعضاء المنظمة (لحساب مندوب المخيم المختار كبانر لدور owner/admin)
  * - showBanner / onToggleBanner: حالة تفعيل البانر، يديرها الأب
  * - onBannerLinesChange: يُستدعى بأسطر البانر الجاهزة (أو null) كلما تغيّرت
+ * - startOpen: يفتح اللوحة موسّعة من البداية (اختياري، افتراضي: مطوية)
  */
 export default function CampDelegatePanel({
-  profile, camps, filterCamp, orgMembers, showBanner, onToggleBanner, onBannerLinesChange,
+  profile, camps, filterCamp, orgMembers, showBanner, onToggleBanner, onBannerLinesChange, startOpen = false,
 }) {
   const isDelegateOrAssistant = profile?.role === 'camp_delegate' || profile?.role === 'assistant';
   const isOwnerOrAdmin = profile?.role === 'platform_owner' || profile?.role === 'super_admin';
 
+  const [open, setOpen] = useState(startOpen);
   const [bannerCampId, setBannerCampId] = useState(filterCamp || '');
   const lastFilterCamp = useRef(filterCamp);
 
@@ -58,44 +65,65 @@ export default function CampDelegatePanel({
 
   if (!profile) return null;
 
-  return (
-    <View style={styles.wrap}>
-      {isDelegateOrAssistant && (
-        <Text style={[styles.delegateNote, styles.delegateOk]}>
-          ✅ سيظهر اسمك ({profile.full_name || '—'}) كـ{profile.role === 'camp_delegate' ? 'مندوب المخيم' : 'مساعد'} بأعلى ملف الإكسل دائماً
-        </Text>
-      )}
+  const summary = !showBanner
+    ? 'معطّل'
+    : isDelegateOrAssistant
+      ? `باسمك (${profile.full_name || '—'})`
+      : bannerCamp
+        ? `مخيم ${bannerCamp.name}`
+        : 'بدون بانر';
 
-      {isOwnerOrAdmin && (
-        <>
-          <SelectField
-            label="🏷️ بانر الملف (اختر مخيماً لعرض بياناته بأعلى الملف)"
-            value={bannerCamp?.name}
-            placeholder="— بدون بانر —"
-            options={[{ value: '', label: '— بدون بانر —' }, ...(camps || []).map((c) => ({ value: c.id, label: c.name }))]}
-            onSelect={setBannerCampId}
-          />
-          {!!bannerCamp && (
+  return (
+    <View style={styles.fieldPicker}>
+      <Pressable style={styles.fieldPickerHeader} onPress={() => setOpen((o) => !o)}>
+        <Text style={styles.fieldPickerTitle}>🏷️ بانر التصدير ({summary})</Text>
+        <Text style={styles.chevron}>{open ? '▲' : '▼'}</Text>
+      </Pressable>
+
+      {open && (
+        <View style={styles.fieldPickerBody}>
+          {isDelegateOrAssistant && (
             <Text style={[styles.delegateNote, styles.delegateOk]}>
-              🏕️ بانر مخيم "{bannerCamp.name}" مفعّل بأعلى الملف
+              ✅ سيظهر اسمك ({profile.full_name || '—'}) كـ{profile.role === 'camp_delegate' ? 'مندوب المخيم' : 'مساعد'} بأعلى ملف الإكسل دائماً
             </Text>
           )}
-        </>
-      )}
 
-      <View style={styles.bannerRow}>
-        <Switch value={showBanner} onValueChange={onToggleBanner} trackColor={{ true: colors.accent }} />
-        <Text style={styles.bannerLabel}>إظهار البانر بأعلى ملف الإكسل</Text>
-      </View>
+          {isOwnerOrAdmin && (
+            <>
+              <SelectField
+                label="اختر مخيماً لعرض بياناته بأعلى الملف"
+                value={bannerCamp?.name}
+                placeholder="— بدون بانر —"
+                options={[{ value: '', label: '— بدون بانر —' }, ...(camps || []).map((c) => ({ value: c.id, label: c.name }))]}
+                onSelect={setBannerCampId}
+              />
+              {!!bannerCamp && (
+                <Text style={[styles.delegateNote, styles.delegateOk]}>
+                  🏕️ بانر مخيم "{bannerCamp.name}" مفعّل بأعلى الملف
+                </Text>
+              )}
+            </>
+          )}
+
+          <View style={styles.bannerRow}>
+            <Switch value={showBanner} onValueChange={onToggleBanner} trackColor={{ true: colors.accent }} />
+            <Text style={styles.bannerLabel}>إظهار البانر بأعلى ملف الإكسل</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: 10 },
+  fieldPicker: { backgroundColor: colors.surface2, borderRadius: 12, marginBottom: 10, overflow: 'hidden' },
+  fieldPickerHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', padding: 12 },
+  fieldPickerTitle: { color: colors.accent, fontWeight: '900', fontSize: 12 },
+  chevron: { color: colors.muted, fontSize: 10 },
+  fieldPickerBody: { paddingHorizontal: 12, paddingBottom: 12 },
   delegateNote: { fontSize: 12, fontWeight: 'bold', textAlign: 'right', marginBottom: 8, padding: 10, borderRadius: 10, overflow: 'hidden' },
   delegateOk: { color: colors.green, backgroundColor: 'rgba(16,185,129,0.12)' },
   delegateWarn: { color: colors.accent, backgroundColor: 'rgba(245,158,11,0.12)' },
-  bannerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  bannerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 4 },
   bannerLabel: { color: colors.muted, fontSize: 11 },
 });

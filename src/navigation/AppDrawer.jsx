@@ -15,7 +15,7 @@ import colors from '../theme/colors';
  * بـ React Native نفسه، فتعمل فوراً عبر تحديث OTA بدون أي بناء إضافي.
  */
 export default function AppDrawer({ visible, onClose, navigation }) {
-  const { profile, logout, isOwner, isSuperAdmin, orgId, canAccessPageNow } = useAuth();
+  const { profile, logout, isOwner, isSuperAdmin, isSaasAdmin, orgId, canAccessPageNow } = useAuth();
   const { getAllowedCampIds, filterLocal } = useDataScope();
 
   // شارات عدد بسيطة على "الطلبات المعلّقة" و"التنبيهات" -- تُحسب فقط
@@ -121,6 +121,11 @@ export default function AppDrawer({ visible, onClose, navigation }) {
               { icon: '🗄️', label: 'إدارة البيانات والتشخيص', screen: 'Data', pageKey: 'data' },
               { icon: '📋', label: 'سجل التدقيق الشامل', screen: 'AuditLog', pageKey: 'data' },
             ]
+          : []),
+        // مالك منصة SaaS الكلي فقط (فوق كل المنظمات) -- منفصل تماماً عن
+        // isOwner العادي (مالك منظمته هو بس)
+        ...(isSaasAdmin
+          ? [{ icon: '🏢', label: 'طلبات تسجيل منظمات جديدة', screen: 'OrgSignupRequests' }]
           : []),
         // عناصر حساب عامة -- متاحة لكل مستخدم بغض النظر عن دوره (كانت
         // بقسم منفصل 'التواصل والحساب'، أُلغي ودُمجت هنا)

@@ -169,6 +169,10 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.portalBtnText}>🏕️ بوابة الأسرة</Text>
             </Pressable>
 
+            <Pressable onPress={() => navigation.navigate('OrgSignup')} style={styles.portalBtn}>
+              <Text style={styles.portalBtnText}>➕ سجّل كمندوب مخيم جديد</Text>
+            </Pressable>
+
             <Text style={styles.copyright}>© 2026 Mahmoud Rateb Ramadan</Text>
 
             {seconds > 10 && (

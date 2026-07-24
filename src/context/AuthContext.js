@@ -42,6 +42,7 @@ async function getRawStoredSession() {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
+  const [isSaasAdmin, setIsSaasAdmin] = useState(false);
   const [profile, setProfile] = useState(null);
   const [previewAs, setPreviewAs] = useState(null);
   const [pagePermRows, setPagePermRows] = useState([]);
@@ -141,6 +142,12 @@ export const AuthProvider = ({ children }) => {
       setProfile(data);
       cacheData('user_profile', userId, data);
       loadPagePermissions(data.org_id);
+      // فحص خفيف غير حاجب: هل هذا المستخدم مالك منصة SaaS كلي (فوق كل
+      // المنظمات)؟ مستقل تماماً عن دوره العادي بمنظمته (platform_owner
+      // العادي). فشل الفحص (لا اتصال مثلاً) يترك isSaasAdmin=false بأمان.
+      supabase.from('saas_admins').select('user_id').eq('user_id', userId).maybeSingle()
+        .then(({ data: row }) => setIsSaasAdmin(!!row))
+        .catch(() => {});
       return data;
     } catch (err) {
       console.error('[fetchUserProfile]', err.message);
@@ -245,6 +252,7 @@ export const AuthProvider = ({ children }) => {
       setSession(null);
       setUser(null);
       setProfile(null);
+      setIsSaasAdmin(false);
       setPreviewAs(null);
       setPagePermRows([]);
       setPagePermLoaded(false);
@@ -280,6 +288,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     session,
+    isSaasAdmin,
     profile: effectiveProfile,
     realProfile: profile,
     refreshProfile: () => (user?.id ? fetchUserProfile(user.id) : Promise.resolve(null)),

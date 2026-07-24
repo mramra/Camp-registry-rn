@@ -8,6 +8,8 @@ import { notifyNow } from '../lib/notifications';
 import LoginScreen from '../screens/login/LoginScreen';
 import ForceChangePasswordScreen from '../screens/login/ForceChangePasswordScreen';
 import FamilyPortalScreen from '../screens/familyportal/FamilyPortalScreen';
+import OrgSignupScreen from '../screens/orgsignup/OrgSignupScreen';
+import OrgSignupRequestsScreen from '../screens/orgsignup/OrgSignupRequestsScreen';
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import FamiliesListScreen from '../screens/families/FamiliesListScreen';
 import FamilyDetailScreen from '../screens/families/FamilyDetailScreen';
@@ -154,6 +156,7 @@ const RootNavigator = () => {
           <>
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="FamilyPortal" component={FamilyPortalScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="OrgSignup" component={OrgSignupScreen} options={{ headerShown: false }} />
           </>
         ) : mustChangePassword ? (
           <Stack.Screen name="ForceChangePassword" component={ForceChangePasswordScreen} options={{ headerShown: false }} />
@@ -208,6 +211,7 @@ const RootNavigator = () => {
 
             {/* الطلبات المعلّقة — منقولة بالكامل */}
             <Stack.Screen name="PendingRequests" component={PendingRequestsScreen} options={{ title: 'الطلبات المعلّقة' }} />
+            <Stack.Screen name="OrgSignupRequests" component={OrgSignupRequestsScreen} options={{ title: 'طلبات تسجيل منظمات جديدة' }} />
             <Stack.Screen name="Alerts" component={AlertsScreen} options={{ title: 'التنبيهات' }} />
             <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'إدارة الأجهزة' }} />
             <Stack.Screen name="Analysis" component={AnalysisScreen} options={{ title: 'لوحة الإحصائيات' }} />

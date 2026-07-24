@@ -26,6 +26,8 @@ export default function OrgSignupRequestsScreen() {
   const [mainTab, setMainTab] = useState('orgs');
   const [requests, setRequests] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [orgs, setOrgs] = useState([]);
+  const [activateTarget, setActivateTarget] = useState(null); // منظمة يجري تفعيلها مباشرة
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null); // { kind: 'org'|'payment', item }
@@ -45,12 +47,14 @@ export default function OrgSignupRequestsScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const [orgsJson, paysJson] = await Promise.all([
+      const [orgsJson, paysJson, allOrgsJson] = await Promise.all([
         callAPI({ action: 'listPending' }),
         callAPI({ action: 'listPendingPayments' }),
+        callAPI({ action: 'listOrganizations' }),
       ]);
       setRequests(orgsJson.requests || []);
       setPayments(paysJson.payments || []);
+      setOrgs(allOrgsJson.organizations || []);
     } catch (e) {
       showError(e.message);
     } finally {
@@ -131,6 +135,21 @@ export default function OrgSignupRequestsScreen() {
     }
   };
 
+  const handleActivateDirect = async (period) => {
+    if (!activateTarget) return;
+    setBusyId(activateTarget.id);
+    try {
+      await callAPI({ action: 'activateOrgDirect', orgId: activateTarget.id, period });
+      showSuccess(`تم تفعيل اشتراك "${activateTarget.name}" (${period === 'yearly' ? 'سنوي' : 'شهري'})`);
+      setActivateTarget(null);
+      loadData();
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const renderOrgItem = ({ item }) => (
     <View style={styles.card}>
       <Text style={styles.name}>👤 {item.full_name}</Text>
@@ -150,6 +169,31 @@ export default function OrgSignupRequestsScreen() {
           <Text style={styles.rejectBtnText}>❌ رفض</Text>
         </Pressable>
       </View>
+    </View>
+  );
+
+  const STATUS_LABEL = {
+    trial: '🎁 تجربة', active: '✅ مفعّل', pending_payment: '⏳ بانتظار دفع',
+    expired: '⛔ منتهٍ', suspended: '🚫 موقوف',
+  };
+
+  const renderAllOrgItem = ({ item }) => (
+    <View style={styles.card}>
+      <Text style={styles.name}>🏢 {item.name}</Text>
+      <Text style={styles.line}>{STATUS_LABEL[item.subscription_status] || item.subscription_status}</Text>
+      {item.subscription_status === 'trial' && !!item.trial_ends_at && (
+        <Text style={styles.line}>تجربة لغاية {formatDateTime(item.trial_ends_at)}</Text>
+      )}
+      {item.subscription_status === 'active' && !!item.plan_expires_at && (
+        <Text style={styles.line}>مفعّل لغاية {formatDateTime(item.plan_expires_at)}</Text>
+      )}
+      <Pressable
+        style={[styles.approveBtn, { marginTop: 10 }, busyId === item.id && styles.disabled]}
+        onPress={() => setActivateTarget(item)}
+        disabled={busyId === item.id}
+      >
+        <Text style={styles.approveBtnText}>✅ تفعيل مباشر (بدون إثبات)</Text>
+      </Pressable>
     </View>
   );
 
@@ -183,14 +227,15 @@ export default function OrgSignupRequestsScreen() {
     );
   }
 
-  const data = mainTab === 'orgs' ? requests : payments;
+  const data = mainTab === 'orgs' ? requests : mainTab === 'payments' ? payments : orgs;
+  const renderItem = mainTab === 'orgs' ? renderOrgItem : mainTab === 'payments' ? renderPaymentItem : renderAllOrgItem;
 
   return (
     <SafeAreaView style={styles.screen}>
       <FlatList
         data={data}
         keyExtractor={(item) => item.id}
-        renderItem={mainTab === 'orgs' ? renderOrgItem : renderPaymentItem}
+        renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View>
@@ -198,10 +243,11 @@ export default function OrgSignupRequestsScreen() {
             <View style={styles.chipsRow}>
               <FilterChip label={`🏢 منظمات جديدة (${requests.length})`} selected={mainTab === 'orgs'} onPress={() => setMainTab('orgs')} />
               <FilterChip label={`💳 طلبات دفع (${payments.length})`} selected={mainTab === 'payments'} onPress={() => setMainTab('payments')} />
+              <FilterChip label={`📋 كل المنظمات (${orgs.length})`} selected={mainTab === 'allOrgs'} onPress={() => setMainTab('allOrgs')} />
             </View>
           </View>
         }
-        ListEmptyComponent={<EmptyState icon={mainTab === 'orgs' ? '🏢' : '💳'} title="لا توجد طلبات معلّقة حالياً" />}
+        ListEmptyComponent={<EmptyState icon={mainTab === 'orgs' ? '🏢' : mainTab === 'payments' ? '💳' : '📋'} title="لا توجد نتائج" />}
       />
 
       <BottomSheetModal visible={!!rejectTarget} onClose={() => setRejectTarget(null)} title="رفض الطلب">
@@ -223,6 +269,17 @@ export default function OrgSignupRequestsScreen() {
             <Text style={styles.resultHint}>⚠️ هاي الكلمة ما تظهر مرة ثانية -- تأكد نسختها/بعتّها قبل ما تغلق هاي النافذة.</Text>
           </View>
         )}
+      </BottomSheetModal>
+      <BottomSheetModal visible={!!activateTarget} onClose={() => setActivateTarget(null)} title={`تفعيل "${activateTarget?.name || ''}" مباشرة`}>
+        <Text style={styles.resultText}>حدد مدة الاشتراك (بدون أي طلب إثبات دفع من العميل):</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+          <Pressable style={[styles.approveBtn, busyId === activateTarget?.id && styles.disabled]} onPress={() => handleActivateDirect('monthly')} disabled={busyId === activateTarget?.id}>
+            <Text style={styles.approveBtnText}>شهري (٣٠ يوم)</Text>
+          </Pressable>
+          <Pressable style={[styles.approveBtn, busyId === activateTarget?.id && styles.disabled]} onPress={() => handleActivateDirect('yearly')} disabled={busyId === activateTarget?.id}>
+            <Text style={styles.approveBtnText}>سنوي (٣٦٥ يوم)</Text>
+          </Pressable>
+        </View>
       </BottomSheetModal>
     </SafeAreaView>
   );

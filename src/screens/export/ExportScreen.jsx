@@ -14,6 +14,7 @@ import PageHeader from '../../components/ui/PageHeader';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import SelectField from '../../components/ui/SelectField';
 import FormSection from '../../components/ui/FormSection';
+import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FieldPicker, { orderedSelected } from '../../components/ui/FieldPicker';
 import { showToast } from '../../utils/toast';
 import colors from '../../theme/colors';
@@ -41,6 +42,10 @@ export default function ExportScreen() {
   const [showBanner, setShowBanner] = useState(true);
   const [bannerLines, setBannerLines] = useState(null);
   const [cxBannerLines, setCxBannerLines] = useState(null);
+  const [famExportOpen, setFamExportOpen] = useState(false);
+  const [memExportOpen, setMemExportOpen] = useState(false);
+  const [missingExportOpen, setMissingExportOpen] = useState(false);
+  const [cxExportOpen, setCxExportOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mainTab, setMainTab] = useState('quickFam'); // quickFam | quickMem | customFam | customMem | import
   const [importPreview, setImportPreview] = useState(null);
@@ -165,6 +170,7 @@ export default function ExportScreen() {
         await exportXLSX(rows, sheetName, fname);
       }
       showToast(`تم تصدير ${data.length} أسرة`, 'success');
+      setFamExportOpen(false);
     } catch (e) {
       showToast('خطأ: ' + e.message, 'error');
     } finally {
@@ -203,6 +209,7 @@ export default function ExportScreen() {
         await exportXLSX(rows, sheetName, fname);
       }
       showToast(`تم تصدير ${rows.length} فرد`, 'success');
+      setMemExportOpen(false);
     } catch (e) {
       showToast('خطأ: ' + e.message, 'error');
     } finally {
@@ -240,6 +247,7 @@ export default function ExportScreen() {
         await exportXLSX(rows, 'الأسر الناقصة', 'الأسر_الناقصة');
       }
       showToast(`${missing.length} أسرة ناقصة`, 'success');
+      setMissingExportOpen(false);
     } catch (e) {
       showToast('خطأ: ' + e.message, 'error');
     } finally {
@@ -497,6 +505,7 @@ export default function ExportScreen() {
         await exportXLSX(rows, sheetName, fname);
       }
       showToast(`تم تصدير ${cxSelected.size} ${isMem ? 'فرد' : 'أسرة'}`, 'success');
+      setCxExportOpen(false);
     } catch (e) {
       showToast('خطأ: ' + e.message, 'error');
     } finally {
@@ -665,21 +674,10 @@ export default function ExportScreen() {
           <FormSection title="👨‍👩‍👧 سجل أرباب الأسر">
             {canExport ? (
               <>
-                <FieldPicker title="📋 حقول رباب الأسر" cols={famCols} onChange={setFamCols} />
-                <CampDelegatePanel
-                  profile={profile}
-                  camps={camps}
-                  filterCamp={filterCamp}
-                  orgMembers={orgMembers}
-                  showBanner={showBanner}
-                  onToggleBanner={setShowBanner}
-                  onBannerLinesChange={setBannerLines}
-                />
-                <Pressable style={styles.btnPrimary} onPress={exportFamilies} disabled={loading}>
+                <Pressable style={styles.btnPrimary} onPress={() => setFamExportOpen(true)} disabled={loading}>
                   <Text style={styles.btnPrimaryText}>👨‍👩‍👧 تصدير كشف رباب الأسر</Text>
                 </Pressable>
-                <FieldPicker title="⚠️ حقول الأسر الناقصة" cols={missingCols} onChange={setMissingCols} />
-                <Pressable style={styles.btnRed} onPress={exportMissing} disabled={loading}>
+                <Pressable style={styles.btnRed} onPress={() => setMissingExportOpen(true)} disabled={loading}>
                   <Text style={styles.btnRedText}>⚠️ الأسر الناقصة</Text>
                 </Pressable>
               </>
@@ -692,21 +690,9 @@ export default function ExportScreen() {
         {mainTab === 'quickMem' && (
           <FormSection title="👤 سجل أفراد الأسر">
             {canExport ? (
-              <>
-                <FieldPicker title="📋 حقول الأفراد" cols={memCols} onChange={setMemCols} />
-                <CampDelegatePanel
-                  profile={profile}
-                  camps={camps}
-                  filterCamp={filterCamp}
-                  orgMembers={orgMembers}
-                  showBanner={showBanner}
-                  onToggleBanner={setShowBanner}
-                  onBannerLinesChange={setBannerLines}
-                />
-                <Pressable style={styles.btnBlue} onPress={exportMembers} disabled={loading}>
-                  <Text style={styles.btnBlueText}>👤 تصدير كشف أفراد الأسر</Text>
-                </Pressable>
-              </>
+              <Pressable style={styles.btnBlue} onPress={() => setMemExportOpen(true)} disabled={loading}>
+                <Text style={styles.btnBlueText}>👤 تصدير كشف أفراد الأسر</Text>
+              </Pressable>
             ) : (
               <Text style={styles.lockedText}>🔒 لا تملك صلاحية التصدير</Text>
             )}
@@ -785,24 +771,13 @@ export default function ExportScreen() {
               </ScrollView>
             </View>
 
-            <FieldPicker
-              title={cxMode === 'families' ? '📋 حقول رباب الأسر (مع الزوجة)' : '📋 حقول الأفراد'}
-              cols={cxMode === 'families' ? cxFamCols : cxMemCols}
-              onChange={cxMode === 'families' ? setCxFamCols : setCxMemCols}
-            />
-            <CampDelegatePanel
-              profile={profile}
-              camps={camps}
-              filterCamp={cxCamp}
-              orgMembers={orgMembers}
-              showBanner={showBanner}
-              onToggleBanner={setShowBanner}
-              onBannerLinesChange={setCxBannerLines}
-            />
-
-            <Pressable style={[styles.btnPrimary, cxSelected.size === 0 && styles.btnDisabled]} onPress={doCustomExport} disabled={loading || cxSelected.size === 0}>
+            <Pressable
+              style={[styles.btnPrimary, cxSelected.size === 0 && styles.btnDisabled]}
+              onPress={() => setCxExportOpen(true)}
+              disabled={loading || cxSelected.size === 0}
+            >
               <Text style={styles.btnPrimaryText}>
-                📥 تصدير {cxSelected.size > 0 ? `${cxSelected.size} ${cxMode === 'families' ? 'أسرة' : 'فرد'}` : ''}
+                📤 تصدير {cxSelected.size > 0 ? `${cxSelected.size} ${cxMode === 'families' ? 'أسرة' : 'فرد'}` : ''}
               </Text>
             </Pressable>
           </FormSection>
@@ -879,6 +854,81 @@ export default function ExportScreen() {
 
         {loading && <ActivityIndicator color={colors.accent} style={{ marginTop: 12 }} />}
       </ScrollView>
+
+      <BottomSheetModal visible={famExportOpen} onClose={() => setFamExportOpen(false)} title="تصدير كشف رباب الأسر">
+        <FieldPicker title="📋 حقول رباب الأسر" cols={famCols} onChange={setFamCols} startOpen />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={filterCamp}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setBannerLines}
+          startOpen
+        />
+        <Pressable style={styles.btnPrimary} onPress={exportFamilies} disabled={loading}>
+          <Text style={styles.btnPrimaryText}>📥 تصدير</Text>
+        </Pressable>
+      </BottomSheetModal>
+
+      <BottomSheetModal visible={memExportOpen} onClose={() => setMemExportOpen(false)} title="تصدير كشف أفراد الأسر">
+        <FieldPicker title="📋 حقول الأفراد" cols={memCols} onChange={setMemCols} startOpen />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={filterCamp}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setBannerLines}
+          startOpen
+        />
+        <Pressable style={styles.btnBlue} onPress={exportMembers} disabled={loading}>
+          <Text style={styles.btnBlueText}>📥 تصدير</Text>
+        </Pressable>
+      </BottomSheetModal>
+
+      <BottomSheetModal visible={missingExportOpen} onClose={() => setMissingExportOpen(false)} title="تصدير الأسر الناقصة">
+        <FieldPicker title="⚠️ حقول الأسر الناقصة" cols={missingCols} onChange={setMissingCols} startOpen />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={filterCamp}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setBannerLines}
+          startOpen
+        />
+        <Pressable style={styles.btnRed} onPress={exportMissing} disabled={loading}>
+          <Text style={styles.btnRedText}>📥 تصدير</Text>
+        </Pressable>
+      </BottomSheetModal>
+
+      <BottomSheetModal visible={cxExportOpen} onClose={() => setCxExportOpen(false)} title="تصدير الكشف المخصص">
+        <FieldPicker
+          title={cxMode === 'families' ? '📋 حقول رباب الأسر (مع الزوجة)' : '📋 حقول الأفراد'}
+          cols={cxMode === 'families' ? cxFamCols : cxMemCols}
+          onChange={cxMode === 'families' ? setCxFamCols : setCxMemCols}
+          startOpen
+        />
+        <CampDelegatePanel
+          profile={profile}
+          camps={camps}
+          filterCamp={cxCamp}
+          orgMembers={orgMembers}
+          showBanner={showBanner}
+          onToggleBanner={setShowBanner}
+          onBannerLinesChange={setCxBannerLines}
+          startOpen
+        />
+        <Pressable style={styles.btnPrimary} onPress={doCustomExport} disabled={loading}>
+          <Text style={styles.btnPrimaryText}>
+            📥 تصدير {cxSelected.size > 0 ? `${cxSelected.size} ${cxMode === 'families' ? 'أسرة' : 'فرد'}` : ''}
+          </Text>
+        </Pressable>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }

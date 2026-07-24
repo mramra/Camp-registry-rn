@@ -6,6 +6,7 @@ import { formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
+import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FormInput from '../../components/ui/FormInput';
 import colors from '../../theme/colors';
@@ -14,30 +15,27 @@ const FUNCTION_URL = 'https://ojclpkenecicujkqhhlu.supabase.co/functions/v1/org-
 const ANON_KEY = 'sb_publishable_d6q8hoDDcohuZFHk3jxI7g_IBWWCmNu';
 
 /**
- * شاشة "طلبات تسجيل منظمات جديدة" -- منفصلة تماماً عن شاشة "طلبات
- * معلّقة" العادية (لأنها تسبق وجود أي منظمة أصلاً، مو طلب داخل منظمة
- * موجودة). مرئية فقط لمن هو مسجَّل بجدول saas_admins (مالك منصة SaaS
- * الكلي)، يتحقق منها السيرفر نفسه بكل استدعاء بغض النظر عمّا تعرضه
- * الواجهة.
+ * شاشة مالك منصة SaaS الكلي -- تبويبان:
+ * 1. طلبات تسجيل منظمات جديدة (مندوب سجّل مخيماً جديداً، بانتظار موافقة)
+ * 2. طلبات إثبات دفع (منظمات موجودة أرسلت تحويل، بانتظار تأكيد تفعيل الاشتراك)
+ * كلاهما عبر Edge Function واحدة (org-signup)، محمية بعضوية saas_admins
+ * الحقيقية بالسيرفر نفسه، بغض النظر عمّا تعرضه الواجهة.
  */
 export default function OrgSignupRequestsScreen() {
   const { session } = useAuth();
+  const [mainTab, setMainTab] = useState('orgs');
   const [requests, setRequests] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState(null);
-  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null); // { kind: 'org'|'payment', item }
   const [rejectReason, setRejectReason] = useState('');
-  const [resultModal, setResultModal] = useState(null); // { email, password, orgName, campName }
+  const [resultModal, setResultModal] = useState(null);
 
   const callAPI = async (payload) => {
     const res = await fetch(FUNCTION_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: ANON_KEY,
-        Authorization: `Bearer ${session?.access_token}`,
-      },
+      headers: { 'Content-Type': 'application/json', apikey: ANON_KEY, Authorization: `Bearer ${session?.access_token}` },
       body: JSON.stringify(payload),
     });
     const json = await res.json();
@@ -47,20 +45,22 @@ export default function OrgSignupRequestsScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const json = await callAPI({ action: 'listPending' });
-      setRequests(json.requests || []);
+      const [orgsJson, paysJson] = await Promise.all([
+        callAPI({ action: 'listPending' }),
+        callAPI({ action: 'listPendingPayments' }),
+      ]);
+      setRequests(orgsJson.requests || []);
+      setPayments(paysJson.payments || []);
     } catch (e) {
       showError(e.message);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [session?.access_token]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
-  const onRefresh = () => { setRefreshing(true); loadData(); };
 
-  const handleApprove = (req) => {
+  const handleApproveOrg = (req) => {
     Alert.alert(
       'الموافقة على الطلب',
       `هل توافق على إنشاء منظمة ومخيم "${req.camp_name}" وحساب مندوب باسم "${req.full_name}"؟`,
@@ -85,12 +85,42 @@ export default function OrgSignupRequestsScreen() {
     );
   };
 
+  const handleApprovePayment = (p) => {
+    Alert.alert(
+      'تأكيد الدفع',
+      `هل تأكّدت من استلام تحويل "${p.organizations?.name || p.org_id}" (${p.period === 'yearly' ? 'سنوي' : 'شهري'}, مرجع: ${p.reference_number})؟ الموافقة تفعّل الاشتراك مباشرة وتفتح تصدير الملفات.`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'تأكيد',
+          onPress: async () => {
+            setBusyId(p.id);
+            try {
+              await callAPI({ action: 'approvePayment', paymentId: p.id });
+              showSuccess('تم تفعيل الاشتراك');
+              loadData();
+            } catch (e) {
+              showError(e.message);
+            } finally {
+              setBusyId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleReject = async () => {
     if (!rejectTarget) return;
-    setBusyId(rejectTarget.id);
+    const { kind, item } = rejectTarget;
+    setBusyId(item.id);
     try {
-      await callAPI({ action: 'reject', requestId: rejectTarget.id, reason: rejectReason.trim() || null });
-      showSuccess('تم رفض الطلب');
+      if (kind === 'org') {
+        await callAPI({ action: 'reject', requestId: item.id, reason: rejectReason.trim() || null });
+      } else {
+        await callAPI({ action: 'rejectPayment', paymentId: item.id, reason: rejectReason.trim() || null });
+      }
+      showSuccess('تم الرفض');
       setRejectTarget(null);
       setRejectReason('');
       loadData();
@@ -101,7 +131,7 @@ export default function OrgSignupRequestsScreen() {
     }
   };
 
-  const renderItem = ({ item }) => (
+  const renderOrgItem = ({ item }) => (
     <View style={styles.card}>
       <Text style={styles.name}>👤 {item.full_name}</Text>
       <Text style={styles.line}>🆔 {item.national_id} &nbsp; 📱 {item.phone}</Text>
@@ -113,18 +143,32 @@ export default function OrgSignupRequestsScreen() {
       <Text style={styles.dateLine}>📅 {formatDateTime(item.created_at)}</Text>
 
       <View style={styles.actionsRow}>
-        <Pressable
-          style={[styles.approveBtn, busyId === item.id && styles.disabled]}
-          onPress={() => handleApprove(item)}
-          disabled={busyId === item.id}
-        >
+        <Pressable style={[styles.approveBtn, busyId === item.id && styles.disabled]} onPress={() => handleApproveOrg(item)} disabled={busyId === item.id}>
           {busyId === item.id ? <ActivityIndicator color="#000" size="small" /> : <Text style={styles.approveBtnText}>✅ موافقة</Text>}
         </Pressable>
-        <Pressable
-          style={[styles.rejectBtn, busyId === item.id && styles.disabled]}
-          onPress={() => { setRejectTarget(item); setRejectReason(''); }}
-          disabled={busyId === item.id}
-        >
+        <Pressable style={[styles.rejectBtn, busyId === item.id && styles.disabled]} onPress={() => { setRejectTarget({ kind: 'org', item }); setRejectReason(''); }} disabled={busyId === item.id}>
+          <Text style={styles.rejectBtnText}>❌ رفض</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderPaymentItem = ({ item }) => (
+    <View style={styles.card}>
+      <Text style={styles.name}>🏢 {item.organizations?.name || '—'}</Text>
+      <Text style={styles.line}>👤 {item.submitted_by_name}</Text>
+      <View style={styles.divider} />
+      <Text style={styles.campLine}>{item.period === 'yearly' ? '📆 اشتراك سنوي' : '📆 اشتراك شهري'}</Text>
+      <Text style={styles.line}>🔖 الرقم المرجعي: {item.reference_number}</Text>
+      {!!item.amount && <Text style={styles.line}>💰 المبلغ: {item.amount}</Text>}
+      {!!item.note && <Text style={styles.line}>📝 {item.note}</Text>}
+      <Text style={styles.dateLine}>📅 {formatDateTime(item.created_at)}</Text>
+
+      <View style={styles.actionsRow}>
+        <Pressable style={[styles.approveBtn, busyId === item.id && styles.disabled]} onPress={() => handleApprovePayment(item)} disabled={busyId === item.id}>
+          {busyId === item.id ? <ActivityIndicator color="#000" size="small" /> : <Text style={styles.approveBtnText}>✅ تأكيد الدفع</Text>}
+        </Pressable>
+        <Pressable style={[styles.rejectBtn, busyId === item.id && styles.disabled]} onPress={() => { setRejectTarget({ kind: 'payment', item }); setRejectReason(''); }} disabled={busyId === item.id}>
           <Text style={styles.rejectBtnText}>❌ رفض</Text>
         </Pressable>
       </View>
@@ -139,23 +183,25 @@ export default function OrgSignupRequestsScreen() {
     );
   }
 
+  const data = mainTab === 'orgs' ? requests : payments;
+
   return (
     <SafeAreaView style={styles.screen}>
       <FlatList
-        data={requests}
+        data={data}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        renderItem={mainTab === 'orgs' ? renderOrgItem : renderPaymentItem}
         contentContainerStyle={styles.listContent}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
         ListHeaderComponent={
-          <PageHeader
-            icon="🏢"
-            title="طلبات تسجيل منظمات جديدة"
-            subtitle={<Text style={styles.headerSubtitle}>{requests.length} طلب بانتظار المراجعة</Text>}
-          />
+          <View>
+            <PageHeader icon="🏢" title="مالك منصة SaaS" subtitle={<Text style={styles.headerSubtitle}>مراجعة الطلبات المعلّقة</Text>} />
+            <View style={styles.chipsRow}>
+              <FilterChip label={`🏢 منظمات جديدة (${requests.length})`} selected={mainTab === 'orgs'} onPress={() => setMainTab('orgs')} />
+              <FilterChip label={`💳 طلبات دفع (${payments.length})`} selected={mainTab === 'payments'} onPress={() => setMainTab('payments')} />
+            </View>
+          </View>
         }
-        ListEmptyComponent={<EmptyState icon="🏢" title="لا توجد طلبات معلّقة حالياً" />}
+        ListEmptyComponent={<EmptyState icon={mainTab === 'orgs' ? '🏢' : '💳'} title="لا توجد طلبات معلّقة حالياً" />}
       />
 
       <BottomSheetModal visible={!!rejectTarget} onClose={() => setRejectTarget(null)} title="رفض الطلب">
@@ -187,6 +233,7 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   headerSubtitle: { color: colors.muted, fontSize: 11 },
+  chipsRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
 
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRightWidth: 3, borderRightColor: colors.accent, borderRadius: 12, padding: 14, marginBottom: 10 },
   name: { color: colors.white, fontWeight: 'bold', fontSize: 14, textAlign: 'right' },

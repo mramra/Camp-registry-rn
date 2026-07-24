@@ -37,6 +37,47 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './supabase';
+
+/**
+ * بوابة الاشتراك المركزية -- نقطة تحقق واحدة فقط يمرّ منها *كل* تصدير
+ * Excel بالتطبيق (الدوال الأربع بالأسفل تستدعيها أول شي)، عشان تفعيل
+ * الاشتراك أو قفله ينطبق تلقائياً على كل شاشات التصدير العشر بلا أي
+ * تعديل بأي شاشة منها. تعتمد على سياسة RLS "org_self_select" على جدول
+ * organizations (كل مستخدم يشوف بس صف منظمته هو)، فما فيه حاجة نمرّر
+ * org_id يدوياً -- الاستعلام نفسه محدود تلقائياً.
+ *
+ * فشل الفحص نفسه (لا اتصال إنترنت لحظة الفحص مثلاً) لا يمنع التصدير --
+ * فقط رفض *صريح* من حالة الاشتراك الفعلية يمنعه، عشان مشكلة شبكة عابرة
+ * ما توقّف عمل موظف بمنظمة مفعّلة اشتراكها فعلاً.
+ */
+async function assertExportAllowed() {
+  let data;
+  try {
+    const res = await supabase.from('organizations').select('subscription_status, trial_ends_at, plan_expires_at').limit(1).maybeSingle();
+    data = res.data;
+  } catch {
+    return;
+  }
+  if (!data) return;
+
+  const now = Date.now();
+  const { subscription_status, trial_ends_at, plan_expires_at } = data;
+
+  if (subscription_status === 'active' && (!plan_expires_at || new Date(plan_expires_at).getTime() >= now)) return;
+  if (subscription_status === 'trial' && (!trial_ends_at || new Date(trial_ends_at).getTime() >= now)) return;
+
+  if (subscription_status === 'suspended') {
+    throw new Error('تم إيقاف اشتراك منظمتك من مالك المنصة -- تواصل معه لمعرفة التفاصيل.');
+  }
+  if (subscription_status === 'trial') {
+    throw new Error('انتهت فترة التجربة المجانية -- فعّل الاشتراك من شاشة "الاشتراك والباقات" لمتابعة تصدير الملفات.');
+  }
+  if (subscription_status === 'active') {
+    throw new Error('انتهى اشتراكك -- جدّده من شاشة "الاشتراك والباقات" لمتابعة تصدير الملفات.');
+  }
+  throw new Error('اشتراك منظمتك غير مفعّل بعد -- راجع شاشة "الاشتراك والباقات".');
+}
 
 const SAF_DIR_KEY = 'excelio_downloads_directory_uri';
 
@@ -259,6 +300,7 @@ function buildFinalName(fileName) {
  * @param {string} fileName
  */
 export async function exportCampTemplateReport(info, dataRows, fileName) {
+  await assertExportAllowed();
   if (!dataRows || dataRows.length === 0) {
     throw new Error('لا توجد بيانات للتصدير');
   }
@@ -398,6 +440,7 @@ export async function exportCampTemplateReport(info, dataRows, fileName) {
  * @param {string} fileName - اسم الملف (بدون امتداد)
  */
 export async function exportXLSX(rows, sheetName, fileName) {
+  await assertExportAllowed();
   if (!rows || rows.length === 0) {
     throw new Error('لا توجد بيانات للتصدير');
   }
@@ -417,6 +460,7 @@ export async function exportXLSX(rows, sheetName, fileName) {
  * @param {string} fileName - اسم الملف (بدون امتداد)
  */
 export async function exportXLSXMultiSheet(sheets, fileName) {
+  await assertExportAllowed();
   const validSheets = (sheets || []).filter((s) => s.rows && s.rows.length > 0);
   if (validSheets.length === 0) {
     throw new Error('لا توجد بيانات للتصدير');
@@ -440,6 +484,7 @@ export async function exportXLSXMultiSheet(sheets, fileName) {
  * @param {string} fileName - اسم الملف (بدون امتداد)
  */
 export async function exportXLSXMultiSheetWithBanners(sheets, fileName) {
+  await assertExportAllowed();
   const validSheets = (sheets || []).filter((s) => s.rows && s.rows.length > 0);
   if (validSheets.length === 0) {
     throw new Error('لا توجد بيانات للتصدير');

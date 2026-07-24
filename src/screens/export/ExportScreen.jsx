@@ -63,6 +63,7 @@ export default function ExportScreen() {
   const [cxMode, setCxMode] = useState('families');
   const [cxCamp, setCxCamp] = useState('');
   const [cxSearch, setCxSearch] = useState('');
+  const [cxPickerOpen, setCxPickerOpen] = useState(false);
   const [cxAgeMin, setCxAgeMin] = useState('');
   const [cxAgeMax, setCxAgeMax] = useState('');
   const [cxSelected, setCxSelected] = useState(new Set());
@@ -457,8 +458,8 @@ export default function ExportScreen() {
 
   const switchTab = (tab) => {
     setMainTab(tab);
-    if (tab === 'customFam') cxSwitchMode('families');
-    if (tab === 'customMem') cxSwitchMode('members');
+    if (tab === 'customFam') { cxSwitchMode('families'); setCxPickerOpen(true); }
+    if (tab === 'customMem') { cxSwitchMode('members'); setCxPickerOpen(true); }
   };
 
   const doCustomExport = async () => {
@@ -727,48 +728,53 @@ export default function ExportScreen() {
             )}
 
             <View style={styles.pickerBox}>
-              <View style={styles.pickerHeader}>
+              <Pressable style={styles.pickerHeader} onPress={() => setCxPickerOpen((o) => !o)}>
                 <Text style={styles.pickerTitle}>
                   {cxMode === 'families' ? '👨‍👩‍👧 اختر الأسر' : '👤 اختر الأفراد'}
                   <Text style={styles.pickerCount}> ({cxSelected.size} من {cxList.length})</Text>
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  <Pressable style={styles.miniBtn} onPress={cxSelectAll}><Text style={styles.miniBtnText}>الكل</Text></Pressable>
-                  <Pressable style={styles.miniBtn} onPress={cxDeselectAll}><Text style={styles.miniBtnText}>لا شيء</Text></Pressable>
-                </View>
-              </View>
-              <TextInput
-                value={cxSearch}
-                onChangeText={setCxSearch}
-                placeholder="🔍 ابحث بالاسم أو الخيمة..."
-                placeholderTextColor={colors.muted}
-                style={[styles.textInput, { marginTop: 8 }]}
-              />
-              <ScrollView style={styles.pickerList} nestedScrollEnabled>
-                {cxList.length === 0 ? (
-                  <Text style={styles.emptyListText}>لا توجد نتائج</Text>
-                ) : (
-                  cxList.slice(0, 200).map((item) => (
-                    <Pressable
-                      key={item.id}
-                      onPress={() => cxToggleOne(item.id)}
-                      style={[styles.pickerRow, cxSelected.has(item.id) && styles.pickerRowActive]}
-                    >
-                      <View style={cxSelected.has(item.id) ? styles.orderBadge : styles.orderBadgeEmpty}>
-                        {cxSelected.has(item.id) && (
-                          <Text style={styles.orderBadgeText}>{[...cxSelected].indexOf(item.id) + 1}</Text>
-                        )}
-                      </View>
-                      <Text style={styles.pickerTent}>⛺{item.tent || '—'}</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.pickerName} numberOfLines={1}>{cxMode === 'families' ? item.head_name : item.name}</Text>
-                        {cxMode === 'members' && <Text style={styles.pickerSub}>{item.relation || '—'} • {item.fam_name}</Text>}
-                      </View>
-                      {cxMode === 'families' && <Text style={styles.pickerSub}>{membersCountMap[item.id] || 0} فرد</Text>}
-                    </Pressable>
-                  ))
-                )}
-              </ScrollView>
+                <Text style={styles.chevron}>{cxPickerOpen ? '▲' : '▼'}</Text>
+              </Pressable>
+              {cxPickerOpen && (
+                <>
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                    <Pressable style={styles.miniBtn} onPress={cxSelectAll}><Text style={styles.miniBtnText}>الكل</Text></Pressable>
+                    <Pressable style={styles.miniBtn} onPress={cxDeselectAll}><Text style={styles.miniBtnText}>لا شيء</Text></Pressable>
+                  </View>
+                  <TextInput
+                    value={cxSearch}
+                    onChangeText={setCxSearch}
+                    placeholder="🔍 ابحث بالاسم أو الخيمة..."
+                    placeholderTextColor={colors.muted}
+                    style={[styles.textInput, { marginTop: 8 }]}
+                  />
+                  <ScrollView style={styles.pickerList} nestedScrollEnabled>
+                    {cxList.length === 0 ? (
+                      <Text style={styles.emptyListText}>لا توجد نتائج</Text>
+                    ) : (
+                      cxList.slice(0, 200).map((item) => (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => cxToggleOne(item.id)}
+                          style={[styles.pickerRow, cxSelected.has(item.id) && styles.pickerRowActive]}
+                        >
+                          <View style={cxSelected.has(item.id) ? styles.orderBadge : styles.orderBadgeEmpty}>
+                            {cxSelected.has(item.id) && (
+                              <Text style={styles.orderBadgeText}>{[...cxSelected].indexOf(item.id) + 1}</Text>
+                            )}
+                          </View>
+                          <Text style={styles.pickerTent}>⛺{item.tent || '—'}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.pickerName} numberOfLines={1}>{cxMode === 'families' ? item.head_name : item.name}</Text>
+                            {cxMode === 'members' && <Text style={styles.pickerSub}>{item.relation || '—'} • {item.fam_name}</Text>}
+                          </View>
+                          {cxMode === 'families' && <Text style={styles.pickerSub}>{membersCountMap[item.id] || 0} فرد</Text>}
+                        </Pressable>
+                      ))
+                    )}
+                  </ScrollView>
+                </>
+              )}
             </View>
 
             <Pressable
@@ -980,6 +986,7 @@ const styles = StyleSheet.create({
   pickerHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   pickerTitle: { color: colors.accent, fontWeight: '900', fontSize: 12 },
   pickerCount: { color: colors.muted, fontWeight: 'normal' },
+  chevron: { color: colors.muted, fontSize: 10 },
   pickerList: { maxHeight: 260, marginTop: 8, overflow: 'hidden' },
   emptyListText: { color: colors.muted, fontSize: 12, textAlign: 'center', paddingVertical: 16 },
   pickerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 8, borderRadius: 8, marginBottom: 2 },

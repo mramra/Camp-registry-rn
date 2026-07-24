@@ -65,10 +65,18 @@ export default function CampDelegatePanel({
   // يطلع فعلياً بأعلى ملف الإكسل. camps تُمرَّر عشان المخيمات الفرعية
   // (بلا مندوب خاص فيها أبداً) تورّث مندوب مخيمها الرئيسي تلقائياً.
   const bannerDelegate = !isDelegateOrAssistant && bannerCamp ? getCampDelegateInfo(bannerCamp, orgMembers, camps) : null;
+  const bannerCampLabel = bannerCamp
+    ? `${bannerDelegate?.name || 'بدون مندوب'} — ${bannerCamp.name}`
+    : null;
+  // كل خيار "اسم المندوب — اسم المخيم" عشان يتوضّح فوراً أي مخيم بالضبط
+  // (خصوصاً لما نفس المندوب يدير مخيمه الرئيسي + فروعه، فيتكرر اسمه
+  // لأكثر من مخيم -- هذا طبيعي، مو خطأ، وإضافة اسم المخيم توضّحه). إزالة
+  // أي مخيم مكرر بالقائمة نفسها (احتياط دفاعي لو مصدر camps فيه تكرار).
+  const uniqueCamps = Array.from(new Map((camps || []).map((c) => [c.id, c])).values());
   const delegateOptions = !isDelegateOrAssistant
-    ? (camps || []).map((c) => {
+    ? uniqueCamps.map((c) => {
         const d = getCampDelegateInfo(c, orgMembers, camps);
-        return { value: c.id, label: d?.name ? d.name : `⚠️ بدون مندوب (${c.name})` };
+        return { value: c.id, label: `${d?.name || '⚠️ بدون مندوب'} — ${c.name}` };
       })
     : [];
 
@@ -84,9 +92,7 @@ export default function CampDelegatePanel({
     ? 'معطّل'
     : isDelegateOrAssistant
       ? `باسمك (${profile.full_name || '—'})`
-      : bannerCamp
-        ? (bannerDelegate?.name || `بدون مندوب (${bannerCamp.name})`)
-        : 'بدون بانر';
+      : bannerCampLabel || 'بدون بانر';
 
   return (
     <View style={styles.fieldPicker}>
@@ -107,7 +113,7 @@ export default function CampDelegatePanel({
             <>
               <SelectField
                 label="اختر مندوباً لعرض بيانات مخيمه بأعلى الملف"
-                value={bannerCamp ? (bannerDelegate?.name || `بدون مندوب (${bannerCamp.name})`) : undefined}
+                value={bannerCampLabel}
                 placeholder="— بدون بانر —"
                 options={[{ value: '', label: '— بدون بانر —' }, ...delegateOptions]}
                 onSelect={setBannerCampId}

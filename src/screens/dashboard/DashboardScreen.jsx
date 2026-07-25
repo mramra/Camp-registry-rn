@@ -37,6 +37,13 @@ export default function DashboardScreen() {
   const [pendingDevicesCount, setPendingDevicesCount] = useState(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const { getAllowedCampIds, filterLocal } = useDataScope();
+  const [showBackupReminder, setShowBackupReminder] = useState(true);
+
+  // يوم الخميس تحديداً (getDay(): 0=أحد...4=خميس) -- يظهر بنر التذكير
+  // في كل مرة يفتح فيها المالك التطبيق بهذا اليوم (مش وقت ثابت بالساعة،
+  // طلب صريح)، ويختفي فقط لو ضغط "✕" لهاي الجلسة -- يرجع يظهر تلقائياً
+  // بأي فتح جديد للتطبيق يوم الخميس القادم.
+  const isThursday = new Date().getDay() === 4;
 
   const [stats, setStats] = useState(null);
   const [offlineInfo, setOfflineInfo] = useState(null);
@@ -282,6 +289,18 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        {isOwner && isThursday && showBackupReminder && (
+          <View style={styles.backupReminderBanner}>
+            <Pressable style={styles.backupReminderClose} onPress={() => setShowBackupReminder(false)}>
+              <Text style={styles.backupReminderCloseText}>✕</Text>
+            </Pressable>
+            <Text style={styles.backupReminderText}>📅 اليوم الخميس — لا تنسَ أخذ نسخة احتياطية كاملة</Text>
+            <Pressable style={styles.backupReminderBtn} onPress={() => navigation.navigate('Data')}>
+              <Text style={styles.backupReminderBtnText}>💾 خذ نسخة الآن</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* اختصارات سريعة -- أكثر 4 إجراءات استخداماً، بدل فتح القائمة
             الجانبية كل مرة */}
         <View style={styles.quickRow}>
@@ -484,6 +503,15 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 10, marginBottom: 12,
   },
   offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
+  backupReminderBanner: {
+    backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.4)',
+    borderRadius: 12, padding: 12, marginBottom: 12,
+  },
+  backupReminderClose: { position: 'absolute', top: 8, left: 10, padding: 4 },
+  backupReminderCloseText: { color: colors.muted, fontSize: 14, fontWeight: 'bold' },
+  backupReminderText: { color: colors.green, fontSize: 13, fontWeight: 'bold', textAlign: 'right', marginBottom: 8 },
+  backupReminderBtn: { backgroundColor: colors.green, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  backupReminderBtnText: { color: '#000', fontWeight: '900', fontSize: 12 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   pendingAlertBox: {
     backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',

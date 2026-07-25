@@ -12,9 +12,8 @@ import EmptyState from '../../components/ui/EmptyState';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import FormInput from '../../components/ui/FormInput';
 import SelectField from '../../components/ui/SelectField';
+import DateFields from '../../components/ui/DateFields';
 import colors from '../../theme/colors';
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
 
 /**
  * قائمة جولات التوزيع — جولة = كيان واحد فقط (اسم + تاريخ يحدده المستخدم +
@@ -34,7 +33,12 @@ export default function DistributionsScreen() {
   const [search, setSearch] = useState('');
   const [formVisible, setFormVisible] = useState(false);
   const [name, setName] = useState('');
-  const [roundDate, setRoundDate] = useState(todayStr());
+  const [roundDay, setRoundDay] = useState(() => new Date().getDate());
+  const [roundMonth, setRoundMonth] = useState(() => new Date().getMonth() + 1);
+  const [roundYear, setRoundYear] = useState(() => new Date().getFullYear());
+  const roundDateStr = (roundDay && roundMonth && roundYear)
+    ? `${roundYear}-${String(roundMonth).padStart(2, '0')}-${String(roundDay).padStart(2, '0')}`
+    : '';
   const [notes, setNotes] = useState('');
   const [bannerCampId, setBannerCampId] = useState(null); // اختياري -- للبانر بالتصدير فقط، لا يقيّد عرض الأسر
   const [saving, setSaving] = useState(false);
@@ -74,7 +78,10 @@ export default function DistributionsScreen() {
   const openAddForm = () => {
     setEditingRoundId(null);
     setName('');
-    setRoundDate(todayStr());
+    const t = new Date();
+    setRoundDay(t.getDate());
+    setRoundMonth(t.getMonth() + 1);
+    setRoundYear(t.getFullYear());
     setNotes('');
     setBannerCampId(null);
     setFormVisible(true);
@@ -83,7 +90,10 @@ export default function DistributionsScreen() {
   const openEditForm = (round) => {
     setEditingRoundId(round.id);
     setName(round.name || '');
-    setRoundDate(round.round_date || todayStr());
+    const d = round.round_date ? new Date(round.round_date) : new Date();
+    setRoundDay(d.getDate());
+    setRoundMonth(d.getMonth() + 1);
+    setRoundYear(d.getFullYear());
     setNotes(round.notes || '');
     setBannerCampId(round.camp_id || null);
     setFormVisible(true);
@@ -94,18 +104,18 @@ export default function DistributionsScreen() {
       showError('اسم الجولة مطلوب');
       return;
     }
-    if (!roundDate) {
+    if (!roundDateStr) {
       showError('تاريخ الجولة مطلوب');
       return;
     }
     setSaving(true);
     try {
       const result = editingRoundId
-        ? await updateDistRound(editingRoundId, { name: name.trim(), round_date: roundDate, notes: notes.trim() || null, camp_id: bannerCampId })
+        ? await updateDistRound(editingRoundId, { name: name.trim(), round_date: roundDateStr, notes: notes.trim() || null, camp_id: bannerCampId })
         : await createDistRound({
             org_id: orgId,
             name: name.trim(),
-            round_date: roundDate,
+            round_date: roundDateStr,
             notes: notes.trim() || null,
             camp_id: bannerCampId,
           });
@@ -117,7 +127,10 @@ export default function DistributionsScreen() {
       setFormVisible(false);
       setEditingRoundId(null);
       setName('');
-      setRoundDate(todayStr());
+      const t2 = new Date();
+      setRoundDay(t2.getDate());
+      setRoundMonth(t2.getMonth() + 1);
+      setRoundYear(t2.getFullYear());
       setNotes('');
       setBannerCampId(null);
       loadData();
@@ -222,7 +235,15 @@ export default function DistributionsScreen() {
 
       <BottomSheetModal visible={formVisible} onClose={() => setFormVisible(false)} title={editingRoundId ? '✏️ تعديل الجولة' : '➕ جولة توزيع جديدة'}>
         <FormInput label="اسم الجولة *" placeholder="توزيع شتوي 2026" value={name} onChangeText={setName} />
-        <FormInput label="تاريخ الجولة * (YYYY-MM-DD)" value={roundDate} onChangeText={setRoundDate} />
+        <Text style={styles.fieldLabel}>تاريخ الجولة *</Text>
+        <DateFields
+          day={roundDay}
+          month={roundMonth}
+          year={roundYear}
+          onChangeDay={setRoundDay}
+          onChangeMonth={setRoundMonth}
+          onChangeYear={setRoundYear}
+        />
         <FormInput label="ملاحظات" value={notes} onChangeText={setNotes} multiline numberOfLines={2} />
         <SelectField
           label="مخيم البانر (اختياري -- يظهر بأعلى ملف Excel عند التصدير بس)"
@@ -245,6 +266,7 @@ export default function DistributionsScreen() {
 }
 
 const styles = StyleSheet.create({
+  fieldLabel: { color: colors.muted, fontSize: 12, fontWeight: 'bold', marginBottom: 6, textAlign: 'right' },
   screen: { flex: 1, backgroundColor: colors.bg },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },

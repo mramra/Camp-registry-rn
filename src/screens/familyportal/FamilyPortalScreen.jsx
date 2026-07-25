@@ -349,6 +349,45 @@ export default function FamilyPortalScreen({ navigation }) {
                     })
                   )}
                 </View>
+                <View style={styles.infoCard}>
+                  <Text style={styles.infoCardTitle}>💬 تواصل مع إدارة المخيم</Text>
+                  <Text style={styles.requestHint}>
+                    اكتب أي استفسار أو طلب (إضافة مولود، تغيير جوال، أي شي ثاني) — بيوصل مباشرة
+                    لمسؤول المخيم وممكن يردّ عليك هون بنفس المكان.
+                  </Text>
+
+                  {messages.length > 0 && (
+                    <View style={styles.chatBox}>
+                      {messages.map((m) => (
+                        <View
+                          key={m.id}
+                          style={[styles.bubble, m.sender_role === 'staff' ? styles.bubbleStaff : styles.bubbleFamily]}
+                        >
+                          <Text style={styles.bubbleSender}>{m.sender_role === 'staff' ? `👤 ${m.sender_name || 'إدارة المخيم'}` : 'أنت'}</Text>
+                          <Text style={styles.bubbleText}>{m.message}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  <TextInput
+                    value={newMessage}
+                    onChangeText={setNewMessage}
+                    placeholder="اكتب رسالتك هنا..."
+                    placeholderTextColor={colors.muted}
+                    multiline
+                    style={[styles.input, styles.requestTextInput]}
+                    editable={!sendingMessage}
+                  />
+                  <Pressable
+                    style={[styles.button, sendingMessage && styles.buttonDisabled]}
+                    onPress={handleSendMessage}
+                    disabled={sendingMessage}
+                  >
+                    <Text style={styles.buttonText}>{sendingMessage ? '⏳ جاري الإرسال...' : '📤 إرسال'}</Text>
+                  </Pressable>
+                </View>
+
                 {missingFieldDefs.length > 0 && (
                   <View style={[styles.infoCard, styles.missingCard]}>
                     <Text style={styles.infoCardTitle}>🔴 بيانات ناقصة — أكملها الآن</Text>
@@ -472,44 +511,6 @@ export default function FamilyPortalScreen({ navigation }) {
                   </View>
                 )}
 
-                <View style={styles.infoCard}>
-                  <Text style={styles.infoCardTitle}>💬 تواصل مع إدارة المخيم</Text>
-                  <Text style={styles.requestHint}>
-                    اكتب أي استفسار أو طلب (إضافة مولود، تغيير جوال، أي شي ثاني) — بيوصل مباشرة
-                    لمسؤول المخيم وممكن يردّ عليك هون بنفس المكان.
-                  </Text>
-
-                  {messages.length > 0 && (
-                    <View style={styles.chatBox}>
-                      {messages.map((m) => (
-                        <View
-                          key={m.id}
-                          style={[styles.bubble, m.sender_role === 'staff' ? styles.bubbleStaff : styles.bubbleFamily]}
-                        >
-                          <Text style={styles.bubbleSender}>{m.sender_role === 'staff' ? `👤 ${m.sender_name || 'إدارة المخيم'}` : 'أنت'}</Text>
-                          <Text style={styles.bubbleText}>{m.message}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  <TextInput
-                    value={newMessage}
-                    onChangeText={setNewMessage}
-                    placeholder="اكتب رسالتك هنا..."
-                    placeholderTextColor={colors.muted}
-                    multiline
-                    style={[styles.input, styles.requestTextInput]}
-                    editable={!sendingMessage}
-                  />
-                  <Pressable
-                    style={[styles.button, sendingMessage && styles.buttonDisabled]}
-                    onPress={handleSendMessage}
-                    disabled={sendingMessage}
-                  >
-                    <Text style={styles.buttonText}>{sendingMessage ? '⏳ جاري الإرسال...' : '📤 إرسال'}</Text>
-                  </Pressable>
-                </View>
               </View>
             )}
           </View>

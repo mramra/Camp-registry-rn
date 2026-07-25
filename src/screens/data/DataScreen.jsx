@@ -25,7 +25,7 @@ const TABLES = [
   // كانت هاي الجداول السبعة ناقصة بالكامل من النسخة الاحتياطية القديمة
   // رغم بيانات حقيقية موجودة فيها -- لو انفقد شي كان يضيع بلا رجعة.
   { key: 'audit_logs', label: 'سجل التدقيق', icon: '📜', hasOrg: true },
-  { key: 'family_history', label: 'سجل التعديلات/الطلبات', icon: '🕒', hasOrg: true },
+  { key: 'family_history', label: 'سجل التعديلات والطلبات', icon: '🕒', hasOrg: true },
   { key: 'family_activity_log', label: 'سجل نشاط الأسر', icon: '📇', hasOrg: true },
   { key: 'page_permissions', label: 'صلاحيات الصفحات المخصَّصة', icon: '🔐', hasOrg: true },
   { key: 'portal_messages', label: 'محادثات بوابة الأسرة', icon: '💬', hasOrg: true },

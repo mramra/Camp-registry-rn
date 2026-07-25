@@ -237,7 +237,7 @@ export function checkFamilyIssues(f, members) {
   else if (!luhnCheck(f.head_id)) issues.push('رقم الهوية غير صحيح');
   if (!f.phone1?.trim()) issues.push('رقم الجوال ناقص');
   if (!f.phone2?.trim()) issues.push('رقم واتساب ناقص');
-  else if (!f.whatsapp_prefix?.trim()) issues.push('مقدمة الواتساب ناقصة');
+  if (!f.whatsapp_prefix?.trim()) issues.push('مقدمة الواتساب ناقصة');
   if (!f.wallet_type?.trim()) issues.push('نوع المحفظة الإلكترونية ناقص');
   if (!f.wallet_phone?.trim()) issues.push('رقم المحفظة الإلكترونية ناقص');
   if (!f.head_dob) issues.push('تاريخ الميلاد ناقص');

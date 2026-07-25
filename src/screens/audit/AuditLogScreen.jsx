@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
@@ -37,14 +37,21 @@ export default function AuditLogScreen() {
   const [filter, setFilter] = useState('');
 
   const loadData = useCallback(async () => {
-    if (!orgId) return;
+    if (!orgId) { setLoading(false); return; }
+    setLoading(true);
     const data = await fetchAuditLogs(orgId, 300);
     setLogs(data);
     setLoading(false);
     setRefreshing(false);
   }, [orgId]);
 
-  useFocusEffect(useCallback(() => { setLoading(true); loadData(); }, [loadData]));
+  // useFocusEffect وحده كان يعتمد فقط على لحظة التركيز -- لو الشاشة
+  // فُتحت قبل ما orgId يجهز (لسه البروفايل يحمّل بالخلفية)، ما كان
+  // فيه أي إعادة محاولة تلقائية لما orgId يصير جاهز، فتضل الشاشة عالقة
+  // بحالة "تحميل" للأبد. useEffect عادي هون يضمن إعادة الجلب فوراً
+  // بمجرد ما orgId يتوفر، بغض النظر عن حالة التركيز.
+  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const onRefresh = () => { setRefreshing(true); loadData(); };
 

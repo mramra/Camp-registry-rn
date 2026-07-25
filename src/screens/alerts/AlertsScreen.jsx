@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase';
 import { isIncomplete, getVulnerabilityScore } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
+import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import colors from '../../theme/colors';
 
 const LEVEL_STYLE = {
@@ -31,6 +32,7 @@ export default function AlertsScreen() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [namesModal, setNamesModal] = useState(null); // التنبيه المفتوح حالياً (فيه items)
 
   const loadAlerts = useCallback(async () => {
     if (!orgId) return;
@@ -59,8 +61,8 @@ export default function AlertsScreen() {
           level: 'yellow',
           icon: '⚠️',
           title: `${incomplete.length} أسرة ببيانات ناقصة`,
-          desc: 'تحتاج استكمال البيانات',
-          screen: 'FamiliesList',
+          desc: 'اضغط "عرض" لرؤية الأسماء',
+          items: incomplete.map((f) => ({ id: f.id, name: f.head_name || '(بدون اسم)' })),
         });
       }
 
@@ -71,7 +73,8 @@ export default function AlertsScreen() {
           level: 'yellow',
           icon: '📵',
           title: `${noPhone.length} أسرة بدون رقم جوال`,
-          desc: 'لا يمكن التواصل معهم',
+          desc: 'اضغط "عرض" لرؤية الأسماء',
+          items: noPhone.map((f) => ({ id: f.id, name: f.head_name || '(بدون اسم)' })),
         });
       }
 
@@ -89,8 +92,8 @@ export default function AlertsScreen() {
           level: 'red',
           icon: '🔁',
           title: `${dupIds.length} أسرة بهوية مكررة`,
-          desc: dupIds.slice(0, 3).map((f) => f.head_name).join('، ') + (dupIds.length > 3 ? ' وآخرون' : ''),
-          screen: 'FamiliesList',
+          desc: 'اضغط "عرض" لرؤية الأسماء',
+          items: dupIds.map((f) => ({ id: f.id, name: f.head_name || '(بدون اسم)' })),
         });
       }
 
@@ -106,8 +109,8 @@ export default function AlertsScreen() {
           level: 'yellow',
           icon: '📞',
           title: `${dupPh.length} أسرة بجوال مكرر`,
-          desc: dupPh.slice(0, 3).map((f) => f.head_name).join('، ') + (dupPh.length > 3 ? ' وآخرون' : ''),
-          screen: 'FamiliesList',
+          desc: 'اضغط "عرض" لرؤية الأسماء',
+          items: dupPh.map((f) => ({ id: f.id, name: f.head_name || '(بدون اسم)' })),
         });
       }
 
@@ -167,8 +170,8 @@ export default function AlertsScreen() {
               level: 'blue',
               icon: '🔑',
               title: `${pending.length} مستخدم لم يغيّر كلمة المرور`,
-              desc: pending.slice(0, 3).map((u) => u.full_name).join('، '),
-              screen: 'UsersList',
+              desc: 'اضغط "عرض" لرؤية الأسماء',
+              items: pending.map((u) => ({ id: u.id, name: u.full_name || '(بدون اسم)', type: 'user' })),
             });
           }
         } catch {
@@ -196,8 +199,8 @@ export default function AlertsScreen() {
               level: 'red',
               icon: '🆘',
               title: `${neverReceived.length} أسرة شديدة الضعف لم تستلم أي مساعدة`,
-              desc: neverReceived.slice(0, 3).map((f) => f.head_name).join('، ') + (neverReceived.length > 3 ? ' وآخرون' : ''),
-              screen: 'FamiliesList',
+              desc: 'اضغط "عرض" لرؤية الأسماء',
+              items: neverReceived.map((f) => ({ id: f.id, name: f.head_name || '(بدون اسم)' })),
             });
           }
         }
@@ -254,7 +257,15 @@ export default function AlertsScreen() {
                   <Text style={[styles.title, { color: s.text }]}>{a.icon} {a.title}</Text>
                   <Text style={styles.desc}>{a.desc}</Text>
                 </View>
-                {!!a.screen && (
+                {!!a.items?.length && (
+                  <Pressable
+                    style={[styles.actionBtn, { backgroundColor: `${s.text}22`, borderColor: s.border }]}
+                    onPress={() => setNamesModal(a)}
+                  >
+                    <Text style={[styles.actionText, { color: s.text }]}>عرض</Text>
+                  </Pressable>
+                )}
+                {!a.items && !!a.screen && (
                   <Pressable
                     style={[styles.actionBtn, { backgroundColor: `${s.text}22`, borderColor: s.border }]}
                     onPress={() => navigation.push(a.screen)}
@@ -267,6 +278,27 @@ export default function AlertsScreen() {
           );
         })}
       </ScrollView>
+
+      <BottomSheetModal
+        visible={!!namesModal}
+        onClose={() => setNamesModal(null)}
+        title={namesModal ? `${namesModal.icon} ${namesModal.title}` : ''}
+      >
+        {namesModal?.items?.map((item) => (
+          <Pressable
+            key={item.id}
+            style={styles.nameRow}
+            onPress={() => {
+              setNamesModal(null);
+              if (item.type === 'user') navigation.push('UserForm', { userId: item.id });
+              else navigation.push('FamilyDetail', { familyId: item.id });
+            }}
+          >
+            <Text style={styles.nameRowText}>{item.name}</Text>
+            <Text style={styles.nameRowArrow}>◀</Text>
+          </Pressable>
+        ))}
+      </BottomSheetModal>
     </SafeAreaView>
   );
 }
@@ -283,4 +315,10 @@ const styles = StyleSheet.create({
   desc: { color: colors.muted, fontSize: 11, textAlign: 'right' },
   actionBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   actionText: { fontSize: 11, fontWeight: 'bold' },
+  nameRow: {
+    flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  nameRowText: { color: colors.white, fontSize: 14, textAlign: 'right' },
+  nameRowArrow: { color: colors.muted, fontSize: 12 },
 });

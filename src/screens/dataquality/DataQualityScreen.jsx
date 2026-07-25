@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { checkFamilyIssues, isIncomplete, hasMissingDob } from '../../lib/helpers';
+import { checkFamilyIssues, hasMissingDob } from '../../lib/helpers';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
@@ -14,16 +14,34 @@ import EmptyState from '../../components/ui/EmptyState';
 import SelectField from '../../components/ui/SelectField';
 import colors from '../../theme/colors';
 
-// فُصلت هذه الشاشة عن "كل الأسر" (طلب مباشر) لتقليل عدد الفلاتر بالصفحة
-// الرئيسية -- "الأشد ضعفاً" اتشالت من هذا الفلتر لأنها مغطاة بالكامل
-// بشاشة "تقرير الاحتياجات" (مكانها الطبيعي)، فبقي هون بس فلاتر جودة
-// البيانات الفعلية: نواقص وتكرارات.
-const ISSUE_OPTIONS = [
-  { key: '', icon: '👥', label: 'الكل' },
-  { key: 'incomplete', icon: '⚠️', label: 'ناقص' },
-  { key: 'dob', icon: '🎂', label: 'تاريخ ميلاد ناقص' },
-  { key: 'dup_id', icon: '🔁', label: 'هوية مكررة' },
-  { key: 'dup_phone', icon: '📞', label: 'جوال مكرر' },
+/**
+ * "نواقص وتكررات" (كانت "جودة البيانات") -- بدل شبكة أيقونات ثابتة
+ * بـ5 فئات عامة بس، صار فلترة تفصيلية بحقلين: مخيم + نوع بيان محدَّد
+ * (كل حقل من checkFamilyIssues المركزية له خيار مستقل هون)، عشان تقدر
+ * تسأل بالضبط "مين بمخيم كذا ناقص اسمه رباعي" بدون ما تفلتر يدوياً.
+ *
+ * كل نوع بيان معرَّف بدالة match(f, issues) ترجع true/false -- تُطبَّق
+ * على قائمة الأسر مع فلتر المخيم المختار. الأنواع الخاصة (تاريخ الميلاد،
+ * التكرارات) لها معالجة مستقلة بمنطقها الأصلي (hasMissingDob/dupSets).
+ */
+const DATA_TYPE_OPTIONS = [
+  { key: '', label: '— كل النواقص والتكررات —', match: null },
+  { key: 'name4', label: '👤 الاسم غير رباعي', match: (f, issues) => issues.includes('اسم رب الأسرة ناقص') || issues.includes('الاسم غير رباعي') },
+  { key: 'head_id', label: '🆔 رقم الهوية (ناقص/غير صحيح)', match: (f, issues) => issues.includes('رقم الهوية ناقص') || issues.includes('رقم الهوية غير صحيح') },
+  { key: 'phone1', label: '📱 رقم الجوال', match: (f, issues) => issues.includes('رقم الجوال ناقص') },
+  { key: 'phone2', label: '💬 رقم واتساب', match: (f, issues) => issues.includes('رقم واتساب ناقص') },
+  { key: 'whatsapp_prefix', label: '🔢 مقدمة الواتساب', match: (f, issues) => issues.includes('مقدمة الواتساب ناقصة') },
+  { key: 'wallet_type', label: '💳 نوع المحفظة الإلكترونية', match: (f, issues) => issues.includes('نوع المحفظة الإلكترونية ناقص') },
+  { key: 'wallet_phone', label: '💳 رقم المحفظة الإلكترونية', match: (f, issues) => issues.includes('رقم المحفظة الإلكترونية ناقص') },
+  { key: 'dob', label: '🎂 تاريخ الميلاد (رب الأسرة أو أي فرد)', match: null },
+  { key: 'marital', label: '💍 الحالة الاجتماعية', match: (f, issues) => issues.includes('الحالة الاجتماعية ناقصة') },
+  { key: 'camp', label: '🏕️ المخيم', match: (f, issues) => issues.includes('المخيم ناقص') },
+  { key: 'original_address', label: '🗺️ المحافظة الأصلية', match: (f, issues) => issues.includes('المحافظة الأصلية ناقصة') },
+  { key: 'governorate_current', label: '📍 محافظة السكن الحالي', match: (f, issues) => issues.includes('محافظة السكن الحالي ناقصة') },
+  { key: 'spouse', label: '👰 بيانات الزوجة (لمتزوج)', match: (f, issues) => issues.includes('بيانات الزوجة ناقصة') },
+  { key: 'member_name', label: '👥 اسم فرد فارغ/قصير', match: (f, issues) => issues.some((i) => i === 'اسم فرد فارغ' || i.includes('قصير جداً')) },
+  { key: 'dup_id', label: '🔁 هوية مكررة', match: null },
+  { key: 'dup_phone', label: '📞 جوال مكرر', match: null },
 ];
 
 export default function DataQualityScreen() {
@@ -39,10 +57,10 @@ export default function DataQualityScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [offlineInfo, setOfflineInfo] = useState(null);
   const [filterCamp, setFilterCamp] = useState('');
-  const [filterIssue, setFilterIssue] = useState('incomplete');
+  const [filterType, setFilterType] = useState('');
 
   const loadData = useCallback(async () => {
-    if (!orgId) return;
+    if (!orgId) { setLoading(false); return; }
     const cached = await getCachedData('data_quality', profile?.id);
     const hadCache = !!cached?.data;
     if (hadCache) {
@@ -89,7 +107,6 @@ export default function DataQualityScreen() {
     return map;
   }, [allMembers]);
 
-  // ── كشف التكرار (هوية/جوال) — نفس منطق شاشة كل الأسر حرفياً ──
   const { dupIdSet, dupPhoneSet } = useMemo(() => {
     const idOwners = {};
     families.forEach((f) => {
@@ -116,31 +133,27 @@ export default function DataQualityScreen() {
     return { dupIdSet, dupPhoneSet };
   }, [families, allMembers]);
 
-  const counts = useMemo(() => {
-    const base = filterCamp ? families.filter((f) => f.camp_id === filterCamp) : families;
-    return {
-      all: base.length,
-      incomplete: base.filter((f) => isIncomplete(f, membersByFamily[f.id])).length,
-      dob: base.filter((f) => hasMissingDob(f, membersByFamily[f.id])).length,
-      dup_id: base.filter((f) => dupIdSet.has(f.id)).length,
-      dup_phone: base.filter((f) => dupPhoneSet.has(f.id)).length,
-    };
-  }, [families, filterCamp, membersByFamily, dupIdSet, dupPhoneSet]);
+  const matchesType = useCallback((f, key) => {
+    if (!key) {
+      const issues = checkFamilyIssues(f, membersByFamily[f.id]);
+      return issues.length > 0 || hasMissingDob(f, membersByFamily[f.id]) || dupIdSet.has(f.id) || dupPhoneSet.has(f.id);
+    }
+    if (key === 'dob') return hasMissingDob(f, membersByFamily[f.id]);
+    if (key === 'dup_id') return dupIdSet.has(f.id);
+    if (key === 'dup_phone') return dupPhoneSet.has(f.id);
+    const opt = DATA_TYPE_OPTIONS.find((o) => o.key === key);
+    if (!opt?.match) return false;
+    const issues = checkFamilyIssues(f, membersByFamily[f.id]);
+    return opt.match(f, issues);
+  }, [membersByFamily, dupIdSet, dupPhoneSet]);
 
   const filtered = useMemo(() => {
-    let list = families.filter(
-      (f) => isIncomplete(f, membersByFamily[f.id]) || hasMissingDob(f, membersByFamily[f.id]) || dupIdSet.has(f.id) || dupPhoneSet.has(f.id)
-    );
+    let list = families.filter((f) => matchesType(f, filterType));
     if (filterCamp) list = list.filter((f) => f.camp_id === filterCamp);
-    if (filterIssue === 'incomplete') list = list.filter((f) => isIncomplete(f, membersByFamily[f.id]));
-    else if (filterIssue === 'dob') list = list.filter((f) => hasMissingDob(f, membersByFamily[f.id]));
-    else if (filterIssue === 'dup_id') list = list.filter((f) => dupIdSet.has(f.id));
-    else if (filterIssue === 'dup_phone') list = list.filter((f) => dupPhoneSet.has(f.id));
-
     return list.sort(
       (a, b) => checkFamilyIssues(b, membersByFamily[b.id]).length - checkFamilyIssues(a, membersByFamily[a.id]).length
     );
-  }, [families, membersByFamily, dupIdSet, dupPhoneSet, filterCamp, filterIssue]);
+  }, [families, filterCamp, filterType, matchesType, membersByFamily]);
 
   const styles = getStyles();
 
@@ -190,7 +203,7 @@ export default function DataQualityScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <View>
-            <PageHeader icon="🔍" title="جودة البيانات" subtitle={`${filtered.length} أسرة بحاجة مراجعة`} />
+            <PageHeader icon="🔍" title="نواقص وتكررات" subtitle={`${filtered.length} أسرة بحاجة مراجعة`} />
             {!!offlineInfo && (
               <View style={styles.offlineBanner}>
                 <Text style={styles.offlineBannerText}>
@@ -198,35 +211,28 @@ export default function DataQualityScreen() {
                 </Text>
               </View>
             )}
-            <View style={styles.statsGrid}>
-              {ISSUE_OPTIONS.map((o) => (
-                <Pressable
-                  key={o.key || 'all'}
-                  onPress={() => setFilterIssue(o.key)}
-                  style={[styles.statBox, filterIssue === o.key && styles.statBoxActive]}
-                >
-                  <Text style={styles.statIcon}>{o.icon}</Text>
-                  <Text style={styles.statCount}>{o.key ? counts[o.key] : counts.all}</Text>
-                  <Text style={styles.statLabel}>{o.label}</Text>
-                </Pressable>
-              ))}
-            </View>
             <SelectField
-              wheel
               label="المخيم"
               value={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
               options={[{ value: '', label: 'كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))]}
               onSelect={setFilterCamp}
               placeholder="كل المخيمات"
             />
-            {filterIssue === 'dob' && filtered.length > 0 && (
+            <SelectField
+              label="نوع البيان الناقص/المكرر"
+              value={DATA_TYPE_OPTIONS.find((o) => o.key === filterType)?.label}
+              options={DATA_TYPE_OPTIONS.map((o) => ({ value: o.key, label: o.label }))}
+              onSelect={setFilterType}
+              placeholder="— كل النواقص والتكررات —"
+            />
+            {filtered.length > 0 && (
               <Pressable
                 style={styles.smsBtn}
                 onPress={() =>
                   navigation.navigate('SMS', {
                     preselectFamilyIds: filtered.map((f) => f.id),
                     presetMessage:
-                      'السلام عليكم، برجاء استكمال تاريخ الميلاد الناقص لأفراد أسرتكم عبر بوابة الأسرة (رابط التطبيق) — يساعدنا هذا بخدمتكم بشكل أفضل. شكراً لتعاونكم.',
+                      'السلام عليكم، برجاء استكمال بياناتكم الناقصة عبر بوابة الأسرة (رابط التطبيق) أو التواصل معنا — يساعدنا هذا بخدمتكم بشكل أفضل. شكراً لتعاونكم.',
                   })
                 }
               >
@@ -252,18 +258,6 @@ const getStyles = () =>
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
 
-    statsGrid: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-    statBox: {
-      flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-      borderRadius: 12, paddingVertical: 10, alignItems: 'center',
-    },
-    statBoxActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
-    statIcon: { fontSize: 16 },
-    statCount: { color: colors.white, fontWeight: '900', fontSize: 15, marginTop: 2 },
-    statLabel: { color: colors.muted, fontSize: 9, marginTop: 2, textAlign: 'center' },
-
-
-
     card: { flexDirection: 'row-reverse', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, marginBottom: 8, overflow: 'hidden' },
     sideBar: { width: 5 },
     cardName: { color: colors.white, fontWeight: 'bold', fontSize: 13, textAlign: 'right', padding: 12, paddingBottom: 0 },
@@ -274,7 +268,7 @@ const getStyles = () =>
     tagDob: { color: colors.accent, fontSize: 10, fontWeight: 'bold' },
     smsBtn: {
       backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1, borderColor: colors.accent,
-      borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 12,
+      borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 4, marginBottom: 12,
     },
     smsBtnText: { color: colors.accent, fontWeight: '900', fontSize: 13 },
     tagIncomplete: { color: colors.red, fontSize: 10, fontWeight: 'bold' },

@@ -22,6 +22,16 @@ const TABLES = [
   { key: 'dist_rounds', label: 'جولات التوزيع', icon: '📦', hasOrg: true },
   { key: 'camp_distributions', label: 'دفعات التوزيع', icon: '📋', hasOrg: true },
   { key: 'camp_dist_families', label: 'استلام التوزيعات', icon: '✅', hasOrg: false },
+  // كانت هاي الجداول السبعة ناقصة بالكامل من النسخة الاحتياطية القديمة
+  // رغم بيانات حقيقية موجودة فيها -- لو انفقد شي كان يضيع بلا رجعة.
+  { key: 'audit_logs', label: 'سجل التدقيق', icon: '📜', hasOrg: true },
+  { key: 'family_history', label: 'سجل التعديلات/الطلبات', icon: '🕒', hasOrg: true },
+  { key: 'family_activity_log', label: 'سجل نشاط الأسر', icon: '📇', hasOrg: true },
+  { key: 'page_permissions', label: 'صلاحيات الصفحات المخصَّصة', icon: '🔐', hasOrg: true },
+  { key: 'portal_messages', label: 'محادثات بوابة الأسرة', icon: '💬', hasOrg: true },
+  { key: 'devices', label: 'الأجهزة المعتمدة', icon: '📱', hasOrg: true },
+  { key: 'org_lists', label: 'القوائم', icon: '📋', hasOrg: true },
+  { key: 'org_list_families', label: 'أسر القوائم', icon: '👪', hasOrg: true },
 ];
 
 export default function DataScreen() {

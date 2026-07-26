@@ -42,6 +42,7 @@ import AnalysisScreen from '../screens/analysis/AnalysisScreen';
 import CampCompareScreen from '../screens/campcompare/CampCompareScreen';
 import DataQualityScreen from '../screens/dataquality/DataQualityScreen';
 import NeedsReportScreen from '../screens/needsreport/NeedsReportScreen';
+import FieldActivitiesScreen from '../screens/fieldactivities/FieldActivitiesScreen';
 import SecurityAuditScreen from '../screens/diagnostics/SecurityAuditScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import SubscriptionScreen from '../screens/subscription/SubscriptionScreen';
@@ -218,6 +219,7 @@ const RootNavigator = () => {
             <Stack.Screen name="CampCompare" component={CampCompareScreen} options={{ title: 'مقارنة المخيمات' }} />
             <Stack.Screen name="DataQuality" component={DataQualityScreen} options={{ title: 'نواقص وتكررات' }} />
             <Stack.Screen name="NeedsReport" component={NeedsReportScreen} options={{ title: 'تقرير الاحتياجات' }} />
+            <Stack.Screen name="FieldActivities" component={FieldActivitiesScreen} options={{ title: 'التقرير الإداري' }} />
             <Stack.Screen name="SecurityAudit" component={SecurityAuditScreen} options={{ title: 'الفحص الأمني' }} />
             <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'الإعدادات' }} />
             <Stack.Screen name="Subscription" component={SubscriptionScreen} options={{ title: 'الاشتراك والباقات' }} />

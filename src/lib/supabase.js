@@ -611,6 +611,53 @@ export const deleteDistRound = async (roundId) => {
   }
 };
 
+/** جلب كل نشاطات التقرير الإداري (ندوات/ورشات/توزيعات ميدانية) لمنظمة
+ * معيّنة (غير محذوفة)، الأحدث أولاً، مع اسم جولة التوزيع المرتبطة لو
+ * موجودة. اسم الجدول field_activities (مو activity_log) عمداً، تفادياً
+ * للالتباس مع جدول family_activity_log الموجود أصلاً (سجل تعديلات
+ * الأسر -- مفهوم مختلف تماماً). */
+export const fetchFieldActivities = async (orgId) => {
+  const { data, error } = await supabase
+    .from('field_activities')
+    .select('*, dist_rounds(name)')
+    .eq('org_id', orgId)
+    .eq('_deleted', false)
+    .order('activity_date', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+};
+
+export const createFieldActivity = async (activityData) => {
+  try {
+    const { data, error } = await supabase.from('field_activities').insert([activityData]).select();
+    if (error) throw error;
+    return { success: true, data: data[0] };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+export const updateFieldActivity = async (activityId, updates) => {
+  try {
+    const { error } = await supabase.from('field_activities').update(updates).eq('id', activityId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+export const deleteFieldActivity = async (activityId) => {
+  try {
+    const { error } = await supabase.from('field_activities').update({ _deleted: true }).eq('id', activityId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
 /** عدد الأسر المستلمة لكل جولة توزيع بالمنظمة -- خريطة round_id → عدد،
  * لعرضها مباشرة على بطاقة كل جولة بقائمة التوزيعات. */
 export const fetchDistReceivedCountsByRound = async (orgId) => {

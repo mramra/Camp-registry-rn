@@ -98,6 +98,7 @@ export default function AppDrawer({ visible, onClose, navigation }) {
         { icon: '📈', label: 'تحليلات', screen: 'Analysis', pageKey: 'analysis' },
         { icon: '🏕️', label: 'مقارنة المخيمات', screen: 'CampCompare', pageKey: 'camp_compare' },
         { icon: '📋', label: 'تقرير الاحتياجات', screen: 'NeedsReport', pageKey: 'needs_report' },
+        { icon: '📝', label: 'التقرير الإداري', screen: 'FieldActivities', pageKey: 'field_activities' },
       ],
     },
     {

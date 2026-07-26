@@ -80,10 +80,18 @@ export default function DistributionsScreen() {
 
   const onRefresh = () => { setRefreshing(true); loadData(); };
 
-  const filtered = rounds.filter((r) => {
-    if (search.trim() && !(r.name || '').toLowerCase().includes(search.trim().toLowerCase())) return false;
-    return true;
-  });
+  const filtered = rounds
+    .filter((r) => {
+      if (search.trim() && !(r.name || '').toLowerCase().includes(search.trim().toLowerCase())) return false;
+      return true;
+    })
+    // من الأحدث للأقدم حسب تاريخ الجولة نفسه (لا وقت الإنشاء) -- لو
+    // نفس التاريخ، الأحدث إنشاءً يظهر أولاً كترتيب ثانوي.
+    .sort((a, b) => {
+      const dateDiff = new Date(b.round_date || b.created_at) - new Date(a.round_date || a.created_at);
+      if (dateDiff !== 0) return dateDiff;
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
 
   const openAddForm = () => {
     setEditingRoundId(null);

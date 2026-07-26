@@ -21,6 +21,7 @@ import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
 import FilterChip from '../../components/ui/FilterChip';
+import SelectField from '../../components/ui/SelectField';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
 import PrimaryButton from '../../components/ui/PrimaryButton';
@@ -331,17 +332,16 @@ export default function FamiliesListScreen() {
               )}
             </View>
 
-            {/* فلتر حالة المراجعة -- شرائح بدل شبكة الأيقونات */}
-            <View style={styles.chipsRow}>
-              {APPROVAL_OPTIONS.map((o) => (
-                <FilterChip
-                  key={o.key || 'all'}
-                  label={`${o.icon} ${o.label} (${o.key ? counts[o.key] : counts.all})`}
-                  selected={filterApproval === o.key}
-                  onPress={() => setFilterApproval(o.key)}
-                />
-              ))}
-            </View>
+            {/* فلتر حالة المراجعة -- حقل اختياري واحد بدل 4 شرائح منفصلة */}
+            <SelectField
+              value={`الحالة: ${APPROVAL_OPTIONS.find((o) => o.key === filterApproval)?.label} (${filterApproval ? counts[filterApproval] : counts.all})`}
+              options={APPROVAL_OPTIONS.map((o) => ({
+                value: o.key,
+                label: `${o.icon} ${o.label} (${o.key ? counts[o.key] : counts.all})`,
+              }))}
+              onSelect={setFilterApproval}
+              placeholder="الحالة: الكل"
+            />
 
           </View>
         }

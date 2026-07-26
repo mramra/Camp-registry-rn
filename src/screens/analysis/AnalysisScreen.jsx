@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE, REQUIRED_FAMILY_FIELDS, isAgeInRange } from '../../lib/helpers';
+import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE, isIncomplete, getVulnerabilityScore } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -264,7 +264,17 @@ export default function AnalysisScreen() {
     });
     const orphans = fams.reduce((sum, f) => sum + getOrphanCount(f, memsByFam[f.id]), 0);
 
-    const incomplete = fams.filter((f) => REQUIRED_FAMILY_FIELDS.some((k) => !f[k]?.toString().trim())).length;
+    // موحَّد الآن مع نفس تعريف "نواقص وتكررات" (checkFamilyIssues) بدل
+    // فحص 4 حقول أساسية فقط -- كان يعطي رقماً مختلفاً بصمت عن باقي
+    // الشاشات لنفس المفهوم بالضبط.
+    const incompleteFams = fams.filter((f) => isIncomplete(f, memsByFam[f.id]));
+    const incomplete = incompleteFams.length;
+
+    const femaleHeadFams = fams.filter((f) => f.head_gender === 'أنثى');
+
+    // أسر "شديدة الضعف" = تصنيف critical من نفس دالة الضعف المركزية
+    // المستخدمة بشاشات التوزيعات والتقارير (getVulnerabilityScore).
+    const criticalFams = fams.filter((f) => getVulnerabilityScore(f, memsByFam[f.id]).tier === 'critical');
 
     const orgWorkingAge = allPersons.filter((p) => {
       const a = calcAge(p.personDob);
@@ -310,15 +320,29 @@ export default function AnalysisScreen() {
       infantPersons,
       orphans,
       incomplete,
+      incompleteFams,
+      femaleHeadFams,
+      criticalFams,
       allPersons,
     };
   }, [scopedFams, members, camps, campMap]);
 
   // ── فلتر عمر مخصّص (من/إلى) — انتقل من شاشة "كل الأسر" لهون عشان
-  // يبقى فلتر واحد للعمر بمكان واحد بدل تكراره بشاشتين مختلفتين ──
+  // يبقى فلتر واحد للعمر بمكان واحد بدل تكراره بشاشتين مختلفتين. يستخدم
+  // calcAge() بالضبط زي فئات الأعمار الثابتة فوق (بدل isAgeInRange التي
+  // كانت تحسب عمراً تقريبياً بالأيام) -- وإلا كان يعطي نتيجة مختلفة عن
+  // فئة "كهل 36-59" مثلاً لنفس الشخص عند حدود السنة بالضبط. ──
   const ageRangeMatches = useMemo(() => {
     if (!ageMin && !ageMax) return [];
-    return stats.allPersons.filter((p) => isAgeInRange(p.personDob, ageMin, ageMax));
+    const min = ageMin !== '' ? parseFloat(ageMin) : null;
+    const max = ageMax !== '' ? parseFloat(ageMax) : null;
+    return stats.allPersons.filter((p) => {
+      const a = calcAge(p.personDob);
+      if (a === null) return false;
+      if (min !== null && a < min) return false;
+      if (max !== null && a > max) return false;
+      return true;
+    });
   }, [stats.allPersons, ageMin, ageMax]);
 
   const openDrillDownPersons = (title, persons) => {
@@ -395,14 +419,15 @@ export default function AnalysisScreen() {
               ['👨‍👩‍👧‍👦', stats.total, 'أسرة', colors.accent, () => openDrillDownFamilies('كل الأسر', scopedFams)],
               ['👤', stats.totalPersons, 'فرد', colors.blue, null],
               ['👶', stats.children, 'طفل', colors.green, () => openDrillDownPersons('الأطفال', stats.childPersons)],
+              ['🚺', stats.females, 'إناث', colors.pink, () => openDrillDownPersons('الإناث', stats.femalePersons)],
+              ['🚹', stats.males, 'ذكور', colors.blue, () => openDrillDownPersons('الذكور', stats.malePersons)],
+              ['👩‍🏠', `${stats.femaleHeadPct.toFixed(0)}%`, 'أسر بمعيلة', colors.pink, () => openDrillDownFamilies('أسر بمعيلة', stats.femaleHeadFams)],
+              ['🔴', stats.criticalFams.length, 'شديدة الضعف', colors.red, () => openDrillDownFamilies('أسر شديدة الضعف', stats.criticalFams)],
               ['🕊️', stats.orphans, 'يتيم', colors.muted, null],
-              ['⚠️', stats.incomplete, 'بيانات ناقصة', colors.red, null],
+              ['⚠️', stats.incomplete, 'بيانات ناقصة', colors.red, () => openDrillDownFamilies('بيانات ناقصة', stats.incompleteFams)],
               ['🏕️', stats.byCamp.length, 'مخيم نشط', colors.accent, null],
               ['📐', stats.avgFamilySize.toFixed(1), 'معدل حجم الأسرة', colors.purple, null],
               ['⚖️', stats.dependencyRatio.toFixed(1), 'نسبة الإعالة', colors.orange, null],
-              ['👩‍🏠', `${stats.femaleHeadPct.toFixed(0)}%`, 'أسر بمعيلة', colors.pink, null],
-              ['🚹', stats.males, 'ذكور', colors.blue, () => openDrillDownPersons('الذكور', stats.malePersons)],
-              ['🚺', stats.females, 'إناث', colors.pink, () => openDrillDownPersons('الإناث', stats.femalePersons)],
             ].map(([icon, val, label, color, onPress], i) => (
               <Pressable key={i} style={styles.statBox} onPress={onPress || undefined} disabled={!onPress}>
                 <Text style={styles.statIcon}>{icon}</Text>

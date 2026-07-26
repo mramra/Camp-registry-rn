@@ -126,6 +126,24 @@ export default function FamilyPortalScreen({ navigation }) {
       }
     }
 
+    // فحص تكامل الأزواج المترابطة -- كل حقل هون له "شريك" لازم يكتمل
+    // معه سوا، وإلا البيانات تصير ناقصة/متضاربة بصمت (طلب مباشر بعد
+    // ملاحظة: واتساب بدون مقدمة انأرسل بنجاح بدون أي تنبيه). الفحص
+    // يقارن "القيمة الفعلية بعد هذا الإرسال" (المدخل حديثاً أو الموجود
+    // بالسجل أصلاً) -- مو بس المدخل حديثاً، عشان لو نوع المحفظة موجود
+    // أصلاً بالسجل ورب الأسرة استكمل بس الرقم، هذا يبقى مسموح.
+    const effectivePhone2 = (missingValues.phone2 || '').trim() || family.phone2 || '';
+    const effectivePrefix = whatsappPrefix || family.whatsapp_prefix || '';
+    if (!!effectivePhone2 !== !!effectivePrefix) {
+      return setError('رقم الواتساب ومقدمته (972/970) لازم يُكمَّلا مع بعض -- مو حقل بدون التاني');
+    }
+
+    const effectiveWalletType = (missingValues.wallet_type || '').trim() || family.wallet_type || '';
+    const effectiveWalletPhone = (missingValues.wallet_phone || '').trim() || family.wallet_phone || '';
+    if (!!effectiveWalletType !== !!effectiveWalletPhone) {
+      return setError('نوع المحفظة الإلكترونية ورقمها لازم يُكمَّلا مع بعض -- مو حقل بدون التاني');
+    }
+
     setMissingSending(true);
     setError('');
     try {

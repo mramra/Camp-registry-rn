@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { checkFamilyIssues, hasMissingDob } from '../../lib/helpers';
+import { checkFamilyIssues, hasMissingDob, computeDuplicateSets, hasDataQualityIssue } from '../../lib/helpers';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
@@ -106,37 +106,13 @@ export default function DataQualityScreen() {
     return map;
   }, [allMembers]);
 
-  const { dupIdSet, dupPhoneSet } = useMemo(() => {
-    const idOwners = {};
-    families.forEach((f) => {
-      if (!f.head_id) return;
-      if (!idOwners[f.head_id]) idOwners[f.head_id] = new Set();
-      idOwners[f.head_id].add(f.id);
-    });
-    allMembers.forEach((m) => {
-      if (!m.national_id) return;
-      if (!idOwners[m.national_id]) idOwners[m.national_id] = new Set();
-      idOwners[m.national_id].add(m.family_id);
-    });
-    const dupIdSet = new Set(families.filter((f) => (idOwners[f.head_id]?.size || 0) > 1).map((f) => f.id));
-
-    const cleanPhone = (p) => (p || '').replace(/\s/g, '');
-    const phoneCounts = {};
-    families.forEach((f) => {
-      if (!f.phone1) return;
-      const p = cleanPhone(f.phone1);
-      phoneCounts[p] = (phoneCounts[p] || 0) + 1;
-    });
-    const dupPhoneSet = new Set(families.filter((f) => f.phone1 && phoneCounts[cleanPhone(f.phone1)] > 1).map((f) => f.id));
-
-    return { dupIdSet, dupPhoneSet };
-  }, [families, allMembers]);
+  const { dupIdSet, dupPhoneSet } = useMemo(
+    () => computeDuplicateSets(families, allMembers),
+    [families, allMembers]
+  );
 
   const matchesType = useCallback((f, key) => {
-    if (!key) {
-      const issues = checkFamilyIssues(f, membersByFamily[f.id]);
-      return issues.length > 0 || hasMissingDob(f, membersByFamily[f.id]) || dupIdSet.has(f.id) || dupPhoneSet.has(f.id);
-    }
+    if (!key) return hasDataQualityIssue(f, membersByFamily[f.id], dupIdSet, dupPhoneSet);
     if (key === 'dob') return hasMissingDob(f, membersByFamily[f.id]);
     if (key === 'dup_id') return dupIdSet.has(f.id);
     if (key === 'dup_phone') return dupPhoneSet.has(f.id);

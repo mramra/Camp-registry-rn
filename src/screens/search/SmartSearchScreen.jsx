@@ -153,6 +153,12 @@ export default function SmartSearchScreen() {
           <Text style={styles.searchBtnText}>🔍 بحث</Text>
         </Pressable>
 
+        {!!result && (
+          <Pressable style={styles.resetSearchBtn} onPress={() => { setQuery(''); setResult(null); }}>
+            <Text style={styles.resetSearchBtnText}>↺ إعادة بحث</Text>
+          </Pressable>
+        )}
+
         {!result && (
           <View style={styles.examplesBox}>
             <Text style={styles.examplesTitle}>أمثلة سريعة:</Text>
@@ -210,6 +216,11 @@ const getStyles = () =>
     },
     searchBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
     searchBtnText: { color: '#000', fontWeight: '900', fontSize: 14 },
+    resetSearchBtn: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 12, paddingVertical: 10, alignItems: 'center', marginTop: 8,
+    },
+    resetSearchBtnText: { color: colors.muted, fontWeight: 'bold', fontSize: 13 },
 
     examplesBox: { marginTop: 16 },
     examplesTitle: { color: colors.muted, fontSize: 11, marginBottom: 8, textAlign: 'right' },

@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE, isIncomplete, getVulnerabilityScore } from '../../lib/helpers';
+import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE, computeDuplicateSets, hasDataQualityIssue, getVulnerabilityScore } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -264,10 +264,12 @@ export default function AnalysisScreen() {
     });
     const orphans = fams.reduce((sum, f) => sum + getOrphanCount(f, memsByFam[f.id]), 0);
 
-    // موحَّد الآن مع نفس تعريف "نواقص وتكررات" (checkFamilyIssues) بدل
-    // فحص 4 حقول أساسية فقط -- كان يعطي رقماً مختلفاً بصمت عن باقي
-    // الشاشات لنفس المفهوم بالضبط.
-    const incompleteFams = fams.filter((f) => isIncomplete(f, memsByFam[f.id]));
+    // موحَّد الآن مع نفس تعريف "نواقص وتكررات" بالضبط (hasDataQualityIssue
+    // المركزية بـhelpers.js: نقص بيانات + تاريخ ميلاد ناقص + تكرار هوية/
+    // جوال) بدل فحص 4 حقول أساسية فقط -- كان يعطي رقماً مختلفاً بصمت
+    // (181 هنا مقابل 183 بصفحة النواقص لنفس المفهوم بالضبط).
+    const { dupIdSet, dupPhoneSet } = computeDuplicateSets(fams, mems);
+    const incompleteFams = fams.filter((f) => hasDataQualityIssue(f, memsByFam[f.id], dupIdSet, dupPhoneSet));
     const incomplete = incompleteFams.length;
 
     const femaleHeadFams = fams.filter((f) => f.head_gender === 'أنثى');

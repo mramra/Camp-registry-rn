@@ -271,6 +271,51 @@ export function isIncomplete(f, members) {
   return checkFamilyIssues(f, members).length > 0;
 }
 
+/** يحسب مجموعتي (هوية مكررة / جوال مكرر) عبر كل الأسر + الأفراد معاً --
+ * دالة مركزية بدل تكرار نفس منطق كشف التكرار بأكثر من شاشة (نواقص
+ * وتكررات + تحليلات)، وهو ما كان يسبب فرص لأرقام مختلفة بصمت لو
+ * تعدَّل المنطق بمكان ونُسي الآخر. */
+export function computeDuplicateSets(families, allMembers) {
+  const idOwners = {};
+  (families || []).forEach((f) => {
+    if (!f.head_id) return;
+    if (!idOwners[f.head_id]) idOwners[f.head_id] = new Set();
+    idOwners[f.head_id].add(f.id);
+  });
+  (allMembers || []).forEach((m) => {
+    if (!m.national_id) return;
+    if (!idOwners[m.national_id]) idOwners[m.national_id] = new Set();
+    idOwners[m.national_id].add(m.family_id);
+  });
+  const dupIdSet = new Set((families || []).filter((f) => (idOwners[f.head_id]?.size || 0) > 1).map((f) => f.id));
+
+  const cleanPhone = (p) => (p || '').replace(/\s/g, '');
+  const phoneCounts = {};
+  (families || []).forEach((f) => {
+    if (!f.phone1) return;
+    const p = cleanPhone(f.phone1);
+    phoneCounts[p] = (phoneCounts[p] || 0) + 1;
+  });
+  const dupPhoneSet = new Set((families || []).filter((f) => f.phone1 && phoneCounts[cleanPhone(f.phone1)] > 1).map((f) => f.id));
+
+  return { dupIdSet, dupPhoneSet };
+}
+
+/** هل هذه الأسرة ضمن "نواقص وتكررات" -- التعريف الشامل الموحَّد
+ * (المصدر الوحيد للحقيقة): نقص بأي حقل (checkFamilyIssues) أو تاريخ
+ * ميلاد ناقص لرب الأسرة أو أي فرد (hasMissingDob) أو هوية/جوال مكرر.
+ * دالة مركزية واحدة تُستخدم بكل شاشة تعرض هذا العدد (نواقص وتكررات +
+ * تحليلات) بدل كل شاشة تحسبه بمنطقها الخاص -- سبب سابقاً فرقاً بصامتاً
+ * بالعدد المعروض بين الشاشتين لنفس المفهوم بالضبط. */
+export function hasDataQualityIssue(f, members, dupIdSet, dupPhoneSet) {
+  return (
+    isIncomplete(f, members) ||
+    hasMissingDob(f, members) ||
+    Boolean(dupIdSet?.has(f.id)) ||
+    Boolean(dupPhoneSet?.has(f.id))
+  );
+}
+
 /** خوارزمية Luhn — للتحقق من صحة رقم الهوية رياضياً */
 export function luhnCheck(num) {
   const n = String(num).replace(/\D/g, '');

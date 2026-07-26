@@ -7,7 +7,7 @@ import { TRACKED_FIELDS } from './formOptions';
  * مراجعة)؟ -- منقولة حرفياً من الويب (camp-registry-react/src/lib/db.js). */
 export function isExemptFromApproval(profile) {
   if (!profile) return false;
-  return profile.role === 'platform_owner' || profile.bypass_approval === true;
+  return profile.role === 'platform_owner' || profile.role === 'super_admin' || profile.bypass_approval === true;
 }
 
 /** يحسب الفروقات بين نسخة قديمة وجديدة من بيانات الأسرة، بس للحقول
@@ -237,19 +237,11 @@ export function checkFamilyIssues(f, members) {
   else if (!luhnCheck(f.head_id)) issues.push('رقم الهوية غير صحيح');
   if (!f.phone1?.trim()) issues.push('رقم الجوال ناقص');
   // "بدون" إجابة صريحة (لا يوجد واتساب/محفظة فعلاً) -- تُعتبر مكتملة،
-  // مو ناقصة، ولا تحتاج رقماً مرافقاً. غير ذلك (فارغ تماماً) يبقى ناقصاً.
-  if (f.whatsapp_prefix?.trim() === 'بدون') {
-    // محسوم -- لا فحص إضافي على phone2/whatsapp_prefix
-  } else {
-    if (!f.phone2?.trim()) issues.push('رقم واتساب ناقص');
-    if (!f.whatsapp_prefix?.trim()) issues.push('مقدمة الواتساب ناقصة');
-  }
-  if (f.wallet_type?.trim() === 'بدون') {
-    // محسوم -- لا فحص إضافي على wallet_phone
-  } else {
-    if (!f.wallet_type?.trim()) issues.push('نوع المحفظة الإلكترونية ناقص');
-    if (!f.wallet_phone?.trim()) issues.push('رقم المحفظة الإلكترونية ناقص');
-  }
+  // مو ناقصة. المقدمة/النوع صارا مرتبطين إجبارياً برقم مرافق (يفرضه
+  // نموذج الإدخال نفسه: يستحيل تُحفظ مقدمة حقيقية بلا رقم أو العكس)،
+  // فما فيه داعي فحصهم منفصلين -- فحص الرقم لحاله كافٍ ويغطي الحالتين.
+  if (f.whatsapp_prefix?.trim() !== 'بدون' && !f.phone2?.trim()) issues.push('رقم واتساب ناقص');
+  if (f.wallet_type?.trim() !== 'بدون' && !f.wallet_phone?.trim()) issues.push('رقم المحفظة الإلكترونية ناقص');
   if (!f.head_dob) issues.push('تاريخ الميلاد ناقص');
   if (!f.head_marital?.trim()) issues.push('الحالة الاجتماعية ناقصة');
   if (!f.camp_id) issues.push('المخيم ناقص');

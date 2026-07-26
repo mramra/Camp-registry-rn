@@ -363,20 +363,20 @@ export default function FamilyFormScreen() {
   const handleSave = async () => {
     if (!validate()) return;
 
-    // فحص أخير قبل الحفظ (يحمي من حالات السباق لو الفحص الفوري ما وصل
-    // وقته) -- يشمل رؤساء الأسر والأفراد، وحاجز فعلي يوقف الحفظ لحد ما
-    // المستخدم يأكّد صراحة إنه قاصد يكمل رغم التكرار.
-    // حاجز تكرار نهائي قبل الحفظ -- يشمل اسم ورقم هوية رب الأسرة وكل
-    // فرد على حدة، ويمنع الحفظ فعلياً (بدون خيار "تجاوز") لو فيه أي
-    // تكرار، مع تلوين الحقل المتكرر بالأحمر بدل نافذة تأكيد منفصلة.
+    // حاجز تكرار نهائي قبل الحفظ -- يشمل اسم رب الأسرة وكل فرد على حدة،
+    // ويمنع الحفظ فعلياً (بدون خيار "تجاوز") لو فيه أي تكرار بالاسم، مع
+    // تلوين الحقل المتكرر بالأحمر بدل نافذة تأكيد منفصلة.
+    //
+    // رقم هوية رب الأسرة تحديداً *مستثنى* من هذا الحاجز الصلب (طلب
+    // مباشر) -- تكرار الهوية معروف الحدوث فعلياً (توائم، أخطاء تسجيل
+    // قديمة، إلخ)، فيُسمح بالحفظ ويمر بمسار المراجعة العادي أصلاً
+    // (exempt=false يخزّنها review_status:'pending' لمالك المنصة/مدير
+    // الإيواء يراجعها بنفسه -- exempt=true يحفظها 'approved' فوراً
+    // لأنه هو نفسه صاحب صلاحية الموافقة). التحذير البصري (idDupWarning)
+    // يبقى ظاهر بالحقل، بس بدون منع الحفظ.
     const dupErrors = {};
     const dupChecks = [];
 
-    if (!familyId || headId.trim() !== existingFamily?.head_id) {
-      dupChecks.push(
-        checkDuplicate('id', headId.trim(), familyId).then((w) => { if (w) dupErrors.headId = w; })
-      );
-    }
     if (!familyId || headName.trim() !== existingFamily?.head_name) {
       dupChecks.push(
         checkDuplicate('name', headName.trim(), familyId).then((w) => { if (w) dupErrors.headName = w; })
@@ -622,20 +622,16 @@ export default function FamilyFormScreen() {
             />
           </View>
 
-          <Text style={styles.fieldLabel}>📱 رقم واتساب</Text>
-          <View style={styles.segmentRow}>
-            {['بدون', '972', '970'].map((p) => (
-              <Pressable
-                key={p}
-                style={[styles.segmentBtn, whatsappPrefix === p && styles.segmentBtnActive]}
-                onPress={() => setWhatsappPrefix(p)}
-              >
-                <Text style={[styles.segmentText, whatsappPrefix === p && styles.segmentTextActive]}>{p}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <SelectField
+            label="📱 مقدمة الواتساب"
+            value={whatsappPrefix}
+            options={['بدون', '972', '970']}
+            onSelect={setWhatsappPrefix}
+            placeholder="اختر المقدمة"
+          />
           {whatsappPrefix !== 'بدون' && (
             <FormInput
+              label="رقم واتساب"
               placeholder="05xxxxxxxx"
               value={phone2}
               onChangeText={setPhone2}

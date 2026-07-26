@@ -30,8 +30,6 @@ const DATA_TYPE_OPTIONS = [
   { key: 'head_id', label: '🆔 رقم الهوية (ناقص/غير صحيح)', match: (f, issues) => issues.includes('رقم الهوية ناقص') || issues.includes('رقم الهوية غير صحيح') },
   { key: 'phone1', label: '📱 رقم الجوال', match: (f, issues) => issues.includes('رقم الجوال ناقص') },
   { key: 'phone2', label: '💬 رقم واتساب', match: (f, issues) => issues.includes('رقم واتساب ناقص') },
-  { key: 'whatsapp_prefix', label: '🔢 مقدمة الواتساب', match: (f, issues) => issues.includes('مقدمة الواتساب ناقصة') },
-  { key: 'wallet_type', label: '💳 نوع المحفظة الإلكترونية', match: (f, issues) => issues.includes('نوع المحفظة الإلكترونية ناقص') },
   { key: 'wallet_phone', label: '💳 رقم المحفظة الإلكترونية', match: (f, issues) => issues.includes('رقم المحفظة الإلكترونية ناقص') },
   { key: 'dob', label: '🎂 تاريخ الميلاد (رب الأسرة أو أي فرد)', match: null },
   { key: 'marital', label: '💍 الحالة الاجتماعية', match: (f, issues) => issues.includes('الحالة الاجتماعية ناقصة') },

@@ -29,7 +29,6 @@ const TABS = [
   { key: 'overview', label: '📊 عام' },
   { key: 'age', label: '🎂 الأعمار' },
   { key: 'camps', label: '🏕️ مخيمات' },
-  { key: 'compare', label: '⚖️ مقارنة المخيمات' },
 ];
 
 
@@ -406,12 +405,7 @@ export default function AnalysisScreen() {
 
         <View style={styles.tabsRow}>
           {TABS.map((t) => (
-            <FilterChip
-              key={t.key}
-              label={t.label}
-              selected={tab === t.key}
-              onPress={() => (t.key === 'compare' ? navigation.push('CampCompare') : setTab(t.key))}
-            />
+            <FilterChip key={t.key} label={t.label} selected={tab === t.key} onPress={() => setTab(t.key)} />
           ))}
         </View>
 
@@ -583,8 +577,8 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 10, marginBottom: 12,
   },
   offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  tabsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10, justifyContent: 'center' },
+  tabsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14, justifyContent: 'center' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statBox: { width: '31%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, alignItems: 'center', marginBottom: 8 },

@@ -267,6 +267,7 @@ export default function DashboardScreen() {
     { label: 'أطفال 0-17', value: stats.children, color: colors.green },
     { label: 'بالغون 18-59', value: stats.adults, color: colors.blue },
     { label: 'كبار 60+', value: stats.elderly, color: colors.accent },
+    ...(stats.noAge > 0 ? [{ label: '⚠️ باقي الأعمار (بدون تاريخ ميلاد)', value: stats.noAge, color: colors.muted }] : []),
   ] : [];
 
   return (
@@ -470,9 +471,6 @@ export default function DashboardScreen() {
                   </View>
                 </View>
               ))}
-              {stats.noAge > 0 && (
-                <Text style={styles.noAgeWarn}>⚠️ {stats.noAge} بدون تاريخ ميلاد</Text>
-              )}
             </View>
           </View>
         )}
@@ -586,7 +584,6 @@ const styles = StyleSheet.create({
   barTrack: { height: 6, backgroundColor: colors.surface2, borderRadius: 999, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 999 },
   noData: { color: colors.muted, fontSize: 10 },
-  noAgeWarn: { color: colors.muted, fontSize: 9, marginTop: 4, textAlign: 'right' },
   emptyBox: { alignItems: 'center', paddingVertical: 32 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { color: colors.white, fontWeight: 'bold', marginBottom: 4 },

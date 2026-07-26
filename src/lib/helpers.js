@@ -615,3 +615,20 @@ export function normalizeHealthValue(raw, depth = 0) {
   }
   return String(raw);
 }
+
+/**
+ * يبني رقم واتساب دولي جاهز للإرسال (wa.me) من مقدمة الدولة (970/972)
+ * ورقم الجوال المحلي (059.../056...) -- يشيل الصفر الأول من الرقم
+ * المحلي ويلزقه بالمقدمة مع "+". يرجع null لو الحقول ناقصة أو المقدمة
+ * "بدون" (يعني الأسرة صراحة اختارت عدم توفر واتساب).
+ * مركزية بدل تكرار نفس منطق القص/الدمج بكل شاشة (عرض الأسرة، زر
+ * الإرسال، شاشة SMS الجماعية...).
+ */
+export function formatWhatsappNumber(prefix, phone) {
+  const p = (prefix || '').trim();
+  const ph = (phone || '').trim();
+  if (!p || p === 'بدون' || !ph) return null;
+  const localDigits = ph.replace(/^0+/, '');
+  if (!localDigits) return null;
+  return `+${p}${localDigits}`;
+}

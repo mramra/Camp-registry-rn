@@ -7,13 +7,14 @@ import {
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps, fetchFamilies, fetchFamilyAidHistory } from '../../lib/supabase';
-import { calcAge, checkFamilyIssues, getMemberIcon, arrLabel, getVulnerabilityScore, VULNERABILITY_TIER_LABELS } from '../../lib/helpers';
+import { calcAge, checkFamilyIssues, getMemberIcon, arrLabel, getVulnerabilityScore, VULNERABILITY_TIER_LABELS, formatWhatsappNumber } from '../../lib/helpers';
 import { formatDate, formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import EmptyState from '../../components/ui/EmptyState';
@@ -263,11 +264,23 @@ export default function FamilyDetailScreen() {
     showSuccess(`📋 تم نسخ "${label}"`);
   };
 
+  const whatsappNumber = formatWhatsappNumber(family.whatsapp_prefix, family.phone2);
+
+  const openWhatsapp = async () => {
+    if (!whatsappNumber) return;
+    const digits = whatsappNumber.replace('+', '');
+    const url = `https://wa.me/${digits}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      showError('تعذّر فتح واتساب — تأكد إنه مثبّت على جهازك');
+    }
+  };
+
   const infoRows = [
     ['رقم الهوية', family.head_id],
     ['الجوال', family.phone1],
-    ['مقدمة واتساب', family.whatsapp_prefix],
-    ['رقم واتساب', family.phone2],
+    ['رقم واتساب', whatsappNumber],
     ['المحفظة الإلكترونية', family.wallet_type],
     ['رقم جوال المحفظة', family.wallet_phone],
     ['الجنس', family.head_gender],
@@ -443,6 +456,12 @@ export default function FamilyDetailScreen() {
           </View>
         )}
 
+        {!!whatsappNumber && (
+          <Pressable style={styles.whatsappBtn} onPress={openWhatsapp}>
+            <Text style={styles.whatsappBtnText}>💬 إرسال واتساب ({whatsappNumber})</Text>
+          </Pressable>
+        )}
+
         <View style={styles.actionsRow}>
           <Pressable
             style={styles.qrBtn}
@@ -591,6 +610,11 @@ const styles = StyleSheet.create({
   notes: { color: colors.white, fontSize: 12, textAlign: 'right', lineHeight: 20 },
 
   actionsRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  whatsappBtn: {
+    backgroundColor: 'rgba(37,211,102,0.15)', borderWidth: 1, borderColor: '#25D366',
+    paddingVertical: 13, borderRadius: 12, marginBottom: 8,
+  },
+  whatsappBtnText: { color: '#25D366', fontWeight: '900', fontSize: 13, textAlign: 'center' },
   qrBtn: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, borderRadius: 12 },
   qrBtnText: { color: colors.white, fontWeight: '900', fontSize: 13, textAlign: 'center' },
   editBtn: { flex: 1, backgroundColor: colors.accent, paddingVertical: 12, borderRadius: 12 },

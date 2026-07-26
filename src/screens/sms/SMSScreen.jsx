@@ -19,7 +19,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { checkFamilyIssues, naturalCompare } from '../../lib/helpers';
+import { checkFamilyIssues, naturalCompare, formatWhatsappNumber } from '../../lib/helpers';
 import { showError, showSuccess, showInfo } from '../../utils/toast';
 import { notifyNow } from '../../lib/notifications';
 import PageHeader from '../../components/ui/PageHeader';
@@ -88,6 +88,8 @@ export default function SMSScreen() {
   const [directSending, setDirectSending] = useState(false);
   const [directProgress, setDirectProgress] = useState(null); // { done, total }
   const [birthdayNames, setBirthdayNames] = useState({}); // { familyId: personName }
+  const [whatsappQueue, setWhatsappQueue] = useState(null); // { list, index } — إرسال واتساب تسلسلي
+  const [sendChannel, setSendChannel] = useState('sms'); // 'sms' | 'whatsapp' — قناة الإرسال الجماعي
   const presetAppliedRef = useRef(false);
 
   const loadData = useCallback(async () => {
@@ -128,11 +130,14 @@ export default function SMSScreen() {
   // ويعرض تحذير واضح بعدد الرسائل الباقية + خيار الخروج الفعلي لو أصرّ.
   useEffect(() => {
     const unsub = navigation.addListener('beforeRemove', (e) => {
-      if (!directSending) return;
+      if (!directSending && !whatsappQueue) return;
       e.preventDefault();
+      const msg = directSending
+        ? `تم إرسال ${directProgress?.done || 0} من ${directProgress?.total || 0} رسالة.\n\nالخروج الآن ممكن يوقف إرسال باقي الرسائل. يفضّل الانتظار لحد ما تخلص.`
+        : `وصلت لـ${whatsappQueue.index + 1} من ${whatsappQueue.list.length} بقائمة إرسال الواتساب.\n\nالخروج الآن هيلغي متابعة باقي المستلمين.`;
       Alert.alert(
         '⏳ الإرسال لسه شغّال',
-        `تم إرسال ${directProgress?.done || 0} من ${directProgress?.total || 0} رسالة.\n\nالخروج الآن ممكن يوقف إرسال باقي الرسائل. يفضّل الانتظار لحد ما تخلص.`,
+        msg,
         [
           { text: 'كمّل الانتظار', style: 'cancel', onPress: () => {} },
           { text: 'اخرج بأي حال', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
@@ -140,7 +145,7 @@ export default function SMSScreen() {
       );
     });
     return unsub;
-  }, [navigation, directSending, directProgress]);
+  }, [navigation, directSending, directProgress, whatsappQueue]);
 
   const campMap = useMemo(() => Object.fromEntries(camps.map((c) => [c.id, c.name])), [camps]);
   const memsByFam = useMemo(() => {
@@ -218,18 +223,71 @@ export default function SMSScreen() {
     showInfo(`📋 تم نسخ ${selectedFamilies.length} رقم`);
   };
 
-  // واتساب متاح بس لمستلم واحد محدَّد -- ما فيه إرسال جماعي حقيقي عبر رابط
-  // مباشر زي الرسائل النصية (كل محادثة واتساب لازم تُفتح لحالها يدوياً).
-  const sendWhatsApp = async () => {
-    if (selectedFamilies.length !== 1) return showError('اختر مستلم واحد بالضبط لإرسال واتساب');
-    const text = message.trim();
-    if (!text) return showError('يرجى كتابة نص الرسالة');
-    const f = selectedFamilies[0];
-    const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
-    const phone = f.phone1.replace(/^0/, '970'); // تحويل الصفر الأول لمفتاح فلسطين الدولي
-    await Linking.openURL(`whatsapp://send?phone=${phone}&text=${encodeURIComponent(msg)}`);
-    showSuccess('📲 جارٍ فتح واتساب...');
+  // رقم الواتساب الفعلي المستهدف لأسرة معيّنة: أولوية لحقل الواتساب
+  // المخصَّص (whatsapp_prefix + phone2 -- نفس الحقل يلي تُبنى منه بطاقة
+  // الأسرة)، وإلا نرجع لرقم الجوال الرئيسي مع افتراض مفتاح فلسطين 970
+  // (نفس السلوك القديم -- نحافظ عليه كـfallback بدل ما نمنع الإرسال).
+  const getFamilyWhatsappTarget = (f) => {
+    const dedicated = formatWhatsappNumber(f.whatsapp_prefix, f.phone2);
+    if (dedicated) return dedicated.replace('+', '');
+    if (f.phone1) return f.phone1.replace(/^0/, '970');
+    return null;
   };
+
+  const openWhatsappFor = async (f) => {
+    const text = message.trim();
+    const target = getFamilyWhatsappTarget(f);
+    if (!target) return false;
+    const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
+    await Linking.openURL(`whatsapp://send?phone=${target}&text=${encodeURIComponent(msg)}`);
+    return true;
+  };
+
+  // واتساب ما فيه رابط "إرسال جماعي" حقيقي زي الرسائل النصية (كل محادثة
+  // لازم تُفتح لحالها ويضغط المستخدم إرسال يدوياً داخل واتساب نفسه) --
+  // فالبديل العملي الوحيد هو تسلسل: نفتح محادثة أول مستلم فوراً، وبعد
+  // ما يرسلها المستخدم يدوياً ويرجع للتطبيق، يضغط "التالي" فتنفتح
+  // محادثة المستلم يلي بعده، وهكذا لحد آخر واحد بالقائمة.
+  const sendWhatsApp = async () => {
+    const sel = selectedFamilies;
+    if (!sel.length) return showError('لم تختر أي مستلم');
+    if (!message.trim()) return showError('يرجى كتابة نص الرسالة');
+
+    if (sel.length === 1) {
+      const ok = await openWhatsappFor(sel[0]);
+      if (!ok) return showError('لا يوجد رقم واتساب صالح لهذا المستلم');
+      showSuccess('📲 جارٍ فتح واتساب...');
+      return;
+    }
+
+    setWhatsappQueue({ list: sel, index: 0 });
+    const ok = await openWhatsappFor(sel[0]);
+    if (!ok) {
+      showError(`⚠️ ${sel[0].head_name || '—'}: لا يوجد رقم واتساب صالح — اضغط "التالي" للمتابعة`);
+    } else {
+      showSuccess(`📲 (1 من ${sel.length}) — بعد الإرسال ارجع واضغط "التالي"`);
+    }
+  };
+
+  const advanceWhatsappQueue = async () => {
+    if (!whatsappQueue) return;
+    const nextIndex = whatsappQueue.index + 1;
+    if (nextIndex >= whatsappQueue.list.length) {
+      setWhatsappQueue(null);
+      showSuccess('✅ انتهت قائمة إرسال الواتساب');
+      return;
+    }
+    const f = whatsappQueue.list[nextIndex];
+    setWhatsappQueue({ ...whatsappQueue, index: nextIndex });
+    const ok = await openWhatsappFor(f);
+    if (!ok) {
+      showError(`⚠️ ${f.head_name || '—'}: لا يوجد رقم واتساب صالح — اضغط "التالي" للمتابعة`);
+    } else {
+      showSuccess(`📲 (${nextIndex + 1} من ${whatsappQueue.list.length}) — بعد الإرسال ارجع واضغط "التالي"`);
+    }
+  };
+
+  const cancelWhatsappQueue = () => setWhatsappQueue(null);
 
   // إرسال مباشر من داخل التطبيق (بدون فتح تطبيق الرسائل) -- أندرويد فقط.
   // استيراد المكتبة يصير هنا بالداخل (مو بأعلى الملف) عمداً: المكتبة
@@ -481,21 +539,70 @@ export default function SMSScreen() {
               💡 الرسائل العربية تتحمّل 70 حرف بالرسالة الواحدة بس (مو 160) — نص رسالتك يتقسّم لـ{segInfo.count} رسائل فعلية عند شركة الاتصال، كل وحدة تُحسب لحالها بالتكلفة.
             </Text>
           )}
-          <View style={styles.sendRow}>
-            <Pressable style={[styles.sendBtn, !selected.size && styles.disabled]} onPress={sendSMS} disabled={!selected.size}>
-              <Text style={styles.sendBtnText}>📨 إرسال لـ {selectedFamilies.length} مستلم</Text>
+          {/* اختيار قناة الإرسال الجماعي -- SMS (تقليدي/مباشر) أو واتساب
+              (تسلسلي: محادثة وحدة كل مرة، لعدم وجود API إرسال جماعي
+              حقيقي بدون حساب واتساب أعمال) */}
+          <View style={styles.channelRow}>
+            <Pressable
+              style={[styles.channelChip, sendChannel === 'sms' && styles.channelChipActive]}
+              onPress={() => setSendChannel('sms')}
+            >
+              <Text style={[styles.channelChipText, sendChannel === 'sms' && styles.channelChipTextActive]}>📨 SMS</Text>
             </Pressable>
-            <Pressable style={styles.copyBtn} onPress={copyNums}>
-              <Text style={styles.copyBtnText}>📋 نسخ</Text>
+            <Pressable
+              style={[styles.channelChip, sendChannel === 'whatsapp' && styles.channelChipActive]}
+              onPress={() => setSendChannel('whatsapp')}
+            >
+              <Text style={[styles.channelChipText, sendChannel === 'whatsapp' && styles.channelChipTextActive]}>💬 واتساب</Text>
             </Pressable>
           </View>
-          {selectedFamilies.length === 1 && (
-            <Pressable style={styles.whatsBtn} onPress={sendWhatsApp}>
-              <Text style={styles.whatsBtnText}>📲 إرسال عبر واتساب لهذا المستلم</Text>
+
+          {sendChannel === 'sms' && (
+            <View style={styles.sendRow}>
+              <Pressable style={[styles.sendBtn, !selected.size && styles.disabled]} onPress={sendSMS} disabled={!selected.size}>
+                <Text style={styles.sendBtnText}>📨 إرسال لـ {selectedFamilies.length} مستلم</Text>
+              </Pressable>
+              <Pressable style={styles.copyBtn} onPress={copyNums}>
+                <Text style={styles.copyBtnText}>📋 نسخ</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {sendChannel === 'whatsapp' && !whatsappQueue && (
+            <Pressable style={[styles.whatsBtn, !selected.size && styles.disabled]} onPress={sendWhatsApp} disabled={!selected.size}>
+              <Text style={styles.whatsBtnText}>
+                {selectedFamilies.length === 1
+                  ? '📲 إرسال عبر واتساب لهذا المستلم'
+                  : `💬 بدء إرسال واتساب تسلسلي لـ ${selectedFamilies.length} مستلم`}
+              </Text>
             </Pressable>
           )}
 
-          {Platform.OS === 'android' && (
+          {sendChannel === 'whatsapp' && !!whatsappQueue && (
+            <View style={styles.progressBox}>
+              <Text style={styles.progressText}>
+                واتساب: {whatsappQueue.index + 1} من {whatsappQueue.list.length} — {whatsappQueue.list[whatsappQueue.index]?.head_name || '—'}
+              </Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${((whatsappQueue.index + 1) / whatsappQueue.list.length) * 100}%`, backgroundColor: '#25D366' }]} />
+              </View>
+              <View style={styles.sendRow}>
+                <Pressable style={styles.whatsBtn} onPress={advanceWhatsappQueue}>
+                  <Text style={styles.whatsBtnText}>
+                    {whatsappQueue.index + 1 >= whatsappQueue.list.length ? '✅ إنهاء' : '➡️ التالي'}
+                  </Text>
+                </Pressable>
+                <Pressable style={styles.copyBtn} onPress={cancelWhatsappQueue}>
+                  <Text style={styles.copyBtnText}>✕ إلغاء</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.directHint}>
+                💬 بعد إرسال الرسالة يدوياً داخل واتساب، ارجع للتطبيق واضغط "التالي" عشان تنفتح محادثة المستلم يلي بعده.
+              </Text>
+            </View>
+          )}
+
+          {sendChannel === 'sms' && Platform.OS === 'android' && (
             <>
               <Pressable
                 style={[styles.directBtn, directSending && styles.disabled]}
@@ -669,6 +776,14 @@ const styles = StyleSheet.create({
   countText: { color: colors.muted, fontSize: 11 },
   segWarnText: { color: colors.accent, fontSize: 10, marginBottom: 10, textAlign: 'right', lineHeight: 15 },
   sendRow: { flexDirection: 'row', gap: 8 },
+  channelRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  channelChip: {
+    flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 10, paddingVertical: 10, alignItems: 'center',
+  },
+  channelChipActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
+  channelChipText: { color: colors.muted, fontSize: 12, fontWeight: 'bold' },
+  channelChipTextActive: { color: colors.accent },
   whatsBtn: { backgroundColor: 'rgba(37,211,102,0.12)', borderWidth: 1, borderColor: '#25D366', paddingVertical: 11, borderRadius: 12, alignItems: 'center', marginTop: 8 },
   whatsBtnText: { color: '#25D366', fontWeight: 'bold', fontSize: 12 },
   directBtn: { backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: colors.accent, paddingVertical: 12, borderRadius: 12, alignItems: 'center', marginTop: 8 },

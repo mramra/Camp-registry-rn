@@ -46,6 +46,15 @@ const shortName = (fullName) => {
 // يُستخدم هو، وإلا يرجع لاسم رب الأسرة العادي.
 const resolveGreetingName = (f, birthdayNames) => shortName(birthdayNames?.[f.id] || f.head_name);
 
+// بناء نص الرسالة النهائي لأسرة معيّنة: تعويض {اسم} و{نواقص} (لو موجودين
+// بالقالب) ثم إضافة توقيع المخيم تلقائياً بالنهاية. مركزية بدل تكرار
+// نفس منطق الاستبدال بثلاث أماكن مختلفة بالشاشة.
+const buildMessage = (text, f, birthdayNames, missingSummaries, campMap) =>
+  text
+    .replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames))
+    .replace(/\{نواقص\}/g, missingSummaries?.[f.id] || '')
+  + '\n' + getSig(f.camp_id, campMap);
+
 // عدد أجزاء الرسالة الفعلي: العربي (وأي حرف خارج GSM-7) يستخدم ترميز
 // UCS-2 إجبارياً -- يحمل 70 حرف بالرسالة الواحدة بس (مو 160 زي الإنجليزي)،
 // و67 حرف بالجزء لو الرسالة طويلة ومتعددة الأجزاء. بدون هذا التصحيح كان
@@ -88,6 +97,7 @@ export default function SMSScreen() {
   const [directSending, setDirectSending] = useState(false);
   const [directProgress, setDirectProgress] = useState(null); // { done, total }
   const [birthdayNames, setBirthdayNames] = useState({}); // { familyId: personName }
+  const [missingSummaries, setMissingSummaries] = useState({}); // { familyId: 'نص النواقص' } -- بديل {نواقص}
   const [whatsappQueue, setWhatsappQueue] = useState(null); // { list, index } — إرسال واتساب تسلسلي
   const [sendChannel, setSendChannel] = useState('sms'); // 'sms' | 'whatsapp' — قناة الإرسال الجماعي
   const presetAppliedRef = useRef(false);
@@ -112,6 +122,7 @@ export default function SMSScreen() {
         setSelected(new Set(route.params.preselectFamilyIds));
         if (route.params.presetMessage) setMessage(route.params.presetMessage);
         if (route.params.birthdayNames) setBirthdayNames(route.params.birthdayNames);
+        if (route.params.missingSummaries) setMissingSummaries(route.params.missingSummaries);
       }
       // ما فيه تحديد افتراضي غير هذا -- الشاشة تبدأ دايماً بلا أي اسم محدَّد،
       // المستخدم يختار بنفسه من نافذة المستلمين.
@@ -202,7 +213,7 @@ export default function SMSScreen() {
 
     if (sel.length === 1) {
       const f = sel[0];
-      const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
+      const msg = buildMessage(text, f, birthdayNames, missingSummaries, campMap);
       await Linking.openURL(`sms:${f.phone1}?body=${encodeURIComponent(msg)}`);
       showSuccess('📨 جارٍ فتح تطبيق الرسائل...');
       return;
@@ -238,7 +249,7 @@ export default function SMSScreen() {
     const text = message.trim();
     const target = getFamilyWhatsappTarget(f);
     if (!target) return false;
-    const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
+    const msg = buildMessage(text, f, birthdayNames, missingSummaries, campMap);
     await Linking.openURL(`whatsapp://send?phone=${target}&text=${encodeURIComponent(msg)}`);
     return true;
   };
@@ -378,7 +389,7 @@ export default function SMSScreen() {
 
     for (let i = 0; i < sel.length; i++) {
       const f = sel[i];
-      const msg = text.replace(/\{اسم\}/g, resolveGreetingName(f, birthdayNames)) + '\n' + getSig(f.camp_id, campMap);
+      const msg = buildMessage(text, f, birthdayNames, missingSummaries, campMap);
       try {
         // مهلة 60 ثانية (بدل 25) -- لما التطبيق شغّال بالخلفية عبر الخدمة
         // الأمامية، JS thread ممكن ياخذ أولوية أقل من أندرويد حتى مع
@@ -518,6 +529,7 @@ export default function SMSScreen() {
           </View>
           <Text style={styles.hint}>
             💡 {'{اسم}'} يُستبدل باسم رب الأسرة تلقائياً
+            {Object.keys(missingSummaries).length > 0 ? ' · {نواقص} يُستبدل بنواقص كل أسرة' : ''}
           </Text>
           <TextInput
             value={message}

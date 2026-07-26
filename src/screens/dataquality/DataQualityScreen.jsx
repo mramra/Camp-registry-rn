@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, StyleSheet, SafeAreaView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
@@ -56,6 +56,7 @@ export default function DataQualityScreen() {
   const [offlineInfo, setOfflineInfo] = useState(null);
   const [filterCamp, setFilterCamp] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [search, setSearch] = useState('');
 
   const loadData = useCallback(async () => {
     if (!orgId) { setLoading(false); return; }
@@ -148,10 +149,23 @@ export default function DataQualityScreen() {
   const filtered = useMemo(() => {
     let list = families.filter((f) => matchesType(f, filterType));
     if (filterCamp) list = list.filter((f) => f.camp_id === filterCamp);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((f) => {
+        const headMatch =
+          (f.head_name || '').toLowerCase().includes(q) ||
+          (f.head_id || '').includes(q) ||
+          (f.phone1 || '').includes(q);
+        if (headMatch) return true;
+        return (membersByFamily[f.id] || []).some(
+          (m) => (m.name || '').toLowerCase().includes(q) || (m.national_id || '').includes(q)
+        );
+      });
+    }
     return list.sort(
       (a, b) => checkFamilyIssues(b, membersByFamily[b.id]).length - checkFamilyIssues(a, membersByFamily[a.id]).length
     );
-  }, [families, filterCamp, filterType, matchesType, membersByFamily]);
+  }, [families, filterCamp, filterType, search, matchesType, membersByFamily]);
 
   const styles = getStyles();
 
@@ -210,29 +224,47 @@ export default function DataQualityScreen() {
               </View>
             )}
             <SelectField
-              label="المخيم"
-              value={filterCamp ? campMap[filterCamp] : 'كل المخيمات'}
+              value={filterCamp ? `المخيم: ${campMap[filterCamp]}` : undefined}
               options={[{ value: '', label: 'كل المخيمات' }, ...camps.map((c) => ({ value: c.id, label: c.name }))]}
               onSelect={setFilterCamp}
-              placeholder="كل المخيمات"
+              placeholder="المخيم: كل المخيمات"
             />
             <SelectField
-              label="نوع البيان الناقص/المكرر"
-              value={DATA_TYPE_OPTIONS.find((o) => o.key === filterType)?.label}
+              value={filterType ? `نوع النقص: ${DATA_TYPE_OPTIONS.find((o) => o.key === filterType)?.label}` : undefined}
               options={DATA_TYPE_OPTIONS.map((o) => ({ value: o.key, label: o.label }))}
               onSelect={setFilterType}
-              placeholder="— كل النواقص والتكررات —"
+              placeholder="نوع النقص: — كل النواقص والتكررات —"
+            />
+            {/* بحث حر: رقم هوية/اسم/جوال رب الأسرة أو أي فرد */}
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="🔍 بحث برقم الهوية أو الاسم أو الجوال (رب الأسرة أو فرد)..."
+              placeholderTextColor={colors.muted}
+              style={styles.searchInput}
             />
             {filtered.length > 0 && (
               <Pressable
                 style={styles.smsBtn}
-                onPress={() =>
+                onPress={() => {
+                  // ملخص نصي مختصر لنواقص/تكررات كل أسرة -- يُستخدم بديل
+                  // {نواقص} داخل الرسالة، فكل أسرة توصلها رسالة مخصّصة
+                  // بالضبط بما ينقصها هي (مو نص عام موحّد للكل).
+                  const missingSummaries = {};
+                  filtered.forEach((f) => {
+                    const parts = [...checkFamilyIssues(f, membersByFamily[f.id])];
+                    if (hasMissingDob(f, membersByFamily[f.id])) parts.push('تاريخ ميلاد ناقص');
+                    if (dupIdSet.has(f.id)) parts.push('رقم هوية مكرر');
+                    if (dupPhoneSet.has(f.id)) parts.push('رقم جوال مكرر');
+                    missingSummaries[f.id] = parts.join('، ') || 'مراجعة عامة للبيانات';
+                  });
                   navigation.navigate('SMS', {
                     preselectFamilyIds: filtered.map((f) => f.id),
+                    missingSummaries,
                     presetMessage:
-                      'السلام عليكم، برجاء استكمال بياناتكم الناقصة عبر بوابة الأسرة (رابط التطبيق) أو التواصل معنا — يساعدنا هذا بخدمتكم بشكل أفضل. شكراً لتعاونكم.',
-                  })
-                }
+                      'السيد/ة {اسم}، لاحظنا أن بياناتكم بالنظام ناقصة بالتالي: {نواقص}. برجاء استكمالها عبر بوابة الأسرة بالتطبيق أو التواصل معنا. شكراً لتعاونكم.',
+                  });
+                }}
               >
                 <Text style={styles.smsBtnText}>📩 إرسال رسالة لهذه الأسر ({filtered.length})</Text>
               </Pressable>
@@ -255,6 +287,10 @@ const getStyles = () =>
       borderRadius: 12, padding: 10, marginBottom: 12,
     },
     offlineBannerText: { color: colors.accent, fontSize: 11, textAlign: 'right', lineHeight: 17 },
+    searchInput: {
+      backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+      paddingHorizontal: 14, paddingVertical: 10, color: colors.white, fontSize: 13, textAlign: 'right', marginBottom: 10,
+    },
 
     card: { flexDirection: 'row-reverse', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, marginBottom: 8, overflow: 'hidden' },
     sideBar: { width: 5 },

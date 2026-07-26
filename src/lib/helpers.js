@@ -236,10 +236,20 @@ export function checkFamilyIssues(f, members) {
   if (!f.head_id?.trim()) issues.push('رقم الهوية ناقص');
   else if (!luhnCheck(f.head_id)) issues.push('رقم الهوية غير صحيح');
   if (!f.phone1?.trim()) issues.push('رقم الجوال ناقص');
-  if (!f.phone2?.trim()) issues.push('رقم واتساب ناقص');
-  if (!f.whatsapp_prefix?.trim()) issues.push('مقدمة الواتساب ناقصة');
-  if (!f.wallet_type?.trim()) issues.push('نوع المحفظة الإلكترونية ناقص');
-  if (!f.wallet_phone?.trim()) issues.push('رقم المحفظة الإلكترونية ناقص');
+  // "بدون" إجابة صريحة (لا يوجد واتساب/محفظة فعلاً) -- تُعتبر مكتملة،
+  // مو ناقصة، ولا تحتاج رقماً مرافقاً. غير ذلك (فارغ تماماً) يبقى ناقصاً.
+  if (f.whatsapp_prefix?.trim() === 'بدون') {
+    // محسوم -- لا فحص إضافي على phone2/whatsapp_prefix
+  } else {
+    if (!f.phone2?.trim()) issues.push('رقم واتساب ناقص');
+    if (!f.whatsapp_prefix?.trim()) issues.push('مقدمة الواتساب ناقصة');
+  }
+  if (f.wallet_type?.trim() === 'بدون') {
+    // محسوم -- لا فحص إضافي على wallet_phone
+  } else {
+    if (!f.wallet_type?.trim()) issues.push('نوع المحفظة الإلكترونية ناقص');
+    if (!f.wallet_phone?.trim()) issues.push('رقم المحفظة الإلكترونية ناقص');
+  }
   if (!f.head_dob) issues.push('تاريخ الميلاد ناقص');
   if (!f.head_marital?.trim()) issues.push('الحالة الاجتماعية ناقصة');
   if (!f.camp_id) issues.push('المخيم ناقص');

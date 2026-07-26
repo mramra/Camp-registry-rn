@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps, fetchFamilies, fetchFamilyAidHistory } from '../../lib/supabase';
@@ -257,6 +258,11 @@ export default function FamilyDetailScreen() {
   const issues = checkFamilyIssues(family, members);
   const age = calcAge(family.head_dob);
 
+  const copyField = async (label, value) => {
+    await Clipboard.setStringAsync(String(value));
+    showSuccess(`📋 تم نسخ "${label}"`);
+  };
+
   const infoRows = [
     ['رقم الهوية', family.head_id],
     ['الجوال', family.phone1],
@@ -336,10 +342,15 @@ export default function FamilyDetailScreen() {
           <Text style={styles.headName}>{family.head_name}</Text>
           <View style={styles.grid}>
             {infoRows.map(([label, value]) => (
-              <View key={label} style={styles.infoCell}>
-                <Text style={styles.infoLabel}>{label}</Text>
+              <Pressable
+                key={label}
+                style={styles.infoCell}
+                onLongPress={() => copyField(label, value)}
+                delayLongPress={350}
+              >
+                <Text style={styles.infoLabel}>{label} <Text style={styles.copyHint}>📋</Text></Text>
                 <Text style={styles.infoValue}>{value}</Text>
-              </View>
+              </Pressable>
             ))}
           </View>
           {(() => {
@@ -553,6 +564,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   infoLabel: { color: colors.muted, fontSize: 9, marginBottom: 2, textAlign: 'right' },
+  copyHint: { fontSize: 9, opacity: 0.6 },
   infoValue: { color: colors.white, fontWeight: 'bold', fontSize: 12, textAlign: 'right' },
 
   noMembers: { color: colors.muted, fontSize: 12, textAlign: 'center', paddingVertical: 12 },

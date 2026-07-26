@@ -94,7 +94,7 @@ export default function FamilyFormScreen() {
   const [memberDupWarnings, setMemberDupWarnings] = useState({}); // { [localId]: { name: '', id: '' } }
   const [phone1, setPhone1] = useState('');
   const [phone2, setPhone2] = useState('');
-  const [whatsappPrefix, setWhatsappPrefix] = useState('');
+  const [whatsappPrefix, setWhatsappPrefix] = useState('بدون');
   const [headGender, setHeadGender] = useState('');
   const [headMarital, setHeadMarital] = useState('');
   const [dobDay, setDobDay] = useState(null);
@@ -109,7 +109,7 @@ export default function FamilyFormScreen() {
   const [governorateCurrent, setGovernorateCurrent] = useState('');
   const [displacementStatus, setDisplacementStatus] = useState('');
   const [incomeSource, setIncomeSource] = useState('');
-  const [walletType, setWalletType] = useState('');
+  const [walletType, setWalletType] = useState('بدون');
   const [walletPhone, setWalletPhone] = useState('');
   const [housingType, setHousingType] = useState('');
   const [housingCondition, setHousingCondition] = useState('');
@@ -216,7 +216,7 @@ export default function FamilyFormScreen() {
         setHeadId(data.head_id || '');
         setPhone1(data.phone1 || '');
         setPhone2(data.phone2 || '');
-        setWhatsappPrefix(data.whatsapp_prefix || '');
+        setWhatsappPrefix(data.whatsapp_prefix || 'بدون');
         setHeadGender(data.head_gender || '');
         setHeadMarital(data.head_marital || '');
         const d = splitDob(data.head_dob);
@@ -231,7 +231,7 @@ export default function FamilyFormScreen() {
         setGovernorateCurrent(data.governorate_current || '');
         setDisplacementStatus(data.displacement_status || '');
         setIncomeSource(data.income_source || '');
-        setWalletType(data.wallet_type || '');
+        setWalletType(data.wallet_type || 'بدون');
         setWalletPhone(data.wallet_phone || '');
         setHousingType(data.housing_type || '');
         setHousingCondition(data.housing_condition || '');
@@ -332,6 +332,15 @@ export default function FamilyFormScreen() {
     if (walletPhone.trim() && !PALESTINIAN_PHONE_RE.test(walletPhone.trim())) {
       e.walletPhone = 'رقم غير صحيح -- يجب أن يبدأ بـ059 أو 056 ويكون 10 خانات';
     }
+    // اختيار مقدمة واتساب أو نوع محفظة بدون رقم = بيانات ناقصة فعلياً،
+    // ما بينحفظ (طلب مباشر) -- التسمية "بدون" هي الخيار الوحيد المسموح
+    // بلا رقم مرافق.
+    if (whatsappPrefix && whatsappPrefix !== 'بدون' && !phone2.trim()) {
+      e.phone2 = 'أدخل رقم الواتساب أو اختر "بدون" بالمقدمة';
+    }
+    if (walletType && walletType !== 'بدون' && !walletPhone.trim()) {
+      e.walletPhone = 'أدخل رقم المحفظة أو اختر "بدون" بنوع المحفظة';
+    }
 
     if (!campId) e.campId = 'اختر المخيم';
 
@@ -406,7 +415,7 @@ export default function FamilyFormScreen() {
         head_id: headId.trim(),
         phone1: phone1.trim() || null,
         phone2: phone2.trim() || null,
-        whatsapp_prefix: whatsappPrefix || null,
+        whatsapp_prefix: whatsappPrefix || 'بدون',
         head_gender: headGender || null,
         head_marital: headMarital || null,
         head_dob: dobStr,
@@ -417,7 +426,7 @@ export default function FamilyFormScreen() {
         governorate_current: governorateCurrent || null,
         displacement_status: displacementStatus || null,
         income_source: incomeSource || null,
-        wallet_type: walletType || null,
+        wallet_type: walletType || 'بدون',
         wallet_phone: walletPhone.trim() || null,
         housing_type: housingType || null,
         housing_condition: housingCondition || null,
@@ -614,29 +623,26 @@ export default function FamilyFormScreen() {
           </View>
 
           <Text style={styles.fieldLabel}>📱 رقم واتساب</Text>
-          <View style={styles.row}>
-            <View style={styles.thirdInput}>
-              <View style={styles.segmentRow}>
-                {['972', '970'].map((p) => (
-                  <Pressable
-                    key={p}
-                    style={[styles.segmentBtn, whatsappPrefix === p && styles.segmentBtnActive]}
-                    onPress={() => setWhatsappPrefix(p)}
-                  >
-                    <Text style={[styles.segmentText, whatsappPrefix === p && styles.segmentTextActive]}>{p}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
+          <View style={styles.segmentRow}>
+            {['بدون', '972', '970'].map((p) => (
+              <Pressable
+                key={p}
+                style={[styles.segmentBtn, whatsappPrefix === p && styles.segmentBtnActive]}
+                onPress={() => setWhatsappPrefix(p)}
+              >
+                <Text style={[styles.segmentText, whatsappPrefix === p && styles.segmentTextActive]}>{p}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {whatsappPrefix !== 'بدون' && (
             <FormInput
-              placeholder="05xxxxxxxx (اتركه فارغاً لو نفس رقم الجوال)"
+              placeholder="05xxxxxxxx"
               value={phone2}
               onChangeText={setPhone2}
               keyboardType="phone-pad"
-              style={{ flex: 2 }}
               error={errors.phone2}
             />
-          </View>
+          )}
 
           <SelectField
             label="💳 محفظة إلكترونية"
@@ -645,10 +651,10 @@ export default function FamilyFormScreen() {
             onSelect={setWalletType}
             placeholder="اختر نوع المحفظة"
           />
-          {walletType && walletType !== 'بدون' && (
+          {walletType !== 'بدون' && (
             <FormInput
               label="📱 رقم جوال المحفظة"
-              placeholder="05xxxxxxxx (اتركه فارغاً لو نفس رقم الجوال)"
+              placeholder="05xxxxxxxx"
               value={walletPhone}
               onChangeText={setWalletPhone}
               keyboardType="phone-pad"

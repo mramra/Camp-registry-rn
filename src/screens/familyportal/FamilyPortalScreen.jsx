@@ -59,7 +59,7 @@ export default function FamilyPortalScreen({ navigation }) {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [missingValues, setMissingValues] = useState({});
-  const [whatsappPrefix, setWhatsappPrefix] = useState('');
+  const [whatsappPrefix, setWhatsappPrefix] = useState('بدون');
   const [missingSending, setMissingSending] = useState(false);
   const [missingSent, setMissingSent] = useState(false);
   const [urgentOpen, setUrgentOpen] = useState(false);
@@ -134,14 +134,16 @@ export default function FamilyPortalScreen({ navigation }) {
     // أصلاً بالسجل ورب الأسرة استكمل بس الرقم، هذا يبقى مسموح.
     const effectivePhone2 = (missingValues.phone2 || '').trim() || family.phone2 || '';
     const effectivePrefix = whatsappPrefix || family.whatsapp_prefix || '';
-    if (!!effectivePhone2 !== !!effectivePrefix) {
-      return setError('رقم الواتساب ومقدمته (972/970) لازم يُكمَّلا مع بعض -- مو حقل بدون التاني');
+    const prefixIsReal = effectivePrefix && effectivePrefix !== 'بدون';
+    if (prefixIsReal && !effectivePhone2) {
+      return setError('أدخل رقم الواتساب أو اختر "بدون" بالمقدمة');
     }
 
     const effectiveWalletType = (missingValues.wallet_type || '').trim() || family.wallet_type || '';
     const effectiveWalletPhone = (missingValues.wallet_phone || '').trim() || family.wallet_phone || '';
-    if (!!effectiveWalletType !== !!effectiveWalletPhone) {
-      return setError('نوع المحفظة الإلكترونية ورقمها لازم يُكمَّلا مع بعض -- مو حقل بدون التاني');
+    const walletTypeIsReal = effectiveWalletType && effectiveWalletType !== 'بدون';
+    if (walletTypeIsReal && !effectiveWalletPhone) {
+      return setError('أدخل رقم المحفظة أو اختر "بدون" بنوع المحفظة');
     }
 
     setMissingSending(true);
@@ -149,7 +151,13 @@ export default function FamilyPortalScreen({ navigation }) {
     try {
       const fields = {};
       filled.forEach((d) => { fields[d.key] = missingValues[d.key].trim(); });
-      if (whatsappPrefix && (missingValues.phone2 || '').trim()) fields.whatsapp_prefix = whatsappPrefix;
+      // نرسل مقدمة الواتساب دايماً لما يكون حقل الواتساب أصلاً معروض
+      // كناقص بهالشاشة -- حتى لو "بدون" (إجابة صريحة بلا واتساب، مو
+      // نقص). فحص prefixIsReal فوق ضمن إنه لو مقدمة حقيقية (972/970)
+      // فرقم الواتساب موجود إجبارياً قبل ما نوصل هون.
+      if (missingFieldDefs.some((d) => d.key === 'phone2')) {
+        fields.whatsapp_prefix = whatsappPrefix;
+      }
       await callFamilyPortalAPI('submitMissingData', { nationalId, phone, familyId: family.id, fields });
       setMissingSent(true);
       setMissingValues({});
@@ -467,7 +475,7 @@ export default function FamilyPortalScreen({ navigation }) {
                               </View>
                             ) : d.kind === 'wallet' ? (
                               <View style={styles.maritalRow}>
-                                {['PalPay', 'JawwalPay'].map((opt) => (
+                                {['بدون', 'PalPay', 'JawwalPay'].map((opt) => (
                                   <Pressable
                                     key={opt}
                                     onPress={() => setMissingValues((v) => ({ ...v, [d.key]: opt }))}
@@ -482,10 +490,10 @@ export default function FamilyPortalScreen({ navigation }) {
                             ) : d.kind === 'whatsapp' ? (
                               <View>
                                 <View style={styles.maritalRow}>
-                                  {['972', '970'].map((opt) => (
+                                  {['بدون', '972', '970'].map((opt) => (
                                     <Pressable
                                       key={opt}
-                                      onPress={() => setWhatsappPrefix((v) => (v === opt ? '' : opt))}
+                                      onPress={() => setWhatsappPrefix(opt)}
                                       style={[styles.maritalChip, whatsappPrefix === opt && styles.maritalChipActive]}
                                     >
                                       <Text style={[styles.maritalChipText, whatsappPrefix === opt && styles.maritalChipTextActive]}>
@@ -494,15 +502,17 @@ export default function FamilyPortalScreen({ navigation }) {
                                     </Pressable>
                                   ))}
                                 </View>
-                                <TextInput
-                                  value={missingValues[d.key] || ''}
-                                  onChangeText={(v) => setMissingValues((prev) => ({ ...prev, [d.key]: v }))}
-                                  placeholder="05xxxxxxxx"
-                                  placeholderTextColor={colors.muted}
-                                  keyboardType="phone-pad"
-                                  editable={!missingSending}
-                                  style={styles.input}
-                                />
+                                {whatsappPrefix !== 'بدون' && (
+                                  <TextInput
+                                    value={missingValues[d.key] || ''}
+                                    onChangeText={(v) => setMissingValues((prev) => ({ ...prev, [d.key]: v }))}
+                                    placeholder="05xxxxxxxx"
+                                    placeholderTextColor={colors.muted}
+                                    keyboardType="phone-pad"
+                                    editable={!missingSending}
+                                    style={styles.input}
+                                  />
+                                )}
                               </View>
                             ) : (
                               <TextInput

@@ -14,7 +14,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps, fetchPendingRequestsCount, fetchPendingDevicesCount, fetchUnreadPortalMessagesCount } from '../../lib/supabase';
-import { calcAge, isIncomplete } from '../../lib/helpers';
+import { calcAge, isIncomplete, hasHealthData, getStageGroup } from '../../lib/helpers';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
@@ -110,16 +110,30 @@ export default function DashboardScreen() {
       const incomplete = filteredFams.filter((f) => isIncomplete(f, mByFam[f.id])).length;
 
       const allPersons = [
-        ...filteredFams.map((f) => ({ dob: f.head_dob })),
-        ...members.map((m) => ({ dob: m.dob })),
+        ...filteredFams.map((f) => ({
+          dob: f.head_dob,
+          gender: f.head_gender,
+          hasHealth: hasHealthData(f.head_chronic_diseases) || hasHealthData(f.head_disabilities)
+            || hasHealthData(f.head_injuries) || hasHealthData(f.head_needs),
+        })),
+        ...members.map((m) => ({
+          dob: m.dob,
+          gender: m.gender,
+          hasHealth: hasHealthData(m.chronic_diseases) || hasHealthData(m.disabilities)
+            || hasHealthData(m.injuries) || hasHealthData(m.needs),
+        })),
       ];
-      let children = 0, adults = 0, elderly = 0, noAge = 0;
+      let children = 0, adults = 0, elderly = 0, noAge = 0, women = 0, men = 0, healthCases = 0, schoolAge = 0;
       allPersons.forEach((p) => {
         const age = calcAge(p.dob);
-        if (age === null) { noAge++; return; }
-        if (age < 18) children++;
+        if (age === null) noAge++;
+        else if (age < 18) children++;
         else if (age < 60) adults++;
         else elderly++;
+        if (p.gender === 'أنثى') women++;
+        else if (p.gender === 'ذكر') men++;
+        if (p.hasHealth) healthCases++;
+        if (getStageGroup(age) !== null) schoolAge++;
       });
       const total = Math.max(filteredFams.length + members.length, 1);
 
@@ -144,6 +158,10 @@ export default function DashboardScreen() {
         adults,
         elderly,
         noAge,
+        women,
+        men,
+        healthCases,
+        schoolAge,
         total,
         campBars,
       };
@@ -258,9 +276,14 @@ export default function DashboardScreen() {
 
   const statCards = [
     { icon: '👨‍👩‍👧‍👦', label: 'الأسر', value: stats?.families, color: colors.accent, screen: 'FamiliesList' },
-    { icon: '👤', label: 'الأفراد', value: stats?.members, color: colors.blue, screen: 'Analysis' },
+    { icon: '📊', label: 'تحليلات', value: stats?.members, color: colors.blue, screen: 'Analysis' },
     { icon: '⛺', label: 'المخيمات', value: stats?.camps, color: colors.green, screen: 'CampsList' },
     { icon: '⚠️', label: 'بيانات ناقصة', value: stats?.incomplete, color: (stats?.incomplete || 0) > 0 ? colors.red : colors.muted, screen: 'DataQuality' },
+    { icon: '🧒', label: 'الأطفال', value: stats?.children, color: colors.green, screen: 'Children' },
+    { icon: '👩', label: 'النساء', value: stats?.women, color: colors.pink, screen: 'Women' },
+    { icon: '👨', label: 'الرجال', value: stats?.men, color: colors.blue, screen: 'Men' },
+    { icon: '🩺', label: 'الحالات الصحية', value: stats?.healthCases, color: colors.red, screen: 'HealthRecords' },
+    { icon: '🎒', label: 'الحالة الدراسية', value: stats?.schoolAge, color: colors.accent, screen: 'Education' },
   ];
 
   const ageBars = stats ? [

@@ -5,13 +5,15 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE, REQUIRED_FAMILY_FIELDS } from '../../lib/helpers';
+import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE, REQUIRED_FAMILY_FIELDS, isAgeInRange } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
 import PageHeader from '../../components/ui/PageHeader';
 import FilterChip from '../../components/ui/FilterChip';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
+import AgeRangeFilter from '../../components/ui/AgeRangeFilter';
+import PrimaryButton from '../../components/ui/PrimaryButton';
 import colors from '../../theme/colors';
 
 const AGE_GROUPS = [
@@ -56,6 +58,8 @@ export default function AnalysisScreen() {
   const [filterCamp, setFilterCamp] = useState('all');
   const [campPickerVisible, setCampPickerVisible] = useState(false);
   const [tab, setTab] = useState('overview');
+  const [ageMin, setAgeMin] = useState('');
+  const [ageMax, setAgeMax] = useState('');
   const [drillDown, setDrillDown] = useState(null); // { title, items }
   const [drillSearch, setDrillSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -305,8 +309,16 @@ export default function AnalysisScreen() {
       infantPersons,
       orphans,
       incomplete,
+      allPersons,
     };
   }, [scopedFams, members, camps, campMap]);
+
+  // ── فلتر عمر مخصّص (من/إلى) — انتقل من شاشة "كل الأسر" لهون عشان
+  // يبقى فلتر واحد للعمر بمكان واحد بدل تكراره بشاشتين مختلفتين ──
+  const ageRangeMatches = useMemo(() => {
+    if (!ageMin && !ageMax) return [];
+    return stats.allPersons.filter((p) => isAgeInRange(p.personDob, ageMin, ageMax));
+  }, [stats.allPersons, ageMin, ageMax]);
 
   const openDrillDownPersons = (title, persons) => {
     if (!persons?.length) return;
@@ -383,6 +395,8 @@ export default function AnalysisScreen() {
               ['📐', stats.avgFamilySize.toFixed(1), 'معدل حجم الأسرة', colors.purple, null],
               ['⚖️', stats.dependencyRatio.toFixed(1), 'نسبة الإعالة', colors.orange, null],
               ['👩‍🏠', `${stats.femaleHeadPct.toFixed(0)}%`, 'أسر بمعيلة', colors.pink, null],
+              ['🚹', stats.males, 'ذكور', colors.blue, () => openDrillDownPersons('الذكور', stats.malePersons)],
+              ['🚺', stats.females, 'إناث', colors.pink, () => openDrillDownPersons('الإناث', stats.femalePersons)],
             ].map(([icon, val, label, color, onPress], i) => (
               <Pressable key={i} style={styles.statBox} onPress={onPress || undefined} disabled={!onPress}>
                 <Text style={styles.statIcon}>{icon}</Text>
@@ -406,6 +420,24 @@ export default function AnalysisScreen() {
                 onPress={() => openDrillDownPersons(g.label, g.persons)}
               />
             ))}
+
+            {/* فلتر عمر مخصّص (من/إلى) — منقول من شاشة "كل الأسر" */}
+            <Text style={[styles.panelTitle, { marginTop: 16 }]}>🔍 فلتر عمر مخصّص</Text>
+            <AgeRangeFilter
+              label="من/إلى:"
+              min={ageMin}
+              max={ageMax}
+              onChangeMin={setAgeMin}
+              onChangeMax={setAgeMax}
+              resultCount={(ageMin || ageMax) ? `${ageRangeMatches.length} نتيجة` : ''}
+            />
+            {(ageMin || ageMax) && (
+              <PrimaryButton
+                label={`عرض ${ageRangeMatches.length} نتيجة`}
+                disabled={!ageRangeMatches.length}
+                onPress={() => openDrillDownPersons(`العمر ${ageMin || '0'}–${ageMax || '∞'}`, ageRangeMatches)}
+              />
+            )}
           </View>
         )}
 

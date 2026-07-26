@@ -260,7 +260,7 @@ export default function DashboardScreen() {
     { icon: '👨‍👩‍👧‍👦', label: 'الأسر', value: stats?.families, color: colors.accent, screen: 'FamiliesList' },
     { icon: '👤', label: 'الأفراد', value: stats?.members, color: colors.blue, screen: 'FamiliesList' },
     { icon: '⛺', label: 'المخيمات', value: stats?.camps, color: colors.green, screen: 'CampsList' },
-    { icon: '⚠️', label: 'بيانات ناقصة', value: stats?.incomplete, color: (stats?.incomplete || 0) > 0 ? colors.red : colors.muted, screen: 'FamiliesList' },
+    { icon: '⚠️', label: 'بيانات ناقصة', value: stats?.incomplete, color: (stats?.incomplete || 0) > 0 ? colors.red : colors.muted, screen: 'DataQuality' },
   ];
 
   const ageBars = stats ? [

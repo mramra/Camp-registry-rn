@@ -69,7 +69,7 @@ const navTheme = {
 };
 
 const RootNavigator = () => {
-  const { isAuthenticated, loading, isPreviewMode, previewAs, setPreviewAs, realProfile, orgId, isOwner, profile } = useAuth();
+  const { isAuthenticated, loading, isPreviewMode, previewAs, setPreviewAs, realProfile, orgId, isOwner, profile, isReadOnly, trialDaysLeft } = useAuth();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [navRef, setNavRef] = useState(null);
   const prevCounts = useRef({ pending: null, devices: null, portalMessages: null });
@@ -233,6 +233,21 @@ const RootNavigator = () => {
 
       {isAuthenticated && navRef && (
         <AppDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} navigation={navRef} />
+      )}
+
+      {isAuthenticated && (isReadOnly || (trialDaysLeft !== null && trialDaysLeft <= 2)) && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          backgroundColor: isReadOnly ? '#7f1d1d' : '#7c2d12',
+          paddingHorizontal: 16, paddingTop: 44, paddingBottom: 10,
+          borderBottomWidth: 2, borderBottomColor: colors.red,
+        }}>
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold', textAlign: 'center' }}>
+            {isReadOnly
+              ? '⛔ انتهت الفترة المسموحة لمنظمتك — النظام بوضع القراءة فقط (بدون إضافة/تعديل/حذف). تواصل مع مالك المنصة لتفعيل الاشتراك.'
+              : `⚠️ تنتهي فترتك التجريبية خلال ${trialDaysLeft <= 0 ? 'اليوم' : `${trialDaysLeft} يوم`} — تواصل لتفعيل الاشتراك قبل التوقف عن الإضافة والتعديل.`}
+          </Text>
+        </View>
       )}
 
       {isPreviewMode && (

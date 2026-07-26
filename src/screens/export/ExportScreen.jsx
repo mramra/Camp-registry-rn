@@ -31,10 +31,10 @@ const MISSING_FIELD_DEFS = [
 ];
 
 export default function ExportScreen() {
-  const { profile, orgId } = useAuth();
+  const { profile, orgId, isReadOnly } = useAuth();
   const { getAllowedCampIds, filterLocal, getVisibleCamps } = useDataScope();
   const canExport = hasPermission(profile, 'export');
-  const canImport = hasPermission(profile, 'import');
+  const canImport = hasPermission(profile, 'import') && !isReadOnly;
 
   const [camps, setCamps] = useState([]);
   const [orgMembers, setOrgMembers] = useState([]);

@@ -44,6 +44,7 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [isSaasAdmin, setIsSaasAdmin] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [orgSub, setOrgSub] = useState(null);
   const [previewAs, setPreviewAs] = useState(null);
   const [pagePermRows, setPagePermRows] = useState([]);
   const [pagePermLoaded, setPagePermLoaded] = useState(false);
@@ -142,6 +143,14 @@ export const AuthProvider = ({ children }) => {
       setProfile(data);
       cacheData('user_profile', userId, data);
       loadPagePermissions(data.org_id);
+      // فحص خفيف غير حاجب لحالة اشتراك المنظمة (تجربة/نشط/منتهي/موقوف)
+      // -- يُستخدم لتفعيل وضع "قراءة فقط" تلقائياً بعد انتهاء التجربة
+      // بدون دفع (كان غائباً كلياً سابقاً: التجربة "تنتهي" اسمياً بس
+      // بدون أي فرض فعلي، فيضل المندوب يستخدم النظام كامل الصلاحيات
+      // للأبد). فشل الفحص (لا اتصال) يترك orgSub=null بأمان (لا حجب).
+      supabase.from('organizations').select('subscription_status, trial_ends_at, plan_expires_at').eq('id', data.org_id).maybeSingle()
+        .then(({ data: row }) => setOrgSub(row))
+        .catch(() => {});
       // فحص خفيف غير حاجب: هل هذا المستخدم مالك منصة SaaS كلي (فوق كل
       // المنظمات)؟ مستقل تماماً عن دوره العادي بمنظمته (platform_owner
       // العادي). فشل الفحص (لا اتصال مثلاً) يترك isSaasAdmin=false بأمان.
@@ -285,6 +294,24 @@ export const AuthProvider = ({ children }) => {
     [effectiveProfile, pagePermRows]
   );
 
+  // ── حالة اشتراك المنظمة (تجربة/نشط/منتهي/موقوف) ─────────────
+  // isReadOnly: تجاوزت المنظمة الفترة المسموحة بدون تفعيل دفع فعلي --
+  // يمنع الكتابة/التعديل/الحذف/الاستيراد بالكامل بغض النظر عن الدور
+  // (حتى platform_owner المنظمة نفسها)، بس القراءة/التصدير تبقى متاحة.
+  // trialDaysLeft: للتذكير داخل التطبيق قبل انتهاء التجربة الفعلية.
+  const now = Date.now();
+  const trialEndsMs = orgSub?.trial_ends_at ? new Date(orgSub.trial_ends_at).getTime() : null;
+  const planExpiresMs = orgSub?.plan_expires_at ? new Date(orgSub.plan_expires_at).getTime() : null;
+  const isReadOnly = !!orgSub && (
+    orgSub.subscription_status === 'suspended' ||
+    orgSub.subscription_status === 'expired' ||
+    (orgSub.subscription_status === 'trial' && trialEndsMs !== null && trialEndsMs < now) ||
+    (orgSub.subscription_status === 'active' && planExpiresMs !== null && planExpiresMs < now)
+  );
+  const trialDaysLeft = (orgSub?.subscription_status === 'trial' && trialEndsMs !== null && !isReadOnly)
+    ? Math.ceil((trialEndsMs - now) / (24 * 60 * 60 * 1000))
+    : null;
+
   const value = {
     user,
     session,
@@ -308,9 +335,12 @@ export const AuthProvider = ({ children }) => {
     isSuperAdmin,
     isCampDelegate,
     isAssistant,
-    canWrite: hasPermission(effectiveProfile, 'write'),
-    canEdit: hasPermission(effectiveProfile, 'edit'),
-    canDelete: hasPermission(effectiveProfile, 'delete'),
+    orgSubscription: orgSub,
+    isReadOnly,
+    trialDaysLeft,
+    canWrite: hasPermission(effectiveProfile, 'write') && !isReadOnly,
+    canEdit: hasPermission(effectiveProfile, 'edit') && !isReadOnly,
+    canDelete: hasPermission(effectiveProfile, 'delete') && !isReadOnly,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

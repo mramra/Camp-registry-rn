@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { formatDate } from '../../lib/utils';
 import { calcAge } from '../../lib/helpers';
-import { MARITAL_BY_GENDER, HOUSING_TYPE_OPTIONS, REGIONS } from '../../lib/formOptions';
+import { MARITAL_BY_GENDER, REGIONS } from '../../lib/formOptions';
 import colors from '../../theme/colors';
 
 // نفس معرّف المنظمة الثابت المستخدم بالنسخة الأصلية لبوابة الأسرة العامة
@@ -99,7 +99,6 @@ export default function FamilyPortalScreen({ navigation }) {
         !family.head_dob && { key: 'head_dob', label: '📅 تاريخ الميلاد (YYYY-MM-DD)', kind: 'date' },
         !family.head_marital?.trim() && { key: 'head_marital', label: '💍 الحالة الاجتماعية', kind: 'marital' },
         !family.address?.trim() && { key: 'address', label: '🏠 السكن الحالي (وصف)', kind: 'text' },
-        !family.housing_type?.trim() && { key: 'housing_type', label: '🏘️ نوع المسكن', kind: 'housing' },
         !family.original_address?.trim() && { key: 'original_address', label: '🗺️ المحافظة الأصلية', kind: 'region' },
         !family.governorate_current?.trim() && { key: 'governorate_current', label: '📍 محافظة السكن الحالي', kind: 'region' },
         (!family.wallet_type?.trim() || !family.wallet_phone?.trim()) && { key: 'wallet_type', label: '💳 المحفظة الإلكترونية', kind: 'wallet' },
@@ -382,20 +381,6 @@ export default function FamilyPortalScreen({ navigation }) {
                             {d.kind === 'marital' ? (
                               <View style={styles.maritalRow}>
                                 {(MARITAL_BY_GENDER[family.head_gender] || MARITAL_BY_GENDER['ذكر']).map((opt) => (
-                                  <Pressable
-                                    key={opt}
-                                    onPress={() => setMissingValues((v) => ({ ...v, [d.key]: opt }))}
-                                    style={[styles.maritalChip, missingValues[d.key] === opt && styles.maritalChipActive]}
-                                  >
-                                    <Text style={[styles.maritalChipText, missingValues[d.key] === opt && styles.maritalChipTextActive]}>
-                                      {opt}
-                                    </Text>
-                                  </Pressable>
-                                ))}
-                              </View>
-                            ) : d.kind === 'housing' ? (
-                              <View style={styles.maritalRow}>
-                                {HOUSING_TYPE_OPTIONS.map((opt) => (
                                   <Pressable
                                     key={opt}
                                     onPress={() => setMissingValues((v) => ({ ...v, [d.key]: opt }))}

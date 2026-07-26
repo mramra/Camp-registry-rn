@@ -34,9 +34,7 @@ import {
   FAMILY_CATEGORIES,
   REGIONS,
   INCOME_SOURCE_OPTIONS,
-  HOUSING_TYPE_OPTIONS,
   HOUSING_CONDITION_OPTIONS,
-  DISPLACEMENT_STATUS_OPTIONS,
 } from '../../lib/formOptions';
 import { showError, showSuccess } from '../../utils/toast';
 import { emptyHealthFields, healthSummaryCount } from '../../lib/healthOptions';
@@ -107,11 +105,9 @@ export default function FamilyFormScreen() {
   const [addressDetails, setAddressDetails] = useState('');
   const [currentAddress, setCurrentAddress] = useState('');
   const [governorateCurrent, setGovernorateCurrent] = useState('');
-  const [displacementStatus, setDisplacementStatus] = useState('');
   const [incomeSource, setIncomeSource] = useState('');
   const [walletType, setWalletType] = useState('بدون');
   const [walletPhone, setWalletPhone] = useState('');
-  const [housingType, setHousingType] = useState('');
   const [housingCondition, setHousingCondition] = useState('');
 
   const [categories, setCategories] = useState([]);
@@ -229,11 +225,9 @@ export default function FamilyFormScreen() {
         setAddressDetails(data.address_details || '');
         setCurrentAddress(data.address || '');
         setGovernorateCurrent(data.governorate_current || '');
-        setDisplacementStatus(data.displacement_status || '');
         setIncomeSource(data.income_source || '');
         setWalletType(data.wallet_type || 'بدون');
         setWalletPhone(data.wallet_phone || '');
-        setHousingType(data.housing_type || '');
         setHousingCondition(data.housing_condition || '');
         setNotes(data.notes || '');
         setHeadHealth({
@@ -424,11 +418,12 @@ export default function FamilyFormScreen() {
         address_details: addressDetails.trim() || null,
         address: currentAddress.trim() || null,
         governorate_current: governorateCurrent || null,
-        displacement_status: displacementStatus || null,
+        // كل أسر النظام نازحة فعلياً (نظام إدارة مخيمات نزوح) -- قيمة
+        // ثابتة دائماً، لم يعد هناك حقل اختيار بالنموذج.
+        displacement_status: 'نازح',
         income_source: incomeSource || null,
         wallet_type: walletType || 'بدون',
         wallet_phone: walletPhone.trim() || null,
-        housing_type: housingType || null,
         housing_condition: housingCondition || null,
         category_tags: JSON.stringify(categories),
         notes: notes.trim() || null,
@@ -729,13 +724,6 @@ export default function FamilyFormScreen() {
           />
           <FormInput label="تفاصيل العنوان" value={addressDetails} onChangeText={setAddressDetails} />
 
-          <SelectField
-            label="حالة النزوح"
-            value={displacementStatus}
-            options={DISPLACEMENT_STATUS_OPTIONS}
-            onSelect={setDisplacementStatus}
-            placeholder="نازح / مقيم"
-          />
           <FormInput label="السكن الحالي (وصف)" value={currentAddress} onChangeText={setCurrentAddress} />
           <SelectField
             label="محافظة السكن الحالي"
@@ -743,13 +731,6 @@ export default function FamilyFormScreen() {
             options={REGIONS}
             onSelect={setGovernorateCurrent}
             placeholder="اختر المحافظة"
-          />
-          <SelectField
-            label="نوع المسكن"
-            value={housingType}
-            options={HOUSING_TYPE_OPTIONS}
-            onSelect={setHousingType}
-            placeholder="اختر نوع المسكن"
           />
           <SelectField
             label="حالة المسكن"

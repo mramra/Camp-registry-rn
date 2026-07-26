@@ -34,7 +34,6 @@ import {
   FAMILY_CATEGORIES,
   REGIONS,
   INCOME_SOURCE_OPTIONS,
-  HOUSING_CONDITION_OPTIONS,
 } from '../../lib/formOptions';
 import { showError, showSuccess } from '../../utils/toast';
 import { emptyHealthFields, healthSummaryCount } from '../../lib/healthOptions';
@@ -108,7 +107,6 @@ export default function FamilyFormScreen() {
   const [incomeSource, setIncomeSource] = useState('');
   const [walletType, setWalletType] = useState('بدون');
   const [walletPhone, setWalletPhone] = useState('');
-  const [housingCondition, setHousingCondition] = useState('');
 
   const [categories, setCategories] = useState([]);
   const [notes, setNotes] = useState('');
@@ -228,7 +226,6 @@ export default function FamilyFormScreen() {
         setIncomeSource(data.income_source || '');
         setWalletType(data.wallet_type || 'بدون');
         setWalletPhone(data.wallet_phone || '');
-        setHousingCondition(data.housing_condition || '');
         setNotes(data.notes || '');
         setHeadHealth({
           orphan_status: data.head_orphan_status || null,
@@ -424,7 +421,6 @@ export default function FamilyFormScreen() {
         income_source: incomeSource || null,
         wallet_type: walletType || 'بدون',
         wallet_phone: walletPhone.trim() || null,
-        housing_condition: housingCondition || null,
         category_tags: JSON.stringify(categories),
         notes: notes.trim() || null,
         head_orphan_status: headHealth.orphan_status || null,
@@ -731,13 +727,6 @@ export default function FamilyFormScreen() {
             options={REGIONS}
             onSelect={setGovernorateCurrent}
             placeholder="اختر المحافظة"
-          />
-          <SelectField
-            label="حالة المسكن"
-            value={housingCondition}
-            options={HOUSING_CONDITION_OPTIONS}
-            onSelect={setHousingCondition}
-            placeholder="اختر حالة المسكن"
           />
           <SelectField
             label="مصدر دخل رب الأسرة"

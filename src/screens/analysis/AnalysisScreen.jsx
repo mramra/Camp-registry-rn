@@ -5,7 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { useDataScope } from '../../lib/useDataScope';
 import { fetchFamilies, fetchFamilyMembers, fetchCamps } from '../../lib/supabase';
-import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE, computeDuplicateSets, hasDataQualityIssue, getVulnerabilityScore } from '../../lib/helpers';
+import { calcAge, hasHealthData, getOrphanCount, buildFamWithInfant, buildFamHasNamedWife, isAutoNursing, isInfantAge, INFANT_MAX_AGE, computeDuplicateSets, hasDataQualityIssue, getVulnerabilityScore, parseArr } from '../../lib/helpers';
 import { showError } from '../../utils/toast';
 import { cacheData, getCachedData, withTimeout } from '../../lib/offlineCache';
 import { formatDateTime } from '../../lib/utils';
@@ -277,6 +277,13 @@ export default function AnalysisScreen() {
     // المستخدمة بشاشات التوزيعات والتقارير (getVulnerabilityScore).
     const criticalFams = fams.filter((f) => getVulnerabilityScore(f, memsByFam[f.id]).tier === 'critical');
 
+    // أسر "شهيد/أسير" -- فئات محفوظة بـcategory_tags بنموذج الأسرة، حالات
+    // اجتماعية خاصة تستحق أولوية متابعة (🆘 حالات عاجلة).
+    const specialCaseFams = fams.filter((f) => {
+      const tags = parseArr(f.category_tags);
+      return tags.includes('martyr') || tags.includes('captive');
+    });
+
     const orgWorkingAge = allPersons.filter((p) => {
       const a = calcAge(p.personDob);
       return a !== null && a >= 18 && a < 60;
@@ -324,6 +331,7 @@ export default function AnalysisScreen() {
       incompleteFams,
       femaleHeadFams,
       criticalFams,
+      specialCaseFams,
       allPersons,
     };
   }, [scopedFams, members, camps, campMap]);
@@ -419,6 +427,7 @@ export default function AnalysisScreen() {
               ['🚹', stats.males, 'ذكور', colors.blue, () => openDrillDownPersons('الذكور', stats.malePersons)],
               ['👩‍🏠', `${stats.femaleHeadPct.toFixed(0)}%`, 'أسر بمعيلة', colors.pink, () => openDrillDownFamilies('أسر بمعيلة', stats.femaleHeadFams)],
               ['🔴', stats.criticalFams.length, 'شديدة الضعف', colors.red, () => openDrillDownFamilies('أسر شديدة الضعف', stats.criticalFams)],
+              ['🆘', stats.specialCaseFams.length, 'حالات خاصة (شهيد/أسير)', colors.red, () => openDrillDownFamilies('حالات خاصة (شهيد/أسير)', stats.specialCaseFams)],
               ['🕊️', stats.orphans, 'يتيم', colors.muted, null],
               ['⚠️', stats.incomplete, 'بيانات ناقصة', colors.red, () => openDrillDownFamilies('بيانات ناقصة', stats.incompleteFams)],
               ['🏕️', stats.byCamp.length, 'مخيم نشط', colors.accent, null],

@@ -34,7 +34,6 @@ export const FAMILY_CATEGORIES = [
 export const REGIONS = ['شمال غزة', 'غزة', 'الوسطى', 'جنوب غزة', 'رفح'];
 
 export const INCOME_SOURCE_OPTIONS = ['قطاع خاص', 'قطاع حكومي', 'عمل حر', 'مساعدات فقط', 'لا يعمل'];
-export const HOUSING_CONDITION_OPTIONS = ['سليم', 'هدم جزئي', 'هدم كلي', 'غير قابل للسكن'];
 
 export const GENDER_OPTIONS = ['ذكر', 'أنثى'];
 
@@ -54,7 +53,6 @@ export const TRACKED_FIELDS = {
   address: 'السكن الحالي',
   governorate_current: 'محافظة السكن الحالي',
   displacement_status: 'حالة النزوح',
-  housing_condition: 'حالة المسكن',
   income_source: 'مصدر الدخل',
   wallet_type: 'المحفظة الإلكترونية',
   notes: 'ملاحظات',

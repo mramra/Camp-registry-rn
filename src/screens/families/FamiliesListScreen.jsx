@@ -20,7 +20,6 @@ import { formatDateTime } from '../../lib/utils';
 import { showError } from '../../utils/toast';
 import PageHeader from '../../components/ui/PageHeader';
 import EmptyState from '../../components/ui/EmptyState';
-import FilterChip from '../../components/ui/FilterChip';
 import SelectField from '../../components/ui/SelectField';
 import Badge from '../../components/ui/Badge';
 import BottomSheetModal from '../../components/ui/BottomSheetModal';
@@ -318,30 +317,33 @@ export default function FamiliesListScreen() {
               style={styles.searchInput}
             />
 
-            {/* المخيم */}
-            <View style={styles.chipsRow}>
-              <FilterChip
-                label={filterCamp ? campMap[filterCamp] : `كل المخيمات (${families.length})`}
-                selected={!!filterCamp}
-                onPress={() => setCampPickerVisible(true)}
-              />
-              {hasFilter && (
-                <Pressable style={styles.resetBtn} onPress={resetFilters}>
-                  <Text style={styles.resetText}>↺ إعادة</Text>
-                </Pressable>
-              )}
+            {/* المخيم وحالة المراجعة -- حقلان جنب بعض بنفس الصف */}
+            <View style={styles.fieldsRow}>
+              <Pressable style={styles.campField} onPress={() => setCampPickerVisible(true)}>
+                <Text style={styles.campFieldText}>
+                  {filterCamp ? `المخيم: ${campMap[filterCamp]}` : `المخيم: كل المخيمات (${families.length})`}
+                </Text>
+                <Text style={styles.campFieldChevron}>▾</Text>
+              </Pressable>
+
+              <View style={{ flex: 1 }}>
+                <SelectField
+                  value={`الحالة: ${APPROVAL_OPTIONS.find((o) => o.key === filterApproval)?.label} (${filterApproval ? counts[filterApproval] : counts.all})`}
+                  options={APPROVAL_OPTIONS.map((o) => ({
+                    value: o.key,
+                    label: `${o.icon} ${o.label} (${o.key ? counts[o.key] : counts.all})`,
+                  }))}
+                  onSelect={setFilterApproval}
+                  placeholder="الحالة: الكل"
+                />
+              </View>
             </View>
 
-            {/* فلتر حالة المراجعة -- حقل اختياري واحد بدل 4 شرائح منفصلة */}
-            <SelectField
-              value={`الحالة: ${APPROVAL_OPTIONS.find((o) => o.key === filterApproval)?.label} (${filterApproval ? counts[filterApproval] : counts.all})`}
-              options={APPROVAL_OPTIONS.map((o) => ({
-                value: o.key,
-                label: `${o.icon} ${o.label} (${o.key ? counts[o.key] : counts.all})`,
-              }))}
-              onSelect={setFilterApproval}
-              placeholder="الحالة: الكل"
-            />
+            {hasFilter && (
+              <Pressable style={styles.resetBtn} onPress={resetFilters}>
+                <Text style={styles.resetText}>↺ إعادة الفلاتر</Text>
+              </Pressable>
+            )}
 
           </View>
         }
@@ -414,7 +416,14 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginBottom: 10,
   },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10, justifyContent: 'center' },
+  fieldsRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  campField: {
+    flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 12, marginBottom: 12,
+  },
+  campFieldText: { color: colors.white, fontSize: 13 },
+  campFieldChevron: { color: colors.muted, fontSize: 12 },
 
   resetBtn: {
     borderWidth: 1,

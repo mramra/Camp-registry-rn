@@ -60,6 +60,8 @@ export default function FamilyPortalScreen({ navigation }) {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [missingValues, setMissingValues] = useState({});
   const [whatsappPrefix, setWhatsappPrefix] = useState('بدون');
+  const [walletTypeSel, setWalletTypeSel] = useState('بدون');
+  const [missingError, setMissingError] = useState('');
   const [missingSending, setMissingSending] = useState(false);
   const [missingSent, setMissingSent] = useState(false);
   const [urgentOpen, setUrgentOpen] = useState(false);
@@ -107,62 +109,70 @@ export default function FamilyPortalScreen({ navigation }) {
         !family.housing_type?.trim() && { key: 'housing_type', label: '🏘️ نوع المسكن', kind: 'housing' },
         !family.original_address?.trim() && { key: 'original_address', label: '🗺️ المحافظة الأصلية', kind: 'region' },
         !family.governorate_current?.trim() && { key: 'governorate_current', label: '📍 محافظة السكن الحالي', kind: 'region' },
-        !family.wallet_type?.trim() && { key: 'wallet_type', label: '💳 نوع المحفظة الإلكترونية', kind: 'wallet' },
-        !family.wallet_phone?.trim() && { key: 'wallet_phone', label: '💳 رقم جوال المحفظة', kind: 'phone' },
+        (!family.wallet_type?.trim() || !family.wallet_phone?.trim()) && { key: 'wallet_type', label: '💳 المحفظة الإلكترونية', kind: 'wallet' },
         !family.phone2?.trim() && { key: 'phone2', label: '📱 رقم واتساب', kind: 'whatsapp' },
       ].filter(Boolean)
     : [];
 
   const handleSubmitMissing = async () => {
-    const filled = missingFieldDefs.filter((d) => (missingValues[d.key] || '').trim());
-    if (!filled.length) return setError('عبّي حقل واحد على الأقل قبل الإرسال');
+    // 'wallet_type' لا يُخزَّن بـmissingValues (صار حالة مستقلة walletTypeSel
+    // بنفس نمط مقدمة الواتساب) -- نستبعده من آلية "الحقول المعبّأة" العامة
+    // ونعالجه يدوياً بالأسفل زي phone2/whatsapp_prefix بالضبط.
+    const filled = missingFieldDefs.filter((d) => d.key !== 'wallet_type' && (missingValues[d.key] || '').trim());
+    const walletPhoneVal = (missingValues.wallet_phone || '').trim();
+    const hasWalletField = missingFieldDefs.some((d) => d.key === 'wallet_type');
+    const hasWhatsappField = missingFieldDefs.some((d) => d.key === 'phone2');
+
+    if (!filled.length && !(hasWhatsappField && whatsappPrefix !== 'بدون') && !(hasWalletField && walletTypeSel !== 'بدون')) {
+      return setMissingError('عبّي حقل واحد على الأقل قبل الإرسال');
+    }
 
     // فحص صيغة أرقام الجوال (059/056 + 10 خانات) قبل الإرسال -- تفادي
     // أخطاء الإدخال العشوائية (طلب مباشر)
-    const phoneFields = filled.filter((d) => d.key === 'wallet_phone' || d.key === 'phone2');
+    const phoneFields = filled.filter((d) => d.key === 'phone1');
     for (const d of phoneFields) {
       if (!PALESTINIAN_PHONE_RE.test(missingValues[d.key].trim())) {
-        return setError(`${d.label}: رقم غير صحيح -- يجب أن يبدأ بـ059 أو 056 ويكون 10 خانات`);
+        return setMissingError(`${d.label}: رقم غير صحيح -- يجب أن يبدأ بـ059 أو 056 ويكون 10 خانات`);
       }
     }
-
-    // فحص تكامل الأزواج المترابطة -- كل حقل هون له "شريك" لازم يكتمل
-    // معه سوا، وإلا البيانات تصير ناقصة/متضاربة بصمت (طلب مباشر بعد
-    // ملاحظة: واتساب بدون مقدمة انأرسل بنجاح بدون أي تنبيه). الفحص
-    // يقارن "القيمة الفعلية بعد هذا الإرسال" (المدخل حديثاً أو الموجود
-    // بالسجل أصلاً) -- مو بس المدخل حديثاً، عشان لو نوع المحفظة موجود
-    // أصلاً بالسجل ورب الأسرة استكمل بس الرقم، هذا يبقى مسموح.
-    const effectivePhone2 = (missingValues.phone2 || '').trim() || family.phone2 || '';
-    const effectivePrefix = whatsappPrefix || family.whatsapp_prefix || '';
-    const prefixIsReal = effectivePrefix && effectivePrefix !== 'بدون';
-    if (prefixIsReal && !effectivePhone2) {
-      return setError('أدخل رقم الواتساب أو اختر "بدون" بالمقدمة');
+    if (whatsappPrefix !== 'بدون' && (missingValues.phone2 || '').trim() && !PALESTINIAN_PHONE_RE.test(missingValues.phone2.trim())) {
+      return setMissingError('رقم الواتساب غير صحيح -- يجب أن يبدأ بـ059 أو 056 ويكون 10 خانات');
+    }
+    if (walletTypeSel !== 'بدون' && walletPhoneVal && !PALESTINIAN_PHONE_RE.test(walletPhoneVal)) {
+      return setMissingError('رقم المحفظة غير صحيح -- يجب أن يبدأ بـ059 أو 056 ويكون 10 خانات');
     }
 
-    const effectiveWalletType = (missingValues.wallet_type || '').trim() || family.wallet_type || '';
-    const effectiveWalletPhone = (missingValues.wallet_phone || '').trim() || family.wallet_phone || '';
-    const walletTypeIsReal = effectiveWalletType && effectiveWalletType !== 'بدون';
-    if (walletTypeIsReal && !effectiveWalletPhone) {
-      return setError('أدخل رقم المحفظة أو اختر "بدون" بنوع المحفظة');
+    // فحص تكامل الأزواج المترابطة -- اختيار مقدمة/نوع محفظة حقيقي
+    // (مو "بدون") لازم يترافق برقم، وإلا البيانات ناقصة/متضاربة بصمت.
+    if (whatsappPrefix !== 'بدون' && !(missingValues.phone2 || '').trim()) {
+      return setMissingError('أدخل رقم الواتساب أو اختر "بدون" بالمقدمة');
+    }
+    if (walletTypeSel !== 'بدون' && !walletPhoneVal) {
+      return setMissingError('أدخل رقم المحفظة أو اختر "بدون" بنوع المحفظة');
     }
 
     setMissingSending(true);
-    setError('');
+    setMissingError('');
     try {
       const fields = {};
       filled.forEach((d) => { fields[d.key] = missingValues[d.key].trim(); });
-      // نرسل مقدمة الواتساب دايماً لما يكون حقل الواتساب أصلاً معروض
-      // كناقص بهالشاشة -- حتى لو "بدون" (إجابة صريحة بلا واتساب، مو
-      // نقص). فحص prefixIsReal فوق ضمن إنه لو مقدمة حقيقية (972/970)
-      // فرقم الواتساب موجود إجبارياً قبل ما نوصل هون.
-      if (missingFieldDefs.some((d) => d.key === 'phone2')) {
+      // نرسل مقدمة الواتساب/نوع المحفظة دايماً لما يكون الحقل أصلاً
+      // معروض كناقص بهالشاشة -- حتى لو "بدون" (إجابة صريحة، مو نقص).
+      // الفحوصات فوق ضمنت إنه لو اختيار حقيقي، فرقمه المرافق موجود
+      // إجبارياً قبل ما نوصل هون.
+      if (hasWhatsappField) {
         fields.whatsapp_prefix = whatsappPrefix;
+        if (whatsappPrefix !== 'بدون') fields.phone2 = (missingValues.phone2 || '').trim();
+      }
+      if (hasWalletField) {
+        fields.wallet_type = walletTypeSel;
+        if (walletTypeSel !== 'بدون') fields.wallet_phone = walletPhoneVal;
       }
       await callFamilyPortalAPI('submitMissingData', { nationalId, phone, familyId: family.id, fields });
       setMissingSent(true);
       setMissingValues({});
     } catch (e) {
-      setError(e.message || 'تعذّر إرسال البيانات، حاول مرة ثانية');
+      setMissingError(e.message || 'تعذّر إرسال البيانات، حاول مرة ثانية');
     } finally {
       setMissingSending(false);
     }
@@ -417,6 +427,7 @@ export default function FamilyPortalScreen({ navigation }) {
                 {missingFieldDefs.length > 0 && (
                   <View style={[styles.infoCard, styles.missingCard]}>
                     <Text style={styles.infoCardTitle}>🔴 بيانات ناقصة — أكملها الآن</Text>
+                    {!!missingError && <Text style={styles.errorMsg}>{missingError}</Text>}
 
                     {missingSent ? (
                       <View style={styles.sentBanner}>
@@ -474,18 +485,31 @@ export default function FamilyPortalScreen({ navigation }) {
                                 ))}
                               </View>
                             ) : d.kind === 'wallet' ? (
-                              <View style={styles.maritalRow}>
-                                {['بدون', 'PalPay', 'JawwalPay'].map((opt) => (
-                                  <Pressable
-                                    key={opt}
-                                    onPress={() => setMissingValues((v) => ({ ...v, [d.key]: opt }))}
-                                    style={[styles.maritalChip, missingValues[d.key] === opt && styles.maritalChipActive]}
-                                  >
-                                    <Text style={[styles.maritalChipText, missingValues[d.key] === opt && styles.maritalChipTextActive]}>
-                                      {opt}
-                                    </Text>
-                                  </Pressable>
-                                ))}
+                              <View>
+                                <View style={styles.maritalRow}>
+                                  {['بدون', 'PalPay', 'JawwalPay'].map((opt) => (
+                                    <Pressable
+                                      key={opt}
+                                      onPress={() => setWalletTypeSel(opt)}
+                                      style={[styles.maritalChip, walletTypeSel === opt && styles.maritalChipActive]}
+                                    >
+                                      <Text style={[styles.maritalChipText, walletTypeSel === opt && styles.maritalChipTextActive]}>
+                                        {opt}
+                                      </Text>
+                                    </Pressable>
+                                  ))}
+                                </View>
+                                {walletTypeSel !== 'بدون' && (
+                                  <TextInput
+                                    value={missingValues.wallet_phone || ''}
+                                    onChangeText={(v) => setMissingValues((prev) => ({ ...prev, wallet_phone: v }))}
+                                    placeholder="05xxxxxxxx"
+                                    placeholderTextColor={colors.muted}
+                                    keyboardType="phone-pad"
+                                    editable={!missingSending}
+                                    style={styles.input}
+                                  />
+                                )}
                               </View>
                             ) : d.kind === 'whatsapp' ? (
                               <View>

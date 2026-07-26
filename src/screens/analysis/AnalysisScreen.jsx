@@ -29,6 +29,7 @@ const TABS = [
   { key: 'overview', label: '📊 عام' },
   { key: 'age', label: '🎂 الأعمار' },
   { key: 'camps', label: '🏕️ مخيمات' },
+  { key: 'compare', label: '⚖️ مقارنة المخيمات' },
 ];
 
 
@@ -359,7 +360,7 @@ export default function AnalysisScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
       >
-        <PageHeader icon="📈" title="لوحة الإحصائيات" />
+        <PageHeader icon="📈" title="تحليلات" />
 
         {!!offlineInfo && (
           <View style={styles.offlineBanner}>
@@ -379,7 +380,12 @@ export default function AnalysisScreen() {
 
         <View style={styles.tabsRow}>
           {TABS.map((t) => (
-            <FilterChip key={t.key} label={t.label} selected={tab === t.key} onPress={() => setTab(t.key)} />
+            <FilterChip
+              key={t.key}
+              label={t.label}
+              selected={tab === t.key}
+              onPress={() => (t.key === 'compare' ? navigation.push('CampCompare') : setTab(t.key))}
+            />
           ))}
         </View>
 

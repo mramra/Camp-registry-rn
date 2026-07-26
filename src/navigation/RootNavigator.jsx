@@ -214,7 +214,7 @@ const RootNavigator = () => {
             <Stack.Screen name="OrgSignupRequests" component={OrgSignupRequestsScreen} options={{ title: 'طلبات تسجيل منظمات جديدة' }} />
             <Stack.Screen name="Alerts" component={AlertsScreen} options={{ title: 'التنبيهات' }} />
             <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'إدارة الأجهزة' }} />
-            <Stack.Screen name="Analysis" component={AnalysisScreen} options={{ title: 'لوحة الإحصائيات' }} />
+            <Stack.Screen name="Analysis" component={AnalysisScreen} options={{ title: 'تحليلات' }} />
             <Stack.Screen name="CampCompare" component={CampCompareScreen} options={{ title: 'مقارنة المخيمات' }} />
             <Stack.Screen name="DataQuality" component={DataQualityScreen} options={{ title: 'نواقص وتكررات' }} />
             <Stack.Screen name="NeedsReport" component={NeedsReportScreen} options={{ title: 'تقرير الاحتياجات' }} />

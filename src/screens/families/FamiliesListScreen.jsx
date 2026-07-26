@@ -331,20 +331,15 @@ export default function FamiliesListScreen() {
               )}
             </View>
 
-            {/* فلتر حالة المراجعة */}
-            <View style={styles.categoryGrid}>
+            {/* فلتر حالة المراجعة -- شرائح بدل شبكة الأيقونات */}
+            <View style={styles.chipsRow}>
               {APPROVAL_OPTIONS.map((o) => (
-                <Pressable
+                <FilterChip
                   key={o.key || 'all'}
+                  label={`${o.icon} ${o.label} (${o.key ? counts[o.key] : counts.all})`}
+                  selected={filterApproval === o.key}
                   onPress={() => setFilterApproval(o.key)}
-                  style={[styles.categoryCell, filterApproval === o.key && styles.categoryCellActive]}
-                >
-                  <Text style={styles.categoryIcon}>{o.icon}</Text>
-                  <Text style={[styles.categoryCount, filterApproval === o.key && styles.categoryCountActive]}>
-                    {o.key ? counts[o.key] : counts.all}
-                  </Text>
-                  <Text style={styles.categoryLabel}>{o.label}</Text>
-                </Pressable>
+                />
               ))}
             </View>
 
@@ -419,18 +414,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginBottom: 10,
   },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10, justifyContent: 'center' },
 
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  categoryCell: {
-    flexGrow: 1, minWidth: '22%', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 12, paddingVertical: 10, alignItems: 'center',
-  },
-  categoryCellActive: { backgroundColor: 'rgba(245,158,11,0.15)', borderColor: colors.accent },
-  categoryIcon: { fontSize: 18, marginBottom: 2 },
-  categoryCount: { color: colors.white, fontWeight: '900', fontSize: 14 },
-  categoryCountActive: { color: colors.accent },
-  categoryLabel: { color: colors.muted, fontSize: 9, marginTop: 1, textAlign: 'center' },
   resetBtn: {
     borderWidth: 1,
     borderColor: colors.border,

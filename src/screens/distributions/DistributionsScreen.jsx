@@ -16,11 +16,20 @@ import DateFields from '../../components/ui/DateFields';
 import colors from '../../theme/colors';
 
 /**
- * قائمة جولات التوزيع — جولة = كيان واحد فقط (اسم + تاريخ يحدده المستخدم +
- * ملاحظات)، بدون أي مفهوم "دفعة" وسيط، وبدون نظام حالة (مسودة/نشط/مكتمل/
- * ملغي) -- حُذف بالكامل بناءً على الطلب. فتح الجولة يوديك مباشرة لشاشة
- * تسجيل الاستلام (مستلمين/غير مستلمين) — لا شاشة وسيطة بينهم.
+ * جولة = كيان واحد فقط (اسم + تاريخ + نوع + ملاحظات)، بدون أي مفهوم
+ * "دفعة" وسيط، وبدون نظام حالة (مسودة/نشط/مكتمل/ملغي) -- حُذف بالكامل
+ * بناءً على الطلب. فتح الجولة يوديك مباشرة لشاشة تسجيل الاستلام
+ * (مستلمين/غير مستلمين) — لا شاشة وسيطة بينهم.
  */
+const ROUND_TYPE_OPTIONS = [
+  { value: 'general', label: '📦 عام / غير محدد' },
+  { value: 'food', label: '🍚 غذاء' },
+  { value: 'financial', label: '💵 نقدية' },
+  { value: 'shelter', label: '🏠 مأوى' },
+  { value: 'hygiene', label: '🧼 نظافة' },
+];
+const ROUND_TYPE_LABELS = Object.fromEntries(ROUND_TYPE_OPTIONS.map((o) => [o.value, o.label]));
+
 export default function DistributionsScreen() {
   const navigation = useNavigation();
   const { orgId, canWrite } = useAuth();
@@ -40,6 +49,7 @@ export default function DistributionsScreen() {
     ? `${roundYear}-${String(roundMonth).padStart(2, '0')}-${String(roundDay).padStart(2, '0')}`
     : '';
   const [notes, setNotes] = useState('');
+  const [roundType, setRoundType] = useState('general');
   const [bannerCampId, setBannerCampId] = useState(null); // اختياري -- للبانر بالتصدير فقط، لا يقيّد عرض الأسر
   const [saving, setSaving] = useState(false);
   const [editingRoundId, setEditingRoundId] = useState(null); // null = إضافة جديدة، وإلا تعديل
@@ -83,6 +93,7 @@ export default function DistributionsScreen() {
     setRoundMonth(t.getMonth() + 1);
     setRoundYear(t.getFullYear());
     setNotes('');
+    setRoundType('general');
     setBannerCampId(null);
     setFormVisible(true);
   };
@@ -95,6 +106,7 @@ export default function DistributionsScreen() {
     setRoundMonth(d.getMonth() + 1);
     setRoundYear(d.getFullYear());
     setNotes(round.notes || '');
+    setRoundType(round.type || 'general');
     setBannerCampId(round.camp_id || null);
     setFormVisible(true);
   };
@@ -111,11 +123,12 @@ export default function DistributionsScreen() {
     setSaving(true);
     try {
       const result = editingRoundId
-        ? await updateDistRound(editingRoundId, { name: name.trim(), round_date: roundDateStr, notes: notes.trim() || null, camp_id: bannerCampId })
+        ? await updateDistRound(editingRoundId, { name: name.trim(), round_date: roundDateStr, type: roundType, notes: notes.trim() || null, camp_id: bannerCampId })
         : await createDistRound({
             org_id: orgId,
             name: name.trim(),
             round_date: roundDateStr,
+            type: roundType,
             notes: notes.trim() || null,
             camp_id: bannerCampId,
           });
@@ -132,6 +145,7 @@ export default function DistributionsScreen() {
       setRoundMonth(t2.getMonth() + 1);
       setRoundYear(t2.getFullYear());
       setNotes('');
+      setRoundType('general');
       setBannerCampId(null);
       loadData();
     } catch (e) {
@@ -172,6 +186,7 @@ export default function DistributionsScreen() {
       >
         <View style={{ flex: 1 }}>
           <Text style={styles.roundName}>📦 {r.name}</Text>
+          <Text style={styles.metaLine}>{ROUND_TYPE_LABELS[r.type] || ROUND_TYPE_LABELS.general}</Text>
           {!!r.notes && <Text style={styles.metaLine}>{r.notes}</Text>}
           <Text style={styles.dateLine}>📅 {formatDate(r.round_date || r.created_at)}</Text>
           {!!r.camp_id && (
@@ -245,6 +260,13 @@ export default function DistributionsScreen() {
           onChangeYear={setRoundYear}
         />
         <FormInput label="ملاحظات" value={notes} onChangeText={setNotes} multiline numberOfLines={2} />
+        <SelectField
+          label="نوع الجولة"
+          value={ROUND_TYPE_LABELS[roundType]}
+          options={ROUND_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          onSelect={(v) => setRoundType(v || 'general')}
+          placeholder="عام / غير محدد"
+        />
         <SelectField
           label="مخيم البانر (اختياري -- يظهر بأعلى ملف Excel عند التصدير بس)"
           value={camps.find((c) => c.id === bannerCampId)?.name}

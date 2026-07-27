@@ -29,8 +29,6 @@ const DATA_TYPE_OPTIONS = [
   { key: 'name4', label: '👤 الاسم غير رباعي', match: (f, issues) => issues.includes('اسم رب الأسرة ناقص') || issues.includes('الاسم غير رباعي') },
   { key: 'head_id', label: '🆔 رقم الهوية (ناقص/غير صحيح)', match: (f, issues) => issues.includes('رقم الهوية ناقص') || issues.includes('رقم الهوية غير صحيح') },
   { key: 'phone1', label: '📱 رقم الجوال', match: (f, issues) => issues.includes('رقم الجوال ناقص') },
-  { key: 'phone2', label: '💬 رقم واتساب', match: (f, issues) => issues.includes('رقم واتساب ناقص') },
-  { key: 'wallet_phone', label: '💳 رقم المحفظة الإلكترونية', match: (f, issues) => issues.includes('رقم المحفظة الإلكترونية ناقص') },
   { key: 'dob', label: '🎂 تاريخ الميلاد (رب الأسرة أو أي فرد)', match: null },
   { key: 'marital', label: '💍 الحالة الاجتماعية', match: (f, issues) => issues.includes('الحالة الاجتماعية ناقصة') },
   { key: 'camp', label: '🏕️ المخيم', match: (f, issues) => issues.includes('المخيم ناقص') },

@@ -248,7 +248,10 @@ export function checkFamilyIssues(f, members) {
   const marital = (f.head_marital || '').trim();
   if (marital === 'متزوج' || marital === 'متزوجة') {
     const hasSpouse = mems.some((m) => m.relation === 'زوجة' || m.relation === 'زوج');
-    if (!hasSpouse) issues.push('بيانات الزوجة ناقصة');
+    // كان النص ثابتاً دائماً "بيانات الزوجة ناقصة" حتى لو رب الأسرة أنثى
+    // (فيكون الناقص فعلياً هو "الزوج" لا "الزوجة") -- صار يعتمد على جنس
+    // رب الأسرة الفعلي.
+    if (!hasSpouse) issues.push(f.head_gender === 'أنثى' ? 'بيانات الزوج ناقصة' : 'بيانات الزوجة ناقصة');
   }
 
   return issues;

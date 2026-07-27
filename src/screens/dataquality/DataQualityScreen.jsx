@@ -31,7 +31,7 @@ const DATA_TYPE_OPTIONS = [
   { key: 'phone1', label: '📱 رقم الجوال', match: (f, issues) => issues.includes('رقم الجوال ناقص') },
   { key: 'dob', label: '🎂 تاريخ الميلاد (رب الأسرة أو أي فرد)', match: null },
   { key: 'marital', label: '💍 الحالة الاجتماعية', match: (f, issues) => issues.includes('الحالة الاجتماعية ناقصة') },
-  { key: 'spouse', label: '👰 بيانات الزوجة (لمتزوج)', match: (f, issues) => issues.includes('بيانات الزوجة ناقصة') },
+  { key: 'spouse', label: '👰 بيانات الزوج/الزوجة (لمتزوج)', match: (f, issues) => issues.includes('بيانات الزوجة ناقصة') || issues.includes('بيانات الزوج ناقصة') },
   { key: 'dup_id', label: '🔁 هوية مكررة', match: null },
   { key: 'dup_phone', label: '📞 جوال مكرر', match: null },
 ];

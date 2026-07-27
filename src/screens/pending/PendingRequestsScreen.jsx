@@ -205,6 +205,11 @@ export default function PendingRequestsScreen() {
             {Object.entries(req.changes.fields || {}).map(([k, v]) => (
               <Text key={k} style={styles.detailText}>• {FIELD_LABEL[k] || k}: {v}</Text>
             ))}
+            {!!req.changes.spouse_name && (
+              <Text style={styles.detailText}>
+                • إضافة فرد جديد ({req.changes.spouse_relation}): {req.changes.spouse_name}
+              </Text>
+            )}
           </View>
         )}
 

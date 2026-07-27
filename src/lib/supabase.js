@@ -887,10 +887,21 @@ export const approveRequest = async (req, reviewer) => {
       await supabase.from('family_members').delete().eq('family_id', family_id);
       await supabase.from('families').delete().eq('id', family_id);
     } else if (action === 'portal_request' && req.changes?.type === 'missing_data') {
-      // استكمال بيانات ناقصة عبر بوابة الأسرة -- الحقول محدَّدة ومُتحقَّق
-      // منها مسبقاً (phone1/head_dob/head_marital فقط)، تُطبَّق مباشرة
-      // على الأسرة بضغطة الموافقة الواحدة بدل ما المندوب يعيد كتابتها يدوياً
-      await supabase.from('families').update(req.changes.fields).eq('id', family_id);
+      // استكمال بيانات ناقصة عبر بوابة الأسرة -- الحقول الحقيقية بجدول
+      // families تُطبَّق مباشرة بضغطة الموافقة الواحدة. اسم الزوج/الزوجة
+      // (لو موجود) لا يقابل عمود بجدول families -- يُنشأ كفرد جديد
+      // بجدول family_members بدل ذلك (بيصير قابلاً للتعديل الكامل لاحقاً
+      // من شاشة تعديل الأسرة زي أي فرد تاني).
+      if (req.changes.fields && Object.keys(req.changes.fields).length) {
+        await supabase.from('families').update(req.changes.fields).eq('id', family_id);
+      }
+      if (req.changes.spouse_name && req.changes.spouse_relation) {
+        await supabase.from('family_members').insert([{
+          family_id,
+          name: req.changes.spouse_name,
+          relation: req.changes.spouse_relation,
+        }]);
+      }
     } else if (action === 'camp_insert') {
       await supabase.from('camps').insert(new_data);
     } else if (action === 'camp_update') {

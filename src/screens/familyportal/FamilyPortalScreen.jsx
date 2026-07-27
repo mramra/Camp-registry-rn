@@ -93,11 +93,20 @@ export default function FamilyPortalScreen({ navigation }) {
   // حقول محدَّدة وآمنة يقدر رب الأسرة يستكملها بنفسه (بدون المساس بحقول
   // الهوية نفسها -- اسم/رقم هوية رب الأسرة تبقى موثوقة من مصدرها الأصلي
   // فقط، ما تُستكمل عبر البوابة لتفادي انتحال هوية)
+  const isMarried = (family?.head_marital || '').trim() === 'متزوج' || (family?.head_marital || '').trim() === 'متزوجة';
+  const hasSpouseMember = (members || []).some((m) => m.relation === 'زوجة' || m.relation === 'زوج');
+  const spouseRelation = family?.head_gender === 'ذكر' ? 'زوجة' : 'زوج';
+
   const missingFieldDefs = family
     ? [
         !family.phone1?.trim() && { key: 'phone1', label: '📱 رقم الجوال', kind: 'phone' },
         !family.head_dob && { key: 'head_dob', label: '📅 تاريخ الميلاد (YYYY-MM-DD)', kind: 'date' },
         !family.head_marital?.trim() && { key: 'head_marital', label: '💍 الحالة الاجتماعية', kind: 'marital' },
+        isMarried && !hasSpouseMember && {
+          key: 'spouse_name',
+          label: spouseRelation === 'زوجة' ? '👰 اسم الزوجة' : '🤵 اسم الزوج',
+          kind: 'text',
+        },
         !family.address?.trim() && { key: 'address', label: '🏠 السكن الحالي (وصف)', kind: 'text' },
         !family.original_address?.trim() && { key: 'original_address', label: '🗺️ المحافظة الأصلية', kind: 'region' },
         !family.governorate_current?.trim() && { key: 'governorate_current', label: '📍 محافظة السكن الحالي', kind: 'region' },
@@ -147,7 +156,7 @@ export default function FamilyPortalScreen({ navigation }) {
     setMissingError('');
     try {
       const fields = {};
-      filled.forEach((d) => { fields[d.key] = missingValues[d.key].trim(); });
+      filled.filter((d) => d.key !== 'spouse_name').forEach((d) => { fields[d.key] = missingValues[d.key].trim(); });
       // نرسل مقدمة الواتساب/نوع المحفظة دايماً لما يكون الحقل أصلاً
       // معروض كناقص بهالشاشة -- حتى لو "بدون" (إجابة صريحة، مو نقص).
       // الفحوصات فوق ضمنت إنه لو اختيار حقيقي، فرقمه المرافق موجود
@@ -160,7 +169,13 @@ export default function FamilyPortalScreen({ navigation }) {
         fields.wallet_type = walletTypeSel;
         if (walletTypeSel !== 'بدون') fields.wallet_phone = walletPhoneVal;
       }
-      await callFamilyPortalAPI('submitMissingData', { nationalId, phone, familyId: family.id, fields });
+      // اسم الزوج/الزوجة لا يقابل عمود بجدول families (بيصير فرداً جديداً
+      // بجدول family_members عند الموافقة) -- يُرسل منفصلاً عن fields.
+      const spouseName = (missingValues.spouse_name || '').trim();
+      await callFamilyPortalAPI('submitMissingData', {
+        nationalId, phone, familyId: family.id, fields,
+        ...(spouseName ? { spouseName, spouseRelation } : {}),
+      });
       setMissingSent(true);
       setMissingValues({});
     } catch (e) {

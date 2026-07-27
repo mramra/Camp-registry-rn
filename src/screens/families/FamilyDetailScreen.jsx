@@ -14,7 +14,7 @@ import * as Clipboard from 'expo-clipboard';
 import NetInfo from '@react-native-community/netinfo';
 import { useAuth } from '../../context/AuthContext';
 import { fetchFamilyById, fetchFamilyMembers, exitFamily, fetchCamps, fetchFamilies, fetchFamilyAidHistory } from '../../lib/supabase';
-import { calcAge, checkFamilyIssues, getMemberIcon, arrLabel, getVulnerabilityScore, VULNERABILITY_TIER_LABELS, formatWhatsappNumber } from '../../lib/helpers';
+import { calcAge, checkFamilyIssues, hasMissingDob, getMemberIcon, arrLabel, getVulnerabilityScore, VULNERABILITY_TIER_LABELS, formatWhatsappNumber } from '../../lib/helpers';
 import { formatDate, formatDateTime } from '../../lib/utils';
 import { showError, showSuccess } from '../../utils/toast';
 import EmptyState from '../../components/ui/EmptyState';
@@ -259,6 +259,17 @@ export default function FamilyDetailScreen() {
   const issues = checkFamilyIssues(family, members);
   const age = calcAge(family.head_dob);
 
+  const missingParts = [...issues, ...(hasMissingDob(family, members) ? ['تاريخ ميلاد ناقص'] : [])];
+  const handleSendMissingSms = () => {
+    if (!missingParts.length) return showSuccess('لا توجد بيانات ناقصة بهذه الأسرة 👍');
+    navigation.navigate('SMS', {
+      preselectFamilyIds: [familyId],
+      missingSummaries: { [familyId]: missingParts.join('، ') },
+      presetMessage:
+        'السيد/ة {اسم}، لاحظنا أن بياناتكم بالنظام ناقصة بالتالي: {نواقص}. برجاء استكمالها عبر بوابة الأسرة بالتطبيق أو التواصل معنا. شكراً لتعاونكم.',
+    });
+  };
+
   const copyField = async (label, value) => {
     await Clipboard.setStringAsync(String(value));
     showSuccess(`📋 تم نسخ "${label}"`);
@@ -462,6 +473,12 @@ export default function FamilyDetailScreen() {
           </Pressable>
         )}
 
+        {missingParts.length > 0 && (
+          <Pressable style={styles.missingSmsBtn} onPress={handleSendMissingSms}>
+            <Text style={styles.missingSmsBtnText}>📩 إرسال البيانات الناقصة</Text>
+          </Pressable>
+        )}
+
         <View style={styles.actionsRow}>
           <Pressable
             style={styles.qrBtn}
@@ -615,6 +632,11 @@ const styles = StyleSheet.create({
     paddingVertical: 13, borderRadius: 12, marginBottom: 8,
   },
   whatsappBtnText: { color: '#25D366', fontWeight: '900', fontSize: 13, textAlign: 'center' },
+  missingSmsBtn: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1.5, borderColor: colors.accent,
+    paddingVertical: 13, borderRadius: 12, marginBottom: 8,
+  },
+  missingSmsBtnText: { color: colors.accent, fontWeight: '900', fontSize: 13, textAlign: 'center' },
   qrBtn: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, borderRadius: 12 },
   qrBtnText: { color: colors.white, fontWeight: '900', fontSize: 13, textAlign: 'center' },
   editBtn: { flex: 1, backgroundColor: colors.accent, paddingVertical: 12, borderRadius: 12 },

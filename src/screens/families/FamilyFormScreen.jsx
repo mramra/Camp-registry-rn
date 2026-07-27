@@ -21,7 +21,7 @@ import {
   logFamilyActivity,
   supabase,
 } from '../../lib/supabase';
-import { luhnCheck, validateName, validateDob, isExemptFromApproval, diffFamilyFields } from '../../lib/helpers';
+import { luhnCheck, validateName, validateDob, isExemptFromApproval, diffFamilyFields, checkFamilyIssues, hasMissingDob } from '../../lib/helpers';
 
 // رقم جوال فلسطيني صحيح: 10 خانات، يبدأ بـ059 أو 056 -- يمنع أخطاء الإدخال
 // العشوائية برقم المحفظة/الواتساب (طلب مباشر)
@@ -82,6 +82,7 @@ export default function FamilyFormScreen() {
   const [existingFamily, setExistingFamily] = useState(null);
   const [loading, setLoading] = useState(!!familyId);
   const [saving, setSaving] = useState(false);
+  const [sendingMissingSms, setSendingMissingSms] = useState(false);
   const [errors, setErrors] = useState({});
 
   const [headName, setHeadName] = useState('');
@@ -351,6 +352,41 @@ export default function FamilyFormScreen() {
     return Object.keys(e).length === 0;
   };
 
+  // يجلب بيانات الأسرة/الأفراد "الرسمية" (المحفوظة فعلاً بقاعدة البيانات،
+  // مو مسودة النموذج الحالية غير المحفوظة)، يحسب نواقصها بنفس منطق صفحة
+  // "نواقص وتكررات" بالضبط (checkFamilyIssues + hasMissingDob)، وينقل
+  // لشاشة SMS برسالة جاهزة {اسم}/{نواقص} لهذه الأسرة فقط.
+  const handleSendMissingSms = async () => {
+    if (!familyId) return;
+    setSendingMissingSms(true);
+    try {
+      const [freshFamily, freshMembers] = await Promise.all([
+        fetchFamilyById(familyId),
+        fetchFamilyMembers([familyId]),
+      ]);
+      if (!freshFamily) {
+        showError('تعذّر جلب بيانات الأسرة');
+        return;
+      }
+      const parts = [...checkFamilyIssues(freshFamily, freshMembers)];
+      if (hasMissingDob(freshFamily, freshMembers)) parts.push('تاريخ ميلاد ناقص');
+      if (!parts.length) {
+        showSuccess('لا توجد بيانات ناقصة بهذه الأسرة 👍');
+        return;
+      }
+      navigation.navigate('SMS', {
+        preselectFamilyIds: [familyId],
+        missingSummaries: { [familyId]: parts.join('، ') },
+        presetMessage:
+          'السيد/ة {اسم}، لاحظنا أن بياناتكم بالنظام ناقصة بالتالي: {نواقص}. برجاء استكمالها عبر بوابة الأسرة بالتطبيق أو التواصل معنا. شكراً لتعاونكم.',
+      });
+    } catch (e) {
+      showError('تعذّر تجهيز الرسالة: ' + e.message);
+    } finally {
+      setSendingMissingSms(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!validate()) return;
 
@@ -575,6 +611,17 @@ export default function FamilyFormScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
+        {!!familyId && (
+          <Pressable
+            style={[styles.missingSmsBtn, sendingMissingSms && styles.disabled]}
+            onPress={handleSendMissingSms}
+            disabled={sendingMissingSms}
+          >
+            <Text style={styles.missingSmsBtnText}>
+              {sendingMissingSms ? '⏳ جارٍ التحضير...' : '📩 إرسال البيانات الناقصة'}
+            </Text>
+          </Pressable>
+        )}
         <FormSection title="👤 بيانات رب الأسرة">
           <FormInput
             label="اسم رب الأسرة *"
@@ -886,6 +933,12 @@ export default function FamilyFormScreen() {
 }
 
 const styles = StyleSheet.create({
+  missingSmsBtn: {
+    backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1.5, borderColor: colors.accent,
+    borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: 14,
+  },
+  missingSmsBtnText: { color: colors.accent, fontWeight: '900', fontSize: 13 },
+  disabled: { opacity: 0.6 },
   dupWarnBox: {
     backgroundColor: 'rgba(239,68,68,0.12)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)',
     borderRadius: 10, padding: 10, marginTop: -6, marginBottom: 12,

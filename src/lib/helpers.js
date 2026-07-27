@@ -241,24 +241,15 @@ export function checkFamilyIssues(f, members) {
   // الأسرة الأساسية بأي شاشة (المصدر الوحيد لهذا المفهوم بكامل التطبيق).
   if (!f.head_dob) issues.push('تاريخ الميلاد ناقص');
   if (!f.head_marital?.trim()) issues.push('الحالة الاجتماعية ناقصة');
-  if (!f.camp_id) issues.push('المخيم ناقص');
-  if (!f.original_address?.trim()) issues.push('المحافظة الأصلية ناقصة');
-  if (!f.governorate_current?.trim()) issues.push('محافظة السكن الحالي ناقصة');
+  // المخيم/المحافظة الأصلية/محافظة السكن الحالي/اسم الفرد الفارغ أو
+  // القصير اعتُبروا "بيانات استكمالية" (غير أساسية) بناءً على طلب
+  // صريح -- ما عادوا يُحسبوا ضمن نواقص الأسرة الأساسية بأي شاشة.
 
   const marital = (f.head_marital || '').trim();
   if (marital === 'متزوج' || marital === 'متزوجة') {
     const hasSpouse = mems.some((m) => m.relation === 'زوجة' || m.relation === 'زوج');
     if (!hasSpouse) issues.push('بيانات الزوجة ناقصة');
   }
-
-  mems.forEach((m) => {
-    const name = (m.name || '').trim();
-    if (!name) {
-      issues.push('اسم فرد فارغ');
-      return;
-    }
-    if (name.split(/\s+/).filter(Boolean).length < 3) issues.push(`اسم "${name}" قصير جداً`);
-  });
 
   return issues;
 }

@@ -31,11 +31,7 @@ const DATA_TYPE_OPTIONS = [
   { key: 'phone1', label: '📱 رقم الجوال', match: (f, issues) => issues.includes('رقم الجوال ناقص') },
   { key: 'dob', label: '🎂 تاريخ الميلاد (رب الأسرة أو أي فرد)', match: null },
   { key: 'marital', label: '💍 الحالة الاجتماعية', match: (f, issues) => issues.includes('الحالة الاجتماعية ناقصة') },
-  { key: 'camp', label: '🏕️ المخيم', match: (f, issues) => issues.includes('المخيم ناقص') },
-  { key: 'original_address', label: '🗺️ المحافظة الأصلية', match: (f, issues) => issues.includes('المحافظة الأصلية ناقصة') },
-  { key: 'governorate_current', label: '📍 محافظة السكن الحالي', match: (f, issues) => issues.includes('محافظة السكن الحالي ناقصة') },
   { key: 'spouse', label: '👰 بيانات الزوجة (لمتزوج)', match: (f, issues) => issues.includes('بيانات الزوجة ناقصة') },
-  { key: 'member_name', label: '👥 اسم فرد فارغ/قصير', match: (f, issues) => issues.some((i) => i === 'اسم فرد فارغ' || i.includes('قصير جداً')) },
   { key: 'dup_id', label: '🔁 هوية مكررة', match: null },
   { key: 'dup_phone', label: '📞 جوال مكرر', match: null },
 ];

@@ -7,13 +7,18 @@ import colors from '../../theme/colors';
  * (اختيار مخيم، فرز، إلخ) ولنماذج الإضافة/التعديل. مقابل مكوّن Modal
  * الأصلي بالويب.
  *
- * KeyboardAvoidingView + keyboardShouldPersistTaps مضافان عمداً لتفادي
- * حجب لوحة المفاتيح لزر الحفظ بالنماذج الطويلة. ملاحظة مهمة: behavior
- * 'height' بأندرويد جُرِّب أولاً لكنه عطّل التمرير بالكامل (حتى بدون
- * فتح الكيبورد إطلاقاً) -- تعارض معروف بين flex:1 وتعديل height
- * القسري لـKeyboardAvoidingView داخل Modal بأندرويد. الحل الآمن: بدون
- * behavior إطلاقاً بأندرويد (نعتمد بدلها على padding سفلي سخي
- * بالـScrollView + keyboardShouldPersistTaps)، وpadding فقط بـiOS.
+ * KeyboardAvoidingView + keyboardShouldPersistTaps مضافان لتفادي حجب
+ * لوحة المفاتيح لزر الحفظ بالنماذج الطويلة (behavior='height' بأندرويد
+ * جُرِّب وعطّل التمرير بالكامل حتى بدون كيبورد -- تُرك بدون behavior
+ * بأندرويد، padding فقط بـiOS).
+ *
+ * السبب الجذري الحقيقي لعطل التمرير (اكتُشف لاحقاً): الـScrollView ما
+ * كان عنده flexShrink:1 -- بدونها، RN Yoga افتراضياً flexShrink=0
+ * (عكس الويب)، فالـScrollView ياخذ ارتفاع محتواه الكامل بدل ما ينحصر
+ * بمساحة sheet المتاحة (maxHeight 75%)، فيصير بلا "مدى تمرير" داخلي
+ * إطلاقاً -- السحب ما بيحرّك شي لأنه أصلاً ما فيه شي يتحرّك. بالإضافة:
+ * paddingBottom كان على style (الحاوية الخارجية) بدل contentContainerStyle
+ * (المحتوى القابل للتمرير الفعلي) فما كان له أي أثر عملي.
  */
 export default function BottomSheetModal({ visible, onClose, title, children }) {
   return (
@@ -30,7 +35,12 @@ export default function BottomSheetModal({ visible, onClose, title, children }) 
                 <Text style={styles.closeText}>✕ إغلاق</Text>
               </Pressable>
             </View>
-            <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              style={styles.body}
+              contentContainerStyle={styles.bodyContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
               {children}
             </ScrollView>
           </Pressable>
@@ -73,5 +83,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   closeText: { color: colors.muted, fontSize: 11 },
-  body: { paddingHorizontal: 16, paddingBottom: 140 },
+  body: { paddingHorizontal: 16, flexShrink: 1 },
+  bodyContent: { paddingBottom: 48 },
 });

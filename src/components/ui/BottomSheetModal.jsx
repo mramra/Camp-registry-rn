@@ -7,20 +7,20 @@ import colors from '../../theme/colors';
  * (اختيار مخيم، فرز، إلخ) ولنماذج الإضافة/التعديل. مقابل مكوّن Modal
  * الأصلي بالويب.
  *
- * KeyboardAvoidingView + keyboardShouldPersistTaps مضافان عمداً: بدونهما
- * لوحة المفاتيح بأندرويد (Modal له سلوك نافذة منفصل عن باقي الشاشة، ما
- * يرث إعدادات windowSoftInputMode للتطبيق تلقائياً) كانت تحجب زر
- * الحفظ/الإضافة بأي نموذج طويل نسبياً (أكثر من 5-6 حقول)، فيبدو للمستخدم
- * وكأن الزر "مش ظاهر" أو "ما بيوصلّه" رغم إنه موجود فعلياً تحت لوحة
- * المفاتيح مباشرة. إصلاح مركزي واحد هنا يغطي كل الشاشات اللي تستخدم
- * هذا المكوّن دفعة واحدة.
+ * KeyboardAvoidingView + keyboardShouldPersistTaps مضافان عمداً لتفادي
+ * حجب لوحة المفاتيح لزر الحفظ بالنماذج الطويلة. ملاحظة مهمة: behavior
+ * 'height' بأندرويد جُرِّب أولاً لكنه عطّل التمرير بالكامل (حتى بدون
+ * فتح الكيبورد إطلاقاً) -- تعارض معروف بين flex:1 وتعديل height
+ * القسري لـKeyboardAvoidingView داخل Modal بأندرويد. الحل الآمن: بدون
+ * behavior إطلاقاً بأندرويد (نعتمد بدلها على padding سفلي سخي
+ * بالـScrollView + keyboardShouldPersistTaps)، وpadding فقط بـiOS.
  */
 export default function BottomSheetModal({ visible, onClose, title, children }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation?.()}>
@@ -54,6 +54,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     maxHeight: '75%',
     paddingTop: 16,
+    flexShrink: 1,
   },
   header: {
     flexDirection: 'row',
@@ -72,5 +73,5 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   closeText: { color: colors.muted, fontSize: 11 },
-  body: { paddingHorizontal: 16, paddingBottom: 20 },
+  body: { paddingHorizontal: 16, paddingBottom: 140 },
 });

@@ -104,12 +104,17 @@ export default function ExportScreen() {
       const visibleCamps = getVisibleCamps(allCamps);
 
       // تحميل كل الأسر والأفراد ضمن النطاق المسموح — لكل من التصدير السريع والمخصص
+      // فلترة exit_date إجبارية هون بالضبط زي fetchFamilies() المستخدمة بكل
+      // شاشة تانية بالتطبيق (Dashboard/FamiliesList/إلخ) -- كانت غايبة هون
+      // سابقاً، فكانت شاشة التصدير الوحيدة اللي تحسب أسراً "خرجت من المخيم"
+      // (exit_date مسجَّل) ضمن العدد، فيطلع رقم أكبر من الحقيقي بكل تصدير.
       const { data: fams } = await withTimeout(
         supabase
           .from('families')
           .select('*, family_members(*)')
           .eq('org_id', orgId)
-          .eq('_deleted', false),
+          .eq('_deleted', false)
+          .is('exit_date', null),
         12000,
         'انتهت مهلة تحميل البيانات'
       );

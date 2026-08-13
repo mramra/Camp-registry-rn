@@ -3,6 +3,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import * as Crypto from 'expo-crypto';
 
 // أسماء الأشهر العربية — مستخدمة بدل Intl.DateTimeFormat عمداً، لأن Hermes
 // على أندرويد له نفس فئة الأخطاء الموثّقة (facebook/hermes#867, #602) مع
@@ -52,11 +53,10 @@ export function generateId() {
   })
 }
 
-export function randomPassword(length = 10) {
+export async function randomPassword(length = 10) {
   const chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefghjkmnpqrstwxyz23456789'
-  return Array.from({ length }, () =>
-    chars[Math.floor(Math.random() * chars.length)]
-  ).join('')
+  const bytes = await Crypto.getRandomBytesAsync(length);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('')
 }
 
 // ════════════════════════════════════════════════════════════

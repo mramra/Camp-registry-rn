@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import colors from '../../theme/colors';
+import { PALESTINIAN_PHONE_RE } from '../../lib/helpers';
 
 const FUNCTION_URL = 'https://ojclpkenecicujkqhhlu.supabase.co/functions/v1/org-signup';
 const ANON_KEY = 'sb_publishable_d6q8hoDDcohuZFHk3jxI7g_IBWWCmNu';
-const PALESTINIAN_PHONE_RE = /^(059|056)\d{7}$/;
 
 /** نفس فحص الاسم الرباعي والهوية المستخدم بباقي التطبيق -- تحقق فوري
  * بالواجهة، والتحقق الحقيقي (الملزِم أمنياً) يعاد بالكامل بالسيرفر. */

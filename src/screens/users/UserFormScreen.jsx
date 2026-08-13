@@ -144,7 +144,7 @@ export default function UserFormScreen() {
         navigation.goBack();
       } else {
         // إنشاء مستخدم جديد — يستدعي Edge Function (ينشئ حساب Auth فعلي)
-        const pass = randomPassword();
+        const pass = await randomPassword();
         const payload = {
           email: `${nationalId.trim()}@c.co`,
           password: pass,

@@ -668,3 +668,6 @@ export function formatWhatsappNumber(prefix, phone) {
   if (!localDigits) return null;
   return `+${p}${localDigits}`;
 }
+
+// رقم الجوال الفلسطيني: يبدأ بـ059 أو 056 ويكون 10 خانات بالمجموع
+export const PALESTINIAN_PHONE_RE = /^(059|056)\d{7}$/;

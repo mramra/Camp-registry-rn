@@ -7,6 +7,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { showToast } from './src/utils/toast';
 import { ensureNotificationPermission } from './src/lib/notifications';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 // فحص صريح عن تحديثات — بدل الاعتماد على السلوك الافتراضي الصامت
 // (يحمّل التحديث بالخلفية لكن ما يطبّقه إلا بعد إعادة فتح ثانية).
@@ -77,9 +78,11 @@ export default function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <StatusBar style="light" backgroundColor="#0d1117" />
-      <RootNavigator />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <StatusBar style="light" backgroundColor="#0d1117" />
+        <RootNavigator />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

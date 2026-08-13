@@ -21,11 +21,7 @@ import {
   logFamilyActivity,
   supabase,
 } from '../../lib/supabase';
-import { luhnCheck, validateName, validateDob, isExemptFromApproval, diffFamilyFields } from '../../lib/helpers';
-
-// رقم جوال فلسطيني صحيح: 10 خانات، يبدأ بـ059 أو 056 -- يمنع أخطاء الإدخال
-// العشوائية برقم المحفظة/الواتساب (طلب مباشر)
-const PALESTINIAN_PHONE_RE = /^(059|056)\d{7}$/;
+import { luhnCheck, validateName, validateDob, isExemptFromApproval, diffFamilyFields, PALESTINIAN_PHONE_RE } from '../../lib/helpers';
 import {
   RELATION_BY_GENDER,
   ALL_RELATIONS,

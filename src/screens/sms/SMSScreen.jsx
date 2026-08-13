@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   Pressable,
-  FlatList,
   ScrollView,
   Linking,
   Platform,

@@ -189,7 +189,7 @@ export default function UsersListScreen() {
         text: 'إعادة تعيين',
         onPress: async () => {
           try {
-            const newPass = randomPassword();
+            const newPass = await randomPassword();
             await callAdminAPI('reset_password', { user_id: u.user_id, new_password: newPass });
             Alert.alert('✅ تم', `كلمة المرور الجديدة:\n${newPass}\n\nشاركها مع المستخدم الآن.`);
           } catch (e) {

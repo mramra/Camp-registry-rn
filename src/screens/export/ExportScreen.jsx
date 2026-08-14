@@ -9,7 +9,7 @@ import { useDataScope } from '../../lib/useDataScope';
 import { hasPermission } from '../../lib/permissions';
 import { exportXLSX, exportXLSXMultiSheetWithBanners, pickAndParseXLSX, exportCampTemplateReport } from '../../lib/excelIO';
 import { calcAge, isAgeInRange, getCampDelegateInfo, normalizeHealthValue, naturalCompare, checkFamilyIssues } from '../../lib/helpers';
-import { FAM_COLS, MEM_COLS, findWife, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
+import { FAM_COLS, MEM_COLS, findSpouse, resolveFamilyColumn, resolveMemberColumn } from '../../lib/exportColumns';
 import PageHeader from '../../components/ui/PageHeader';
 import CampDelegatePanel from '../../components/ui/CampDelegatePanel';
 import SelectField from '../../components/ui/SelectField';
@@ -160,7 +160,7 @@ export default function ExportScreen() {
       const sorted = [...data].sort((a, b) => naturalCompare(a.tent, b.tent));
       const campInfo = getCampInfo(filterCamp);
       const rows = sorted.map((f) => {
-        const wife = findWife(f.family_members);
+        const wife = findSpouse(f.family_members, f.head_gender);
         const row = {};
         selectedCols.forEach((col) => {
           row[col.label] = resolveFamilyColumn(col.key, f, { membersCount: (f.family_members?.length || 0) + 1, wife });
@@ -401,7 +401,7 @@ export default function ExportScreen() {
   const wifeMap = useMemo(() => {
     const m = {};
     allFamilies.forEach((f) => {
-      const wife = findWife(f.family_members);
+      const wife = findSpouse(f.family_members, f.head_gender);
       if (wife) m[f.id] = wife;
     });
     return m;
@@ -577,7 +577,7 @@ export default function ExportScreen() {
       const sorted = [...fams].sort((a, b) => naturalCompare(a.tent, b.tent));
       const dataRows = sorted.map((f) => {
         const members = f.family_members || [];
-        const wife = findWife(members);
+        const wife = findSpouse(members, f.head_gender);
         const ages = ageBuckets(members.map((m) => calcAge(m.dob)));
         const chronicCount = healthCount(f.head_chronic_diseases) + members.reduce((s, m) => s + healthCount(m.chronic_diseases), 0);
         const disabilityCount = healthCount(f.head_disabilities) + members.reduce((s, m) => s + healthCount(m.disabilities), 0);

@@ -9,8 +9,8 @@ import { calcAge, normalizeHealthValue } from './helpers';
 export const FAM_COLS = [
   { key: 'head_name', label: 'اسم رب الأسرة', def: true },
   { key: 'head_id', label: 'رقم هوية رب الأسرة', def: true },
-  { key: 'wife_name', label: 'اسم الزوجة', def: true },
-  { key: 'wife_id', label: 'هوية الزوجة', def: true },
+  { key: 'wife_name', label: 'اسم زوج/ه', def: true },
+  { key: 'wife_id', label: 'هوية زوج/ه', def: true },
   { key: 'phone1', label: 'رقم الجوال', def: true },
   { key: 'phone2', label: 'رقم واتساب', def: false },
   { key: 'wallet_type', label: 'المحفظة الإلكترونية', def: false },
@@ -54,12 +54,20 @@ export const MEM_COLS = [
   { key: 'family_size', label: 'عدد أفراد الأسرة', def: false },
 ];
 
-/** يجد زوجة الأسرة من قائمة أفرادها (relation = زوجة/زوجه) */
+/** يجد شريك حياة رب الأسرة من قائمة أفرادها -- لو رب الأسرة أنثى (متزوجة)
+ * يبحث عن صلة "زوج"، وإلا يبحث عن "زوجة"/"زوجه". هذا يغطي حالة كون رب
+ * الأسرة امرأة (زوجها مسجَّل بصلة "زوج" لا "زوجة"). */
+export function findSpouse(members, headGender) {
+  const relations = headGender === 'أنثى' ? ['زوج'] : ['زوجة', 'زوجه'];
+  return (members || []).find((m) => relations.includes(m.relation || ''));
+}
+
+/** @deprecated استخدم findSpouse -- أُبقيت للتوافق، تبحث عن "زوجة" فقط بغض النظر عن جنس رب الأسرة */
 export function findWife(members) {
   return (members || []).find((m) => ['زوجة', 'زوجه'].includes(m.relation || ''));
 }
 
-/** يُرجع قيمة عمود رب الأسرة (يغطي كل مفاتيح FAM_COLS بما فيها الزوجة) */
+/** يُرجع قيمة عمود رب الأسرة (يغطي كل مفاتيح FAM_COLS بما فيها الزوج/ه) */
 export function resolveFamilyColumn(key, family, { campName, membersCount, wife } = {}) {
   switch (key) {
     case 'head_name': return family.head_name || '';

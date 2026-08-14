@@ -1,0 +1,26 @@
+name: Publish OTA update (preview)
+
+# يشتغل فقط عند push لـ main، وبس لو التغيير مسّ ملفات فعلية بالكود
+# (JS/JSX/JSON/assets) -- مش لو كان التغيير مجرد README أو ملاحظات،
+# عشان نقلل استهلاك دقائق CI/CD المجانية قد الإمكان.
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'src/**'
+      - 'App.js'
+      - 'app.json'
+      - 'package.json'
+      - 'plugins/**'
+
+jobs:
+  publish_preview_update:
+    name: Publish preview update
+    type: update
+    params:
+      # ── مهم جداً: هذا السطر هو سبب العطل السابق ──
+      # بدون تحديده صراحة، يفترض EAS الافتراضي "production"
+      # وتختفي التحديثات عن أجهزة preview بصمت بدون أي خطأ ظاهر.
+      environment: preview
+      branch: preview
+      message: 'تحديث تلقائي (OTA) بعد push على main'

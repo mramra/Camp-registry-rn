@@ -17,10 +17,12 @@ jobs:
   publish_preview_update:
     name: Publish preview update
     type: update
+    # ── مهم جداً: هذا السطر هو سبب العطل السابق ──
+    # بدون تحديده صراحة، يفترض EAS الافتراضي "production"
+    # وتختفي التحديثات عن أجهزة preview بصمت بدون أي خطأ ظاهر.
+    # ملاحظة: لازم يكون بنفس مستوى "type" -- مش جوا "params" (كان هذا
+    # سبب فشل التشغيل الأول بعد 18 ثانية فقط، خطأ صياغة/تحقق).
+    environment: preview
     params:
-      # ── مهم جداً: هذا السطر هو سبب العطل السابق ──
-      # بدون تحديده صراحة، يفترض EAS الافتراضي "production"
-      # وتختفي التحديثات عن أجهزة preview بصمت بدون أي خطأ ظاهر.
-      environment: preview
       branch: preview
       message: 'تحديث تلقائي (OTA) بعد push على main'

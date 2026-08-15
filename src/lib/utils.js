@@ -3,7 +3,6 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import * as Crypto from 'expo-crypto';
 
 // أسماء الأشهر العربية — مستخدمة بدل Intl.DateTimeFormat عمداً، لأن Hermes
 // على أندرويد له نفس فئة الأخطاء الموثّقة (facebook/hermes#867, #602) مع
@@ -53,10 +52,22 @@ export function generateId() {
   })
 }
 
+/**
+ * ── ملاحظة حرجة ──
+ * كانت هذي الدالة تستخدم expo-crypto (getRandomBytesAsync) لتوليد كلمات
+ * مرور آمنة تشفيرياً. تم التراجع فوراً لأن expo-crypto حزمة native جديدة
+ * كلياً لم تكن مبنية أصلاً داخل الـAPK المثبّت عند المستخدمين -- OTA
+ * ينقل JavaScript فقط ولا يقدر يضيف موديولات native لبناء موجود مسبقاً.
+ * النتيجة كانت انهيار كامل للتطبيق عند الفتح (قبل شاشة الدخول) لأن هذا
+ * الملف يُستورد بشكل متسلسل من كل الشاشات عبر RootNavigator.
+ * TODO: بعد أول بناء APK جديد (eas build) يتضمن expo-crypto فعلياً
+ * كموديول native مُجمَّع، أعد تفعيل getRandomBytesAsync هنا بأمان.
+ */
 export async function randomPassword(length = 10) {
   const chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefghjkmnpqrstwxyz23456789'
-  const bytes = await Crypto.getRandomBytesAsync(length);
-  return Array.from(bytes, (b) => chars[b % chars.length]).join('')
+  return Array.from({ length }, () =>
+    chars[Math.floor(Math.random() * chars.length)]
+  ).join('')
 }
 
 // ════════════════════════════════════════════════════════════

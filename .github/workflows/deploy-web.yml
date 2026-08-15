@@ -1,0 +1,41 @@
+name: Deploy web preview to GitHub Pages
+
+# يشتغل عند كل push لـ main -- بناء نسخة الويب (expo export) ونشرها
+# على فرع gh-pages مباشرة. رخيص جداً بدقائق GitHub Actions (مجاني
+# بحدود سخية جداً لمستودع عام)، عكس نشر OTA على EAS.
+on:
+  push:
+    branches: ['main']
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web export
+        run: npx expo export --platform web
+
+      # مهم جداً: بدون هذا الملف، GitHub Pages بيطبّق Jekyll افتراضياً
+      # وبيتجاهل أي مجلد اسمه يبدأ بـ underscore زي _expo/ -- فيصير كل
+      # شي 404. لازم يُعاد إنشاؤه بكل نشر لأنه داخل dist/ الناتج المؤقت.
+      - name: Prevent Jekyll processing
+        run: touch dist/.nojekyll
+
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
